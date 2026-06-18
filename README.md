@@ -1,14 +1,21 @@
 # OwO Boss Helper
 
-A focused Discord bot that automatically:
+A focused Discord bot that helps with OwO guild-boss fights by generating Neon battle commands and tracking guild-boss timing.
 
-- Reads `owo boss i` and `w boss i` boss-inspect pages.
-- Keeps bosses in OwO's authoritative `1/3`, `2/3`, `3/3` order even when users navigate out of order.
-- Extracts current HP from each individual boss image using bundled pixel templates.
-- Generates a mobile-friendly Neon battle command using inline code.
+## Features
+
+- Automatically reads `owo boss i` and `w boss i`.
+- Keeps bosses in OwO's authoritative `1/3`, `2/3`, `3/3` order.
+- Extracts current HP from each individual boss image using bundled digit templates.
+- Generates a mobile-friendly Neon command using inline code.
 - Tracks the latest active guild-boss status message in each configured server.
-- Checks that message every 15 seconds and announces the five-minute cooldown and ready state after a defeat or escape.
-- Persists the selected cooldown channel and active watcher state across restarts.
+- Checks the latest tracked boss message every **15 seconds**.
+- Announces when a new guild boss appears.
+- Announces the five-minute cooldown after a defeat or escape.
+- Announces when the cooldown ends.
+- Supports both slash commands and the lightweight `H` helper prefix.
+- Persists the selected notification channel and active watcher state across restarts.
+- Writes rotating runtime logs to `logs/bot.log`.
 
 Made by Hassaan.
 
@@ -16,20 +23,13 @@ Made by Hassaan.
 
 Special thanks to **Pencilvester** for sharing the original exact-command parsing logic and the weapon/passive rarity ranges that helped form the foundation of the command generator. The project has since been substantially expanded, adapted, and integrated into this Discord bot.
 
-
 > This is an independent community project. It is not affiliated with Discord, OwO Bot, or NeonUtil.
-
-## Public bot vs. self-hosting
-
-People who only want to use your running bot should receive its Discord installation link. They do not need this source code or your token.
-
-People who clone this repository for learning or self-hosting must create their own Discord application and use their own bot token.
 
 ## Requirements
 
 - Python 3.11 or newer
 - A Discord bot application
-- Message Content Intent enabled for that bot
+- Message Content Intent enabled
 
 ## Setup on Windows
 
@@ -41,17 +41,17 @@ notepad .env
 py bot.py
 ```
 
-Set your private token in `.env`:
+Put your private bot token in `.env`:
 
 ```env
 DISCORD_TOKEN=your_real_bot_token_here
 ```
 
-Never upload `.env`, share your token, or paste it into an issue. If a token is exposed, reset it immediately in the Discord Developer Portal.
+Never upload `.env` or share your token.
 
 ## Discord permissions
 
-The bot needs access to the channels where OwO is used:
+The bot needs:
 
 - View Channels
 - Send Messages
@@ -59,51 +59,76 @@ The bot needs access to the channels where OwO is used:
 - Read Message History
 - Add Reactions
 
-The Discord installation scopes should include:
+Installation scopes:
 
 - `bot`
 - `applications.commands`
 
-Enable **Message Content Intent** in the Discord Developer Portal.
+## Commands
 
-## Slash commands
+### Boss command generator
 
-### `/boss-cooldown-channel`
-
-Selects the channel that receives automatic guild-boss cooldown and ready alerts. The command requires Manage Server permission by default.
-
-### `/boss-cooldown`
-
-Privately displays the current cooldown state.
-
-## Boss command generation
-
-The automatic trigger accepts only these commands after whitespace and capitalization are normalized:
+Run either:
 
 ```text
 owo boss i
-owoboss i
 w boss i
-wboss i
 ```
 
-Open all three OwO pages. The bot reads the visible page counter and always generates the final command in `1/3 → 2/3 → 3/3` order.
+Open all three boss pages. The bot reads the visible page counter and emits the final command in `1/3 → 2/3 → 3/3` order.
 
-The final command is shown with one backtick on each side for easier mobile copying. There is no Change HP button; HP is read automatically from the individual boss images, with a safe default when a value cannot be confirmed.
+### Public cooldown status
 
-## Files that stay private
+```text
+H boss cd
+H boss cooldown
+```
 
-These files are intentionally ignored by Git:
+Whitespace and capitalization are ignored. These commands show one of:
+
+- Active boss and its escape time
+- Running five-minute cooldown
+- Ready state
+
+### Slash commands
+
+```text
+/boss-cooldown-channel
+/boss-cooldown
+```
+
+`/boss-cooldown-channel` selects where automatic new-boss, cooldown, and ready alerts are sent. It requires Manage Server permission by default.
+
+## Logging
+
+Runtime activity is written to:
+
+```text
+logs/bot.log
+```
+
+Logs rotate automatically at 5 MB, with up to five backup files:
+
+```text
+bot.log
+bot.log.1
+bot.log.2
+...
+```
+
+The logs include startup, boss-page captures, HP detection, generated commands, active-boss tracking, cooldown events, alerts, and errors. Tokens and `.env` contents are never logged.
+
+## Private runtime files
+
+These remain local and are ignored by Git:
 
 ```text
 .env
 boss_cooldown_config.json
-prefix_config.json
+logs/
 __pycache__/
 *.pyc
 ```
-
-`boss_cooldown_config.json` is generated locally and stores each server's selected cooldown channel and watcher state. Do not commit it.
 
 ## Project structure
 
@@ -114,26 +139,15 @@ owo-boss-helper-discord-bot/
 ├── cogs/
 │   ├── __init__.py
 │   └── boss_generator.py
+├── logs/                  # created automatically
 ├── .env.example
 ├── .gitignore
 ├── bot.py
+├── CHANGELOG.md
 ├── LICENSE
 ├── README.md
 └── requirements.txt
 ```
-
-## Updating
-
-After testing a change locally:
-
-```bat
-git status
-git add .
-git commit -m "Describe the update"
-git push
-```
-
-Keep `.env` and `boss_cooldown_config.json` only on the host machine.
 
 ## License
 
