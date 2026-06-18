@@ -8,7 +8,7 @@ Generator:
 
 Cooldown tracker:
 - Watches the official OwO Bot across the server.
-- When OwO reports that a guild boss was defeated or escaped, starts a 5-minute cooldown.
+- Reads OwO's outcome timestamp and ends cooldown exactly 5 minutes after it.
 - Sends one cooldown-start message and one ready message in the selected channel using Discord timestamps.
 """
 
@@ -16,7 +16,6 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
-import io
 import json
 import re
 import time
@@ -24,9 +23,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 
-import aiohttp
 import discord
-from PIL import Image
 from discord import app_commands
 from discord.ext import commands
 
@@ -49,11 +46,9 @@ ALLOWED_BOSS_TRIGGERS = {"owobossi", "wbossi"}
 SESSION_TIMEOUT_SECONDS = 180
 BOSS_COOLDOWN_SECONDS = 5 * 60
 OUTCOME_DEDUP_SECONDS = 20
-BOSS_WATCH_INTERVAL_SECONDS = 15
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 COOLDOWN_CONFIG_FILE = PROJECT_ROOT / "boss_cooldown_config.json"
-HP_TEMPLATE_DIR = PROJECT_ROOT / "assets" / "hp_digits"
 
 
 def is_boss_trigger(content: str) -> bool:
@@ -79,30 +74,149 @@ def save_cooldown_config(data: dict[str, dict[str, Any]]) -> None:
     temp_file.replace(COOLDOWN_CONFIG_FILE)
 
 
-# These intentionally use past-tense result wording to avoid matching instructions
-# such as "defeat the boss".
+# Outcome detection is intentionally conservative. Guild-boss cards can contain
+# counters such as "0 defeated", which are statistics rather than an outcome.
+# We prefer OwO's own Discord timestamp beside "expired"/"defeated" and only
+# fall back to a recent message/edit timestamp for clear result sentences.
+DISCORD_TIMESTAMP_RE = re.compile(r"<t:(\d{9,12})(?::[tTdDfFR])?>")
+COUNTER_TEXT_RE = re.compile(r"\b\d+\s+(?:fighters?|defeated)\b", re.I)
+
 DEFEATED_PATTERNS = (
-    re.compile(r"\b(?:the\s+|guild\s+)?boss\b.{0,160}\b(?:has\s+been\s+|was\s+)?(?:defeated|slain|killed)\b", re.I),
-    re.compile(r"\b(?:defeated|slain|killed)\b.{0,160}\b(?:the\s+|guild\s+)?boss\b", re.I),
-    re.compile(r"\b(?:the\s+|guild\s+)?boss\b.{0,160}\bhas\s+fallen\b", re.I),
+    re.compile(r"\b(?:the\s+|guild\s+)?boss\b.{0,120}\b(?:has\s+been\s+|was\s+)?(?:defeated|slain|killed)\b", re.I),
+    re.compile(r"\b(?:defeated|slain|killed)\b.{0,120}\b(?:the\s+|guild\s+)?boss\b", re.I),
+    re.compile(r"\b(?:the\s+|guild\s+)?boss\b.{0,120}\bhas\s+fallen\b", re.I),
 )
 
 ESCAPED_PATTERNS = (
-    re.compile(r"\b(?:the\s+|guild\s+)?boss\b.{0,160}\b(?:has\s+|was\s+)?(?:escaped|fled|ran\s+away)\b", re.I),
-    re.compile(r"\b(?:escaped|fled|ran\s+away)\b.{0,160}\b(?:the\s+|guild\s+)?boss\b", re.I),
-    re.compile(r"\b(?:the\s+|guild\s+)?boss\b.{0,160}\bgot\s+away\b", re.I),
+    re.compile(r"\b(?:the\s+|guild\s+)?boss\b.{0,120}\b(?:has\s+|was\s+)?(?:escaped|expired|fled|ran\s+away)\b", re.I),
+    re.compile(r"\b(?:escaped|expired|fled|ran\s+away)\b.{0,120}\b(?:the\s+|guild\s+)?boss\b", re.I),
+    re.compile(r"\b(?:the\s+|guild\s+)?boss\b.{0,120}\bgot\s+away\b", re.I),
 )
+
+STATUS_WORD_RE = re.compile(
+    r"\b(expired|escaped|fled|ran\s+away|defeated|slain|killed)\b",
+    re.I,
+)
+
+# A real outcome gateway event should be very close to the message's creation or
+# edit time. This fallback is only used when OwO does not include a visible <t:...>
+# marker. Old cards are ignored instead of receiving a fresh five-minute timer.
+RECENT_OUTCOME_FALLBACK_SECONDS = 10 * 60
+
+
+def _iter_string_values(node: Any):
+    """Yield every string recursively from a raw Discord message payload."""
+    if isinstance(node, str):
+        yield node
+    elif isinstance(node, dict):
+        for value in node.values():
+            yield from _iter_string_values(value)
+    elif isinstance(node, list):
+        for value in node:
+            yield from _iter_string_values(value)
+
+
+def _parse_iso_timestamp(value: Any) -> int | None:
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            parsed = parsed.replace(tzinfo=timezone.utc)
+        return int(parsed.timestamp())
+    except ValueError:
+        return None
+
+
+def _status_timestamp_candidates(data: dict[str, Any]) -> list[tuple[int, str, int]]:
+    """Return (distance, outcome, timestamp) candidates from OwO's visible text."""
+    candidates: list[tuple[int, str, int]] = []
+
+    def scan(raw_value: str) -> None:
+        status_matches = list(STATUS_WORD_RE.finditer(raw_value))
+        timestamp_matches = list(DISCORD_TIMESTAMP_RE.finditer(raw_value))
+        if not status_matches or not timestamp_matches:
+            return
+
+        for status_match in status_matches:
+            word = status_match.group(1).lower()
+
+            # Ignore statistic counters such as "0 defeated" or "4 defeated".
+            if word in {"defeated", "slain", "killed"}:
+                prefix = raw_value[max(0, status_match.start() - 16):status_match.end()]
+                if re.search(r"\b\d+\s+" + re.escape(word) + r"\b", prefix, re.I):
+                    continue
+
+            outcome = "escaped" if word in {
+                "expired", "escaped", "fled", "ran away"
+            } else "defeated"
+
+            for timestamp_match in timestamp_matches:
+                timestamp = int(timestamp_match.group(1))
+                distance = min(
+                    abs(status_match.start() - timestamp_match.end()),
+                    abs(timestamp_match.start() - status_match.end()),
+                )
+                candidates.append((distance, outcome, timestamp))
+
+    # First scan individual values. This is the most precise case.
+    for raw_value in _iter_string_values(data):
+        scan(raw_value)
+
+    # Components-v2 may split a label and its timestamp into neighboring text
+    # displays. Scan the reconstructed visible text as a safe secondary path.
+    scan(extract_all_text_from_raw(data))
+
+    return candidates
 
 
 def detect_boss_outcome(text: str) -> str | None:
-    """Return `defeated`, `escaped`, or None from an OwO message's full text."""
+    """Detect a clear boss result sentence while ignoring counters like `0 defeated`."""
     normalized = re.sub(r"\s+", " ", text or "").strip()
     if not normalized:
         return None
+
+    normalized = COUNTER_TEXT_RE.sub(" ", normalized)
     if any(pattern.search(normalized) for pattern in DEFEATED_PATTERNS):
         return "defeated"
     if any(pattern.search(normalized) for pattern in ESCAPED_PATTERNS):
         return "escaped"
+    return None
+
+
+def detect_boss_outcome_event(
+    data: dict[str, Any],
+    now: int | None = None,
+) -> tuple[str, int] | None:
+    """Return (outcome, actual outcome timestamp), or None when not trustworthy.
+
+    Priority:
+    1. OwO's visible Discord timestamp next to expired/escaped/defeated.
+    2. A recent Discord edited/message timestamp for a clear result sentence.
+
+    We deliberately do not use the current clock as the outcome time. Doing so
+    would turn an old expired card into a brand-new five-minute cooldown whenever
+    that old message is edited or interacted with.
+    """
+    now = int(time.time()) if now is None else int(now)
+
+    candidates = _status_timestamp_candidates(data)
+    if candidates:
+        # The nearest timestamp to the outcome word is the authoritative one.
+        _, outcome, event_time = min(candidates, key=lambda item: item[0])
+        return outcome, event_time
+
+    outcome = detect_boss_outcome(extract_all_text_from_raw(data))
+    if outcome is None:
+        return None
+
+    for key in ("edited_timestamp", "timestamp"):
+        event_time = _parse_iso_timestamp(data.get(key))
+        if event_time is None:
+            continue
+        if 0 <= now - event_time <= RECENT_OUTCOME_FALLBACK_SECONDS:
+            return outcome, event_time
+
     return None
 
 
@@ -442,185 +556,6 @@ def extract_boss_page_number(data: dict[str, Any]) -> int | None:
     return None
 
 
-
-def extract_media_urls(data: dict[str, Any]) -> list[str]:
-    """Collect image/media URLs from embeds and Components V2 payloads."""
-    urls: list[str] = []
-
-    def add(value: Any) -> None:
-        if isinstance(value, str) and value.startswith(("https://", "http://")):
-            if value not in urls:
-                urls.append(value)
-
-    for embed in data.get("embeds", []):
-        for key in ("image", "thumbnail"):
-            obj = embed.get(key) or {}
-            add(obj.get("url"))
-            add(obj.get("proxy_url"))
-
-    def walk(node: Any) -> None:
-        if isinstance(node, dict):
-            media = node.get("media")
-            if isinstance(media, dict):
-                add(media.get("url"))
-                add(media.get("proxy_url"))
-            attachment = node.get("attachment")
-            if isinstance(attachment, dict):
-                add(attachment.get("url"))
-                add(attachment.get("proxy_url"))
-            # Some payloads expose the URL directly on a media-gallery item.
-            if node.get("type") in (11, 12, 13):
-                add(node.get("url"))
-            for value in node.values():
-                if isinstance(value, (dict, list)):
-                    walk(value)
-        elif isinstance(node, list):
-            for item in node:
-                walk(item)
-
-    walk(data.get("components", []))
-    return urls
-
-
-def _normalize_glyph(mask: list[list[bool]]) -> Image.Image | None:
-    """Trim and center one binary glyph on the same canvas as our templates."""
-    if not mask or not mask[0]:
-        return None
-    h, w = len(mask), len(mask[0])
-    xs, ys = [], []
-    for y in range(h):
-        for x in range(w):
-            if mask[y][x]:
-                xs.append(x); ys.append(y)
-    if not xs:
-        return None
-    left, right, top, bottom = min(xs), max(xs), min(ys), max(ys)
-    glyph = Image.new("L", (right-left+1, bottom-top+1), 0)
-    px = glyph.load()
-    for y in range(top, bottom+1):
-        for x in range(left, right+1):
-            if mask[y][x]:
-                px[x-left, y-top] = 255
-    # Preserve pixel-art edges. Scale down only if an unexpected larger image appears.
-    if glyph.width > 14 or glyph.height > 18:
-        ratio = min(14/glyph.width, 18/glyph.height)
-        glyph = glyph.resize((max(1, round(glyph.width*ratio)), max(1, round(glyph.height*ratio))), Image.Resampling.NEAREST)
-    canvas = Image.new("L", (16, 20), 0)
-    canvas.paste(glyph, ((16-glyph.width)//2, (20-glyph.height)//2))
-    return canvas
-
-
-def load_hp_templates() -> dict[str, list[Image.Image]]:
-    templates: dict[str, list[Image.Image]] = {}
-    if not HP_TEMPLATE_DIR.exists():
-        return templates
-    for path in HP_TEMPLATE_DIR.glob("*.png"):
-        name = path.stem.split("_", 1)[0]
-        char = "/" if name == "slash" else "," if name == "comma" else name
-        try:
-            templates.setdefault(char, []).append(Image.open(path).convert("L"))
-        except OSError:
-            continue
-    return templates
-
-
-def _glyph_similarity(a: Image.Image, b: Image.Image) -> float:
-    ap = list(a.getdata()); bp = list(b.getdata())
-    both = union = 0
-    for av, bv in zip(ap, bp):
-        aa, bb = av > 127, bv > 127
-        both += int(aa and bb)
-        union += int(aa or bb)
-    return both / union if union else 0.0
-
-
-def read_hp_from_image_bytes(image_bytes: bytes, templates: dict[str, list[Image.Image]]) -> tuple[str | None, float]:
-    """Read the left/current HP from OwO's fixed 600x140 boss image."""
-    if not templates:
-        return None, 0.0
-    try:
-        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
-    except OSError:
-        return None, 0.0
-
-    # OwO's HP text lives in the lower bar. Scale coordinates for equivalent sizes.
-    width, height = image.size
-    if width < 250 or height < 70:
-        return None, 0.0
-    y1, y2 = round(height * 118/140), round(height * 136/140)
-    x1, x2 = round(width * 0.25), round(width * 0.75)
-    crop = image.crop((x1, y1, x2, y2))
-    pixels = crop.load()
-    mask = [[False] * crop.width for _ in range(crop.height)]
-    for y in range(crop.height):
-        for x in range(crop.width):
-            r, g, b = pixels[x, y]
-            mask[y][x] = r > 175 and g > 175 and b > 175 and max(r, g, b) - min(r, g, b) < 45
-
-    projection = [sum(mask[y][x] for y in range(crop.height)) for x in range(crop.width)]
-    runs: list[tuple[int, int]] = []
-    start = None
-    for x, count in enumerate(projection):
-        if count and start is None:
-            start = x
-        if start is not None and (count == 0 or x == crop.width - 1):
-            end = x - 1 if count == 0 else x
-            runs.append((start, end)); start = None
-
-    chars, scores = [], []
-    for left, right in runs:
-        glyph_mask = [row[left:right+1] for row in mask]
-        glyph = _normalize_glyph(glyph_mask)
-        if glyph is None:
-            continue
-        best_char, best_score = None, -1.0
-        for char, options in templates.items():
-            score = max(_glyph_similarity(glyph, template) for template in options)
-            if score > best_score:
-                best_char, best_score = char, score
-        if best_char is not None:
-            chars.append(best_char); scores.append(best_score)
-
-    text = "".join(chars)
-    match = re.fullmatch(r"([0-9][0-9,]*)/([0-9][0-9,]*)", text)
-    confidence = sum(scores) / len(scores) if scores else 0.0
-    if not match or confidence < 0.55:
-        return None, confidence
-    current = match.group(1).replace(",", "")
-    maximum = match.group(2).replace(",", "")
-    try:
-        if int(current) < 0 or int(maximum) <= 0 or int(current) > int(maximum):
-            return None, confidence
-    except ValueError:
-        return None, confidence
-    return current, confidence
-
-
-def is_guild_boss_status(data: dict[str, Any]) -> bool:
-    """Recognize OwO's server-wide guild-boss status card, not inventory pages."""
-    text = re.sub(r"\s+", " ", extract_all_text_from_raw(data)).lower()
-    if "lvl " in text:
-        return False
-    return ("fighters" in text and "defeated" in text) or ("guild boss" in text and "fight" in text) or detect_boss_outcome(text) is not None
-
-
-def extract_relevant_timestamp(data: dict[str, Any], now: int | None = None) -> int | None:
-    """Extract OwO's real relative Discord timestamp, falling back to edit/create time."""
-    now = now or int(time.time())
-    text = extract_all_text_from_raw(data)
-    candidates = [int(v) for v in re.findall(r"<t:(\d{9,12})(?::[A-Za-z])?>", text)]
-    past = [value for value in candidates if value <= now + 60]
-    if past:
-        return max(past)
-    for key in ("edited_timestamp", "timestamp"):
-        value = data.get(key)
-        if isinstance(value, str) and value:
-            try:
-                return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
-            except ValueError:
-                pass
-    return None
-
 def extract_boss_from_raw(data: dict[str, Any]) -> tuple[str, str]:
     """Return (boss title, parser text) from content, embeds, or components-v2."""
     content = str(data.get("content") or "")
@@ -827,7 +762,6 @@ class BossSession:
         # Store each boss by OwO's own page number, never by click/read order.
         self.page_texts: dict[int, str] = {}
         self.hp_by_page: dict[int, str] = {}
-        self.hp_confidence_by_page: dict[int, float] = {}
         self.page_signatures: dict[int, str] = {}
         self.created_at = time.monotonic()
 
@@ -852,8 +786,6 @@ async def process_boss_page(
     boss_title: str,
     description: str,
     page_number: int | None,
-    detected_hp: str | None = None,
-    hp_confidence: float = 0.0,
 ) -> None:
     session = active_sessions.get(channel_id)
     if session is None:
@@ -883,8 +815,7 @@ async def process_boss_page(
 
     is_new_page = page_number not in session.page_texts
     session.page_texts[page_number] = parse_text
-    session.hp_by_page[page_number] = detected_hp or extract_hp_from_embed(description)
-    session.hp_confidence_by_page[page_number] = hp_confidence
+    session.hp_by_page[page_number] = extract_hp_from_embed(description)
     session.page_signatures[page_number] = signature
 
     action = "captured" if is_new_page else "updated"
@@ -921,20 +852,12 @@ class BossGenerator(commands.Cog):
         self.cooldown_config = load_cooldown_config()
         self.cooldown_tasks: dict[int, asyncio.Task] = {}
         self.processed_outcome_messages: set[tuple[int, int]] = set()
-        self.guild_boss_watch_tasks: dict[int, asyncio.Task] = {}
-        self.http_session: aiohttp.ClientSession | None = None
-        self.hp_templates = load_hp_templates()
         self._restored = False
 
     def cog_unload(self) -> None:
         for task in self.cooldown_tasks.values():
             task.cancel()
         self.cooldown_tasks.clear()
-        for task in self.guild_boss_watch_tasks.values():
-            task.cancel()
-        self.guild_boss_watch_tasks.clear()
-        if self.http_session and not self.http_session.closed:
-            asyncio.create_task(self.http_session.close())
 
     # ── Cooldown channel setup + status check ─────────────────
 
@@ -1039,10 +962,7 @@ class BossGenerator(commands.Cog):
         if self._restored:
             return
         self._restored = True
-        if self.http_session is None or self.http_session.closed:
-            self.http_session = aiohttp.ClientSession()
         await self.restore_cooldowns()
-        self.restore_guild_boss_watchers()
 
     async def restore_cooldowns(self) -> None:
         """Resume active timers and announce readiness once if one ended offline."""
@@ -1083,69 +1003,6 @@ class BossGenerator(commands.Cog):
         if changed:
             save_cooldown_config(self.cooldown_config)
 
-    async def detect_hp_from_raw(self, data: dict[str, Any]) -> tuple[str | None, float]:
-        if self.http_session is None or self.http_session.closed:
-            self.http_session = aiohttp.ClientSession()
-        for url in extract_media_urls(data):
-            try:
-                async with self.http_session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
-                    if response.status != 200:
-                        continue
-                    body = await response.read()
-                hp, confidence = read_hp_from_image_bytes(body, self.hp_templates)
-                if hp is not None:
-                    print(f"[HP IMAGE] detected {hp} ({confidence:.2f})")
-                    return hp, confidence
-            except (aiohttp.ClientError, asyncio.TimeoutError):
-                continue
-        return None, 0.0
-
-    async def track_latest_guild_boss_message(self, guild_id: int, channel_id: int, message_id: int, data: dict[str, Any]) -> None:
-        if not self.is_cooldown_configured(guild_id) or not is_guild_boss_status(data):
-            return
-        config = self.cooldown_config.setdefault(str(guild_id), {})
-        old_id = int(config.get("active_boss_message_id") or 0)
-        if old_id and message_id < old_id:
-            return
-        config["active_boss_channel_id"] = channel_id
-        config["active_boss_message_id"] = message_id
-        save_cooldown_config(self.cooldown_config)
-        self.start_guild_boss_watcher(guild_id)
-        await self.maybe_handle_outcome(guild_id, message_id, data)
-
-    def restore_guild_boss_watchers(self) -> None:
-        for guild_key, config in self.cooldown_config.items():
-            if config.get("active_boss_channel_id") and config.get("active_boss_message_id"):
-                self.start_guild_boss_watcher(int(guild_key))
-
-    def start_guild_boss_watcher(self, guild_id: int) -> None:
-        existing = self.guild_boss_watch_tasks.get(guild_id)
-        if existing and not existing.done():
-            return
-        self.guild_boss_watch_tasks[guild_id] = asyncio.create_task(self.watch_latest_guild_boss(guild_id))
-
-    async def watch_latest_guild_boss(self, guild_id: int) -> None:
-        try:
-            while True:
-                config = self.cooldown_config.get(str(guild_id), {})
-                channel_id = int(config.get("active_boss_channel_id") or 0)
-                message_id = int(config.get("active_boss_message_id") or 0)
-                if not channel_id or not message_id:
-                    return
-                data = await fetch_raw_message(self.bot, channel_id, message_id)
-                if data and int((data.get("author") or {}).get("id", 0)) == OWO_BOT_ID:
-                    await self.maybe_handle_outcome(guild_id, message_id, data)
-                    config = self.cooldown_config.get(str(guild_id), {})
-                    if not config.get("active_boss_message_id"):
-                        return
-                await asyncio.sleep(BOSS_WATCH_INTERVAL_SECONDS)
-        except asyncio.CancelledError:
-            return
-        finally:
-            current = self.guild_boss_watch_tasks.get(guild_id)
-            if current is asyncio.current_task():
-                self.guild_boss_watch_tasks.pop(guild_id, None)
-
     # ── Gateway listeners ──────────────────────────────────────
 
     @commands.Cog.listener()
@@ -1181,13 +1038,12 @@ class BossGenerator(commands.Cog):
                 return
 
             if cooldown_needed:
-                await self.track_latest_guild_boss_message(message.guild.id, message.channel.id, message.id, data)
+                await self.maybe_handle_outcome(message.guild.id, message.id, data)
 
             if generator_needed:
                 boss_title, description = extract_boss_from_raw(data)
                 if boss_title:
                     page_number = extract_boss_page_number(data)
-                    detected_hp, hp_confidence = await self.detect_hp_from_raw(data)
                     await process_boss_page(
                         self,
                         message.channel.id,
@@ -1195,8 +1051,6 @@ class BossGenerator(commands.Cog):
                         boss_title,
                         description,
                         page_number,
-                        detected_hp,
-                        hp_confidence,
                     )
 
         except Exception as exc:
@@ -1223,13 +1077,12 @@ class BossGenerator(commands.Cog):
                 return
 
             if cooldown_needed:
-                await self.track_latest_guild_boss_message(payload.guild_id, payload.channel_id, payload.message_id, data)
+                await self.maybe_handle_outcome(payload.guild_id, payload.message_id, data)
 
             if generator_needed:
                 boss_title, description = extract_boss_from_raw(data)
                 if boss_title:
                     page_number = extract_boss_page_number(data)
-                    detected_hp, hp_confidence = await self.detect_hp_from_raw(data)
                     await process_boss_page(
                         self,
                         payload.channel_id,
@@ -1237,8 +1090,6 @@ class BossGenerator(commands.Cog):
                         boss_title,
                         description,
                         page_number,
-                        detected_hp,
-                        hp_confidence,
                     )
 
         except Exception as exc:
@@ -1283,7 +1134,7 @@ class BossGenerator(commands.Cog):
 
         embed = discord.Embed(
             title="⚔️ Boss Command Ready",
-            description=f"`{command}`",
+            description=f"```\n{command}\n```",
             color=0x57F287,
         )
         if warnings:
@@ -1310,49 +1161,68 @@ class BossGenerator(commands.Cog):
         if message_key in self.processed_outcome_messages:
             return
 
-        outcome = detect_boss_outcome(extract_all_text_from_raw(data))
-        if outcome is None:
-            return
-
-        config = self.cooldown_config.setdefault(str(guild_id), {})
         now = int(time.time())
-
-        if int(config.get("last_source_message_id") or 0) == source_message_id:
-            self.processed_outcome_messages.add(message_key)
+        outcome_event = detect_boss_outcome_event(data, now=now)
+        if outcome_event is None:
             return
 
-        last_detected_at = int(config.get("last_detected_at") or 0)
-        if now - last_detected_at < OUTCOME_DEDUP_SECONDS:
+        outcome, outcome_time = outcome_event
+        cooldown_end = outcome_time + BOSS_COOLDOWN_SECONDS
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+
+        last_source_id = int(config.get("last_source_message_id") or 0)
+        last_outcome_time = int(config.get("last_outcome_time") or 0)
+        if last_source_id == source_message_id and last_outcome_time == outcome_time:
             self.processed_outcome_messages.add(message_key)
             return
 
         self.processed_outcome_messages.add(message_key)
-        # Keep the in-memory set bounded during long runtimes.
         if len(self.processed_outcome_messages) > 2000:
             self.processed_outcome_messages.clear()
             self.processed_outcome_messages.add(message_key)
 
-        event_time = extract_relevant_timestamp(data, now) or now
-        cooldown_end = event_time + BOSS_COOLDOWN_SECONDS
+        # Record this exact source+timestamp pair so repeated edits do not retrigger
+        # it, but do not let stale cards block a separate current boss outcome.
+        config["last_source_message_id"] = source_message_id
+        config["last_outcome_time"] = outcome_time
+
+        # An old expired/defeated card must never create a fresh cooldown.
+        if cooldown_end <= now:
+            config["cooldown_end"] = 0
+            save_cooldown_config(self.cooldown_config)
+            print(
+                f"[COOLDOWN] Guild {guild_id}: ignored stale {outcome} outcome "
+                f"from {outcome_time}; it was ready at {cooldown_end}"
+            )
+            return
+
+        # Guard against malformed/future timestamps that are not outcome times.
+        if outcome_time > now + 60:
+            save_cooldown_config(self.cooldown_config)
+            print(
+                f"[COOLDOWN] Guild {guild_id}: ignored future outcome timestamp "
+                f"{outcome_time}"
+            )
+            return
+
+        # A second Discord message can describe the same outcome. Deduplicate by
+        # the actual event timestamp rather than by when our bot happened to see it.
+        previous_active_outcome = int(config.get("active_outcome_time") or 0)
+        if previous_active_outcome and abs(outcome_time - previous_active_outcome) < OUTCOME_DEDUP_SECONDS:
+            save_cooldown_config(self.cooldown_config)
+            return
+
         config["cooldown_end"] = cooldown_end
         config["last_result"] = outcome
         config["last_detected_at"] = now
-        config["last_source_message_id"] = source_message_id
+        config["active_outcome_time"] = outcome_time
         config.pop("message_id", None)
-        config.pop("active_boss_channel_id", None)
-        config.pop("active_boss_message_id", None)
         save_cooldown_config(self.cooldown_config)
 
-        # An old card may say "escaped 2 days ago". Record it, but never create
-        # a fresh alert for a cooldown that already ended.
-        if cooldown_end <= now:
-            config["cooldown_end"] = 0
-            config["last_result"] = "ready"
-            save_cooldown_config(self.cooldown_config)
-            print(f"[COOLDOWN] Ignored old {outcome} result from {event_time}")
-            return
-
-        print(f"[COOLDOWN] Guild {guild_id}: boss {outcome}; ready at {cooldown_end}")
+        print(
+            f"[COOLDOWN] Guild {guild_id}: boss {outcome} at {outcome_time}; "
+            f"ready at {cooldown_end}"
+        )
         await self.send_cooldown_started_message(guild_id)
         self.schedule_ready_update(guild_id, cooldown_end)
 
