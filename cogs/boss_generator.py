@@ -7,7 +7,7 @@ Generator:
 - Reads the three paginated OwO boss cards, orders them by the visible 1/3–3/3 counter, and posts the Neon battle command.
 
 Cooldown tracker:
-- Watches the official OwO Bot across the server.
+- Uses gateway payloads to discover status cards only while a boss is active or can spawn.
 - Starts a 5-minute cooldown only when a guild boss is defeated.
 - Marks the guild ready immediately when a boss escapes; escapes have no cooldown.
 - Announces newly detected guild bosses and supports `H help`, `H boss cd`, and `H boss cooldown`.
@@ -380,6 +380,50 @@ async def fetch_raw_message(bot: commands.Bot, channel_id: int, message_id: int)
         return None
 
 
+def message_to_raw_data(message: discord.Message) -> dict[str, Any]:
+    """Build raw-like data from the gateway Message without another API request.
+
+    Discord already sends message content, embeds, Components V2, and attachments
+    over the gateway. Using that payload for discovery prevents one REST GET for
+    every OwO response in busy grinding channels.
+    """
+    components: list[dict[str, Any]] = []
+    for component in getattr(message, "components", []) or []:
+        to_dict = getattr(component, "to_dict", None)
+        if callable(to_dict):
+            try:
+                components.append(to_dict())
+            except Exception:
+                continue
+
+    attachments: list[dict[str, Any]] = []
+    for attachment in getattr(message, "attachments", []) or []:
+        attachments.append(
+            {
+                "id": str(getattr(attachment, "id", "")),
+                "filename": getattr(attachment, "filename", ""),
+                "url": getattr(attachment, "url", ""),
+                "proxy_url": getattr(attachment, "proxy_url", ""),
+                "content_type": getattr(attachment, "content_type", None),
+            }
+        )
+
+    created_at = getattr(message, "created_at", None)
+    edited_at = getattr(message, "edited_at", None)
+    return {
+        "id": str(message.id),
+        "channel_id": str(message.channel.id),
+        "guild_id": str(message.guild.id) if message.guild else None,
+        "author": {"id": str(message.author.id)},
+        "content": message.content or "",
+        "embeds": [embed.to_dict() for embed in message.embeds],
+        "components": components,
+        "attachments": attachments,
+        "timestamp": created_at.isoformat() if created_at else None,
+        "edited_timestamp": edited_at.isoformat() if edited_at else None,
+    }
+
+
 def extract_all_text_from_raw(data: dict[str, Any]) -> str:
     """Combine content, embed text, fields, and components-v2 text."""
     chunks: list[str] = []
@@ -479,6 +523,11 @@ def extract_media_urls(data: dict[str, Any]) -> list[str]:
             obj = embed.get(key) or {}
             add(obj.get("url"))
             add(obj.get("proxy_url"))
+
+    for attachment in data.get("attachments", []):
+        if isinstance(attachment, dict):
+            add(attachment.get("url"))
+            add(attachment.get("proxy_url"))
 
     def walk(node: Any) -> None:
         if isinstance(node, dict):
@@ -873,8 +922,9 @@ def _parse_boss_exact(block: str) -> str:
     q_m=re.search(r"\*\*Quality:\*\*.*?(\d+(?:\.\d+)?)%",weapon_section,re.I)
     if q_m and weapon_values and abs(weapon_values[0]-float(q_m.group(1)))<0.0001:
         weapon_values.pop(0)
-    if weapon_type=="Bleeding Gaze": w_values=[wp_cost]+weapon_values
-    elif weapon_type=="Orb of Potency": w_values=[]
+    # Bleeding Gaze now follows the same blueprint ordering as every other
+    # normal weapon: displayed weapon values first, Weapon Cost last.
+    if weapon_type=="Orb of Potency": w_values=[]
     elif weapon_type=="Rune of the Forgotten": w_values=weapon_values
     else: w_values=weapon_values+[wp_cost]
     passive_types,passive_values=[],[]
@@ -1039,6 +1089,7 @@ class BossGenerator(commands.Cog):
         self.cooldown_tasks: dict[int, asyncio.Task] = {}
         self.processed_outcome_messages: set[tuple[int, int]] = set()
         self.guild_boss_watch_tasks: dict[int, asyncio.Task] = {}
+        self.guild_boss_fetch_locks: dict[int, asyncio.Lock] = {}
         self.http_session: aiohttp.ClientSession | None = None
         self.hp_templates = load_hp_templates()
         self._restored = False
@@ -1318,15 +1369,53 @@ class BossGenerator(commands.Cog):
                 continue
         return None, 0.0
 
+    def is_spawn_window_open(self, guild_id: int) -> bool:
+        """True only when the guild can legitimately receive a new boss."""
+        if not self.is_cooldown_configured(guild_id):
+            return False
+        config = self.cooldown_config.get(str(guild_id), {})
+        if config.get("active_boss_message_id"):
+            return False
+        return int(config.get("cooldown_end") or 0) <= int(time.time())
+
+    def should_inspect_guild_boss_gateway(self, guild_id: int) -> bool:
+        """Inspect gateway payloads only while active or able to spawn.
+
+        During a defeat cooldown no boss can appear, so unrelated OwO traffic is
+        ignored completely. While a boss is active, gateway payloads are still
+        inspected cheaply so a newer status card can replace the tracked one.
+        """
+        if not self.is_cooldown_configured(guild_id):
+            return False
+        config = self.cooldown_config.get(str(guild_id), {})
+        if config.get("active_boss_message_id"):
+            return True
+        return self.is_spawn_window_open(guild_id)
+
+    def is_tracked_boss_message(
+        self, guild_id: int, channel_id: int, message_id: int
+    ) -> bool:
+        config = self.cooldown_config.get(str(guild_id), {})
+        return (
+            int(config.get("active_boss_channel_id") or 0) == channel_id
+            and int(config.get("active_boss_message_id") or 0) == message_id
+        )
+
+    def get_guild_boss_fetch_lock(self, guild_id: int) -> asyncio.Lock:
+        return self.guild_boss_fetch_locks.setdefault(guild_id, asyncio.Lock())
+
     async def refresh_tracked_guild_boss_status(self, guild_id: int) -> None:
-        """Fetch the currently tracked boss message once and process its latest state."""
+        """Fetch the one tracked boss message and process its latest state."""
         config = self.cooldown_config.get(str(guild_id), {})
         channel_id = int(config.get("active_boss_channel_id") or 0)
         message_id = int(config.get("active_boss_message_id") or 0)
         if not channel_id or not message_id:
             return
 
-        data = await fetch_raw_message(self.bot, channel_id, message_id)
+        # The watcher, H command, and slash command can fire close together. One
+        # per-guild lock prevents duplicate GETs for the same tracked message.
+        async with self.get_guild_boss_fetch_lock(guild_id):
+            data = await fetch_raw_message(self.bot, channel_id, message_id)
         if not data:
             return
         if int((data.get("author") or {}).get("id", 0)) != OWO_BOT_ID:
@@ -1420,13 +1509,17 @@ class BossGenerator(commands.Cog):
 
     async def watch_latest_guild_boss(self, guild_id: int) -> None:
         try:
+            # Restored guilds otherwise begin polling in the same millisecond. A
+            # small deterministic stagger spreads those first requests out.
+            await asyncio.sleep((guild_id % 7) * 0.35)
             while True:
                 config = self.cooldown_config.get(str(guild_id), {})
                 channel_id = int(config.get("active_boss_channel_id") or 0)
                 message_id = int(config.get("active_boss_message_id") or 0)
                 if not channel_id or not message_id:
                     return
-                data = await fetch_raw_message(self.bot, channel_id, message_id)
+                async with self.get_guild_boss_fetch_lock(guild_id):
+                    data = await fetch_raw_message(self.bot, channel_id, message_id)
                 if data and int((data.get("author") or {}).get("id", 0)) == OWO_BOT_ID:
                     await self.track_latest_guild_boss_message(
                         guild_id,
@@ -1489,25 +1582,38 @@ class BossGenerator(commands.Cog):
                 return
 
             generator_needed = message.channel.id in active_sessions
-            cooldown_needed = self.is_cooldown_configured(message.guild.id)
-            if not generator_needed and not cooldown_needed:
+            cooldown_gateway_needed = self.should_inspect_guild_boss_gateway(
+                message.guild.id
+            )
+            if not generator_needed and not cooldown_gateway_needed:
                 return
 
-            data = await fetch_raw_message(self.bot, message.channel.id, message.id)
-            if not data:
-                return
+            # Message-create events already contain Components V2. Build raw-like
+            # data locally rather than GETting every OwO response from Discord.
+            data = message_to_raw_data(message)
 
-            # Double-check the fetched author before trusting the payload.
-            if int((data.get("author") or {}).get("id", 0)) != OWO_BOT_ID:
-                return
-
-            if cooldown_needed:
-                await self.track_latest_guild_boss_message(message.guild.id, message.channel.id, message.id, data)
+            if cooldown_gateway_needed and is_guild_boss_status(data):
+                await self.track_latest_guild_boss_message(
+                    message.guild.id, message.channel.id, message.id, data
+                )
 
             if generator_needed:
                 boss_title, description = extract_boss_from_raw(data)
+                page_number = extract_boss_page_number(data)
+
+                # Older discord.py builds may not expose every Components V2 field
+                # on Message. Fall back to one REST fetch only for an explicitly
+                # armed three-page generator session, never for general grinding.
+                if not boss_title or page_number is None:
+                    fetched = await fetch_raw_message(
+                        self.bot, message.channel.id, message.id
+                    )
+                    if fetched:
+                        data = fetched
+                        boss_title, description = extract_boss_from_raw(data)
+                        page_number = extract_boss_page_number(data)
+
                 if boss_title:
-                    page_number = extract_boss_page_number(data)
                     detected_hp, hp_confidence = await self.detect_hp_from_raw(data)
                     await process_boss_page(
                         self,
@@ -1530,21 +1636,41 @@ class BossGenerator(commands.Cog):
                 return
 
             generator_needed = payload.channel_id in active_sessions
-            cooldown_needed = self.is_cooldown_configured(payload.guild_id)
-            if not generator_needed and not cooldown_needed:
+            cooldown_gateway_needed = self.should_inspect_guild_boss_gateway(
+                payload.guild_id
+            )
+            if not generator_needed and not cooldown_gateway_needed:
                 return
 
-            data = await fetch_raw_message(self.bot, payload.channel_id, payload.message_id)
-            if not data:
-                return
+            # For cooldown discovery/tracking, use the edit payload directly. If an
+            # update is partial, the single-message 15-second watcher will read the
+            # final state. We deliberately do not REST-fetch every OwO edit.
+            if cooldown_gateway_needed:
+                data = dict(payload.data)
+                author_id = int((data.get("author") or {}).get("id", 0) or 0)
+                tracked = self.is_tracked_boss_message(
+                    payload.guild_id, payload.channel_id, payload.message_id
+                )
+                if (tracked or author_id == OWO_BOT_ID) and is_guild_boss_status(data):
+                    await self.track_latest_guild_boss_message(
+                        payload.guild_id,
+                        payload.channel_id,
+                        payload.message_id,
+                        data,
+                    )
 
-            if int((data.get("author") or {}).get("id", 0)) != OWO_BOT_ID:
-                return
-
-            if cooldown_needed:
-                await self.track_latest_guild_boss_message(payload.guild_id, payload.channel_id, payload.message_id, data)
-
+            # Page navigation edits are intentionally fetched because the user has
+            # explicitly armed a short generator session. This is a tiny, bounded
+            # request count and is unrelated to server-wide grinding traffic.
             if generator_needed:
+                data = await fetch_raw_message(
+                    self.bot, payload.channel_id, payload.message_id
+                )
+                if not data:
+                    return
+                if int((data.get("author") or {}).get("id", 0)) != OWO_BOT_ID:
+                    return
+
                 boss_title, description = extract_boss_from_raw(data)
                 if boss_title:
                     page_number = extract_boss_page_number(data)

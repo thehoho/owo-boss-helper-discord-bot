@@ -9,13 +9,13 @@ A focused Discord bot that helps with OwO guild-boss fights by generating Neon b
 - Extracts current HP from each individual boss image using bundled digit templates.
 - Generates a mobile-friendly Neon command using inline code.
 - Tracks the latest active guild-boss status message in each configured server.
-- Checks the latest tracked boss message every **15 seconds**.
+- Uses Discord gateway payloads for discovery instead of fetching every OwO response.
+- Checks only the single latest tracked boss message every **15 seconds**.
 - Announces when a new guild boss appears.
-- Starts and announces a five-minute cooldown only after a defeat.
-- Marks the guild ready immediately after an escape; escapes have no cooldown.
+- Announces the five-minute cooldown after a defeat.
+- Marks the guild ready immediately after an escape.
 - Announces when a defeat cooldown ends.
 - Supports both slash commands and the lightweight `H` helper prefix.
-- Includes an `H help` command with a focused usage guide.
 - Persists the selected notification channel and active watcher state across restarts.
 - Writes rotating runtime logs to `logs/bot.log`.
 
@@ -79,15 +79,7 @@ w boss i
 
 Open all three boss pages. The bot reads the visible page counter and emits the final command in `1/3 → 2/3 → 3/3` order.
 
-### Helper guide
-
-```text
-H help
-```
-
-Shows the command generator, cooldown-status commands, and server setup instructions.
-
-### Public boss status
+### Public cooldown status
 
 ```text
 H boss cd
@@ -97,9 +89,8 @@ H boss cooldown
 Whitespace and capitalization are ignored. These commands show one of:
 
 - Active boss and its escape time
-- Running five-minute cooldown after a defeat
-- Immediate ready state after an escape
-- Normal ready state
+- Running five-minute cooldown
+- Ready state
 
 ### Slash commands
 
@@ -108,7 +99,18 @@ Whitespace and capitalization are ignored. These commands show one of:
 /boss-cooldown
 ```
 
-`/boss-cooldown-channel` selects where automatic new-boss, defeat-cooldown, escape, and ready alerts are sent. It requires Manage Server permission by default.
+`/boss-cooldown-channel` selects where automatic new-boss, cooldown, and ready alerts are sent. It requires Manage Server permission by default.
+
+
+## Rate-limit-friendly tracking
+
+The bot does not REST-fetch every OwO message in busy grinding channels.
+
+- While a boss is active, incoming gateway payloads are inspected locally so newer status cards can replace the tracked message.
+- During a five-minute defeat cooldown, unrelated OwO traffic is ignored because a new boss cannot appear.
+- When the guild is ready to spawn, gateway payloads are inspected locally for the next boss card.
+- Only the one currently tracked boss message is fetched every 15 seconds.
+- The three-page generator may make a small, bounded number of fetches after a user explicitly runs `owo boss i` or `w boss i`.
 
 ## Logging
 
