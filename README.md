@@ -2,7 +2,7 @@
 
 A focused Discord bot that automatically:
 
-- Reads `owo boss i` and `w boss i` boss-inventory pages.
+- Reads `owo boss i` and `w boss i` boss-inspect pages.
 - Keeps bosses in OwO's authoritative `1/3`, `2/3`, `3/3` order even when users navigate out of order.
 - Extracts current HP from each individual boss image using bundled pixel templates.
 - Generates a mobile-friendly Neon battle command using inline code.
@@ -11,6 +11,11 @@ A focused Discord bot that automatically:
 - Persists the selected cooldown channel and active watcher state across restarts.
 
 Made by Hassaan.
+
+## Credits
+
+Special thanks to **Pencilvester** for sharing the original exact-command parsing logic and the weapon/passive rarity ranges that helped form the foundation of the command generator. The project has since been substantially expanded, adapted, and integrated into this Discord bot.
+
 
 > This is an independent community project. It is not affiliated with Discord, OwO Bot, or NeonUtil.
 
@@ -77,9 +82,9 @@ The automatic trigger accepts only these commands after whitespace and capitaliz
 
 ```text
 owo boss i
-owobossi
+owoboss i
 w boss i
-wbossi
+wboss i
 ```
 
 Open all three OwO pages. The bot reads the visible page counter and always generates the final command in `1/3 → 2/3 → 3/3` order.
