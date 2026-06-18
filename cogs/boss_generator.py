@@ -2,15 +2,15 @@
 cogs/boss_generator.py — automatic OwO boss command generator and cooldown tracker.
 
 Generator:
-- Watches only exact OwO boss-inspection commands after whitespace is removed:
+- Watches only exact OwO boss-inventory commands after whitespace is removed:
   `owobossi` and `wbossi` (so `owo boss i`, `owoboss i`, `w boss i`, etc. work).
 - Reads the three paginated OwO boss cards, orders them by the visible 1/3–3/3 counter, and posts the Neon battle command.
 
 Cooldown tracker:
 - Watches the official OwO Bot across the server.
-- When OwO reports that a guild boss was defeated or escaped, starts a 5-minute cooldown.
-- Sends one cooldown-start message and one ready message in the selected channel using Discord timestamps.
-- Announces newly detected guild bosses and supports `H boss cd` / `H boss cooldown`.
+- Starts a 5-minute cooldown only when a guild boss is defeated.
+- Marks the guild ready immediately when a boss escapes; escapes have no cooldown.
+- Announces newly detected guild bosses and supports `H help`, `H boss cd`, and `H boss cooldown`.
 - Writes runtime activity to the rotating log configured by bot.py.
 """
 
@@ -52,9 +52,9 @@ OWO_BOT_ID = 408785106942164992
 # Only these two commands are accepted after all whitespace is removed.
 ALLOWED_BOSS_TRIGGERS = {"owobossi", "wbossi"}
 
-# Lightweight public status commands. Whitespace and capitalization are ignored,
-# so `H boss cd`, `hbosscd`, and `H BOSS COOLDOWN` all work.
+# Lightweight public helper commands. Whitespace and capitalization are ignored.
 PREFIX_COOLDOWN_TRIGGERS = {"hbosscd", "hbosscooldown"}
+PREFIX_HELP_TRIGGERS = {"hhelp"}
 
 SESSION_TIMEOUT_SECONDS = 180
 BOSS_COOLDOWN_SECONDS = 5 * 60
@@ -76,6 +76,12 @@ def is_prefix_cooldown_trigger(content: str) -> bool:
     """Accept `H boss cd` and `H boss cooldown`, case-insensitively."""
     normalized = re.sub(r"\s+", "", content or "").lower()
     return normalized in PREFIX_COOLDOWN_TRIGGERS
+
+
+def is_prefix_help_trigger(content: str) -> bool:
+    """Accept `H help`, case-insensitively and with flexible whitespace."""
+    normalized = re.sub(r"\s+", "", content or "").lower()
+    return normalized in PREFIX_HELP_TRIGGERS
 
 
 def load_cooldown_config() -> dict[str, dict[str, Any]]:
@@ -1170,6 +1176,57 @@ class BossGenerator(commands.Cog):
             guild.id,
         )
 
+    async def send_prefix_help(self, message: discord.Message) -> None:
+        """Reply to `H help` with the bot's focused command guide."""
+        if message.guild is None:
+            return
+
+        embed = discord.Embed(
+            title="🐾 OwO Boss Helper",
+            description=(
+                "`H` stands for **Helper** — and it also happens to be the first "
+                "letter of Hassaan's name.\n\n"
+                "This bot helps your server generate correctly ordered Neon boss "
+                "commands and track the current guild-boss status."
+            ),
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name="⚔️ Generate a Neon command",
+            value=(
+                "Send `owo boss i` or `w boss i`, then open all three boss pages. "
+                "The helper reads pages `1/3`, `2/3`, and `3/3`, detects their HP, "
+                "and sends the finished command."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="⏱️ Check the guild boss",
+            value=(
+                "Use `H boss cd` or `H boss cooldown`. While a boss is active, "
+                "you will see its escape time. A defeated boss has a five-minute "
+                "cooldown; an escaped boss can be replaced immediately."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🛠️ Server setup",
+            value=(
+                "A server manager can use `/boss-cooldown-channel` to choose where "
+                "new-boss, defeat-cooldown, escape, and ready alerts are sent. "
+                "`/boss-cooldown` checks the same status privately."
+            ),
+            inline=False,
+        )
+        embed.set_footer(text="Use H help anytime to show this guide.")
+
+        await message.reply(embed=embed, mention_author=False)
+        logger.info(
+            "Prefix help requested by %s in guild %s",
+            message.author,
+            message.guild.id,
+        )
+
     @boss_cooldown_channel.error
     async def boss_cooldown_channel_error(
         self,
@@ -1221,11 +1278,18 @@ class BossGenerator(commands.Cog):
                 config.pop("message_id", None)
                 changed = True
 
-            if cooldown_end > now:
+            # Older builds incorrectly created a five-minute cooldown after an
+            # escape. Migrate that state to immediately ready without sending a
+            # delayed or misleading cooldown-complete alert.
+            if str(config.get("last_result") or "") == "escaped" and cooldown_end > 0:
+                config["cooldown_end"] = 0
+                changed = True
+                logger.info("Removed legacy escape cooldown for guild %s", guild_id)
+            elif cooldown_end > now:
                 self.schedule_ready_update(guild_id, cooldown_end)
             elif cooldown_end > 0:
-                # The bot was offline when the timer ended. Mark it ready and
-                # send the missed ready alert once after reconnecting.
+                # The bot was offline when a defeat cooldown ended. Mark it ready
+                # and send the missed ready alert once after reconnecting.
                 config["cooldown_end"] = 0
                 config["last_result"] = "ready"
                 changed = True
@@ -1278,10 +1342,9 @@ class BossGenerator(commands.Cog):
         config = self.cooldown_config.get(str(guild_id), {})
         expiry = int(config.get("active_boss_expires_at") or 0)
         if expiry and expiry <= int(time.time()) and config.get("active_boss_message_id"):
-            await self.start_boss_cooldown(
+            await self.finish_boss_escape(
                 guild_id,
                 message_id,
-                "escaped",
                 expiry,
             )
 
@@ -1298,8 +1361,8 @@ class BossGenerator(commands.Cog):
         outcome = detect_boss_outcome(extract_all_text_from_raw(data))
         if outcome is not None:
             # A completed status may be a newer replacement message. Let the
-            # outcome handler calculate the real five-minute cooldown from OwO's
-            # timestamp and clear the active boss state.
+            # outcome handler apply the correct rule from OwO's timestamp: five
+            # minutes after defeat, or immediate readiness after escape.
             await self.maybe_handle_outcome(guild_id, message_id, data)
             return
 
@@ -1376,15 +1439,14 @@ class BossGenerator(commands.Cog):
                         return
 
                     # If OwO has not edited the card yet, the stored future expiry
-                    # still gives us an authoritative escape time. Start the
-                    # five-minute cooldown from that exact timestamp rather than
-                    # waiting for another user to request the boss status.
+                    # still gives us an authoritative escape time. Mark the guild
+                    # ready immediately at that time instead of waiting for another
+                    # user to request the boss status.
                     expiry = int(config.get("active_boss_expires_at") or 0)
                     if expiry and expiry <= int(time.time()):
-                        await self.start_boss_cooldown(
+                        await self.finish_boss_escape(
                             guild_id,
                             message_id,
-                            "escaped",
                             expiry,
                         )
                         return
@@ -1403,6 +1465,10 @@ class BossGenerator(commands.Cog):
         try:
             # Human trigger: only exact owo-boss-inventory forms.
             if not message.author.bot:
+                if message.guild and is_prefix_help_trigger(message.content):
+                    await self.send_prefix_help(message)
+                    return
+
                 if message.guild and is_prefix_cooldown_trigger(message.content):
                     await self.send_prefix_cooldown_status(message)
                     return
@@ -1573,64 +1639,137 @@ class BossGenerator(commands.Cog):
 
         now = int(time.time())
         event_time = extract_relevant_timestamp(data, now) or now
-        await self.start_boss_cooldown(
-            guild_id,
-            source_message_id,
-            outcome,
-            event_time,
-        )
+        if outcome == "escaped":
+            await self.finish_boss_escape(
+                guild_id,
+                source_message_id,
+                event_time,
+            )
+        else:
+            await self.start_defeat_cooldown(
+                guild_id,
+                source_message_id,
+                event_time,
+            )
 
-    async def start_boss_cooldown(
+    def claim_boss_outcome(
         self,
         guild_id: int,
         source_message_id: int,
         outcome: str,
         event_time: int,
-    ) -> None:
-        """Persist and announce a defeat/escape cooldown exactly once."""
+    ) -> tuple[dict[str, Any], int] | None:
+        """Deduplicate an outcome, clear the active boss, and persist its result."""
         message_key = (guild_id, source_message_id)
-
         config = self.cooldown_config.setdefault(str(guild_id), {})
         now = int(time.time())
 
         if int(config.get("last_source_message_id") or 0) == source_message_id:
             self.processed_outcome_messages.add(message_key)
-            return
+            return None
 
-        last_detected_at = int(config.get("last_detected_at") or 0)
-        if now - last_detected_at < OUTCOME_DEDUP_SECONDS:
+        # OwO can publish the same result through more than one replacement
+        # message. Deduplicate only the same outcome at essentially the same event
+        # time. Do not use a global time lock: after an escape, a new boss may
+        # appear immediately and could legitimately end within a few seconds.
+        previous_outcome = str(config.get("last_result") or "")
+        previous_event_time = int(config.get("last_outcome_event_time") or 0)
+        if (
+            previous_outcome == outcome
+            and previous_event_time
+            and abs(event_time - previous_event_time) <= OUTCOME_DEDUP_SECONDS
+        ):
             self.processed_outcome_messages.add(message_key)
-            return
+            return None
 
         self.processed_outcome_messages.add(message_key)
-        # Keep the in-memory set bounded during long runtimes.
         if len(self.processed_outcome_messages) > 2000:
             self.processed_outcome_messages.clear()
             self.processed_outcome_messages.add(message_key)
 
-        cooldown_end = event_time + BOSS_COOLDOWN_SECONDS
-        config["cooldown_end"] = cooldown_end
         config["last_result"] = outcome
         config["last_detected_at"] = now
+        config["last_outcome_event_time"] = event_time
         config["last_source_message_id"] = source_message_id
         config.pop("message_id", None)
         config.pop("active_boss_channel_id", None)
         config.pop("active_boss_message_id", None)
         config.pop("active_boss_expires_at", None)
+
+        watcher = self.guild_boss_watch_tasks.get(guild_id)
+        if watcher and watcher is not asyncio.current_task():
+            watcher.cancel()
+
+        return config, now
+
+    async def start_defeat_cooldown(
+        self,
+        guild_id: int,
+        source_message_id: int,
+        event_time: int,
+    ) -> None:
+        """Start the five-minute cooldown that follows a defeated guild boss."""
+        claimed = self.claim_boss_outcome(
+            guild_id, source_message_id, "defeated", event_time
+        )
+        if claimed is None:
+            return
+
+        config, now = claimed
+        cooldown_end = event_time + BOSS_COOLDOWN_SECONDS
+        config["cooldown_end"] = cooldown_end
         save_cooldown_config(self.cooldown_config)
 
-        # An old card may say "escaped 2 days ago". Record it, but never create
-        # a fresh alert for a cooldown that already ended.
+        # Ignore an old result whose five-minute defeat cooldown already ended.
         if cooldown_end <= now:
             config["cooldown_end"] = 0
             config["last_result"] = "ready"
             save_cooldown_config(self.cooldown_config)
-            logger.info("Ignored old %s result from %s", outcome, event_time)
+            logger.info("Ignored old defeated result from %s", event_time)
             return
 
-        logger.info("Guild %s boss %s; ready at %s", guild_id, outcome, cooldown_end)
+        logger.info(
+            "Guild %s boss defeated; cooldown ends at %s",
+            guild_id,
+            cooldown_end,
+        )
         await self.send_cooldown_started_message(guild_id)
         self.schedule_ready_update(guild_id, cooldown_end)
+
+    async def finish_boss_escape(
+        self,
+        guild_id: int,
+        source_message_id: int,
+        event_time: int,
+    ) -> None:
+        """Mark the guild ready immediately because escapes have no cooldown."""
+        claimed = self.claim_boss_outcome(
+            guild_id, source_message_id, "escaped", event_time
+        )
+        if claimed is None:
+            return
+
+        config, now = claimed
+        config["cooldown_end"] = 0
+
+        old_task = self.cooldown_tasks.pop(guild_id, None)
+        if old_task:
+            old_task.cancel()
+
+        save_cooldown_config(self.cooldown_config)
+
+        # Do not publish a fresh alert for a very old escaped card encountered
+        # during history restoration or after a long offline period.
+        if now - event_time > BOSS_COOLDOWN_SECONDS:
+            logger.info("Ignored old escaped result from %s", event_time)
+            return
+
+        logger.info(
+            "Guild %s boss escaped at %s; no cooldown applies",
+            guild_id,
+            event_time,
+        )
+        await self.send_escape_ready_message(guild_id)
 
     def schedule_ready_update(self, guild_id: int, cooldown_end: int) -> None:
         old_task = self.cooldown_tasks.pop(guild_id, None)
@@ -1665,15 +1804,10 @@ class BossGenerator(commands.Cog):
         result = str(config.get("last_result") or "ready")
 
         if cooldown_end > now:
-            result_text = (
-                "The guild boss was **defeated**."
-                if result == "defeated"
-                else "The guild boss **escaped**."
-            )
             embed = discord.Embed(
                 title="⏳ Guild Boss Cooldown",
                 description=(
-                    f"{result_text}\n\n"
+                    "The guild boss was **defeated**.\n\n"
                     f"**Next boss cooldown ends:** <t:{cooldown_end}:R>\n"
                     f"**Ready at:** <t:{cooldown_end}:F>"
                 ),
@@ -1703,6 +1837,16 @@ class BossGenerator(commands.Cog):
                 title="⚔️ Guild Boss Active",
                 description=description,
                 color=0x5865F2,
+            )
+
+        if result == "escaped":
+            return discord.Embed(
+                title="✅ Guild Boss Ready",
+                description=(
+                    "The previous guild boss **escaped**. Escapes do not start a "
+                    "cooldown, so a new guild boss can appear immediately."
+                ),
+                color=0x57F287,
             )
 
         return discord.Embed(
@@ -1758,6 +1902,30 @@ class BossGenerator(commands.Cog):
             logger.info("Sent cooldown alert for guild %s", guild_id)
         except (discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Could not send cooldown alert: %s", exc)
+
+    async def send_escape_ready_message(self, guild_id: int) -> None:
+        """Announce that an escaped boss can be replaced immediately."""
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            logger.warning(
+                "Configured cooldown channel for guild %s is unavailable", guild_id
+            )
+            return
+
+        try:
+            await channel.send(
+                embed=discord.Embed(
+                    title="🏃 Guild Boss Escaped",
+                    description=(
+                        "The guild boss escaped. There is **no cooldown after an "
+                        "escape**, so a new guild boss can appear immediately."
+                    ),
+                    color=0x57F287,
+                )
+            )
+            logger.info("Sent boss-escaped ready alert for guild %s", guild_id)
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send boss-escaped alert: %s", exc)
 
     async def send_new_boss_message(self, guild_id: int, expiry: int | None) -> None:
         """Announce a newly detected guild boss once in the configured channel."""

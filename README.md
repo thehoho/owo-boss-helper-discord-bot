@@ -11,9 +11,11 @@ A focused Discord bot that helps with OwO guild-boss fights by generating Neon b
 - Tracks the latest active guild-boss status message in each configured server.
 - Checks the latest tracked boss message every **15 seconds**.
 - Announces when a new guild boss appears.
-- Announces the five-minute cooldown after a defeat or escape.
-- Announces when the cooldown ends.
+- Starts and announces a five-minute cooldown only after a defeat.
+- Marks the guild ready immediately after an escape; escapes have no cooldown.
+- Announces when a defeat cooldown ends.
 - Supports both slash commands and the lightweight `H` helper prefix.
+- Includes an `H help` command with a focused usage guide.
 - Persists the selected notification channel and active watcher state across restarts.
 - Writes rotating runtime logs to `logs/bot.log`.
 
@@ -77,7 +79,15 @@ w boss i
 
 Open all three boss pages. The bot reads the visible page counter and emits the final command in `1/3 → 2/3 → 3/3` order.
 
-### Public cooldown status
+### Helper guide
+
+```text
+H help
+```
+
+Shows the command generator, cooldown-status commands, and server setup instructions.
+
+### Public boss status
 
 ```text
 H boss cd
@@ -87,8 +97,9 @@ H boss cooldown
 Whitespace and capitalization are ignored. These commands show one of:
 
 - Active boss and its escape time
-- Running five-minute cooldown
-- Ready state
+- Running five-minute cooldown after a defeat
+- Immediate ready state after an escape
+- Normal ready state
 
 ### Slash commands
 
@@ -97,7 +108,7 @@ Whitespace and capitalization are ignored. These commands show one of:
 /boss-cooldown
 ```
 
-`/boss-cooldown-channel` selects where automatic new-boss, cooldown, and ready alerts are sent. It requires Manage Server permission by default.
+`/boss-cooldown-channel` selects where automatic new-boss, defeat-cooldown, escape, and ready alerts are sent. It requires Manage Server permission by default.
 
 ## Logging
 
