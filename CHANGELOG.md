@@ -1,5 +1,22 @@
 # Changelog
 
+## 0.6.1-beta
+
+- Increased the personal team-template limit from 10 to 25.
+- Added stable numbered slots from 1–25 for every user's templates.
+- Added automatic migration for existing `team_templates.db` files.
+- Added `HT`, `HTM`, `HT 3`, and `HTM 3` shortcuts.
+- Added compact create commands such as `HT C <name>` and `HTC <name>`.
+- Added deletion by number or name using `HT D`, `HTD`, and full commands.
+- Added guided Quick replace and Exact reset sessions.
+- Guided mode waits for the user's exact command and OwO's confirmation before continuing.
+- Added a five-second safety delay between confirmed steps.
+- Added retry behavior when OwO reports a cooldown or does not confirm a step.
+- Added concurrent guided-session handling for multiple users and channels.
+- Added `HT cancel` to stop an active guided session.
+- Added a final `wtm` verification prompt after setup completes.
+- Kept rotating file logs; SQLite remains dedicated to structured template data.
+
 ## 0.6.0-beta
 
 - Added personal OwO team templates with a limit of 10 per user.

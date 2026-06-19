@@ -130,6 +130,53 @@ The bot outputs each OwO command as its own inline-code line for easy mobile cop
 - `H team help` — opens the team-template guide.
 - `H team delete <name>` — deletes a template.
 
+## Team-template shortcuts and guided setup
+
+Users can save up to **25** personal OwO team templates. Each template receives a stable number from 1–25 and stores every animal position together with its exact six-character weapon ID.
+
+### Save a team
+
+Run `wtm` or `owo team`, open the correct team page, then reply directly to that OwO message with one of these:
+
+- `HT C <name>`
+- `HTC <name>`
+- `HTM C <name>`
+- `H team create <name>`
+
+Saving the same name updates the existing team without changing its number.
+
+### Open saved teams
+
+- `HT`, `HTM`, or `H team` — open the numbered dropdown.
+- `HT3`, `HTM3`, or `H team 3` — open team #3 directly.
+
+Team numbers remain stable after edits. Deleting a team frees that number for a future template.
+
+### Delete teams
+
+- `HT D 3` or `HTD 3` — delete team #3.
+- `HT D <name>` — delete by name.
+- `H team delete <number or name>` — full command.
+
+### Guided team restoration
+
+Selecting **Quick replace** or **Exact reset** now starts guided mode:
+
+1. The complete command packet is shown privately as a backup.
+2. The helper posts the first command in the channel.
+3. The user sends that exact command.
+4. The helper waits for OwO to confirm it.
+5. After a five-second safety delay, the helper posts the next command.
+6. After the final confirmed step, the helper posts `wtm` for verification.
+
+Guided sessions are isolated by server, channel, and user, so multiple people can restore teams at the same time. Use `HT cancel` to stop your current session.
+
+The helper does not send commands to OwO on a user's behalf. It only presents and advances the commands after confirmation.
+
+### Storage
+
+Templates remain in the local `team_templates.db` SQLite database. Runtime diagnostics remain in rotating text files under `logs/`; logs are not moved into the database because they are append-only operational records rather than structured user data.
+
 ## Rate-limit-friendly tracking
 
 The bot does not REST-fetch every OwO message in busy grinding channels.

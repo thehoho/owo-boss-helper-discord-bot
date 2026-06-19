@@ -1,3 +1,9 @@
+"""OwO team-template storage, shortcuts, and guided team restoration.
+
+Templates are stored per Discord user in SQLite with stable slots 1-25.
+Guided mode waits for OwO confirmations and supports concurrent users.
+"""
+
 from __future__ import annotations
 
 import asyncio
@@ -17,19 +23,56 @@ logger = logging.getLogger(__name__)
 
 OWO_BOT_ID = 408785106942164992
 TEAM_SAVE_EMOJI = "💾"
-MAX_TEMPLATES_PER_USER = 10
+MAX_TEMPLATES_PER_USER = 25
 MAX_TEMPLATE_NAME_LENGTH = 40
+GUIDED_STEP_DELAY_SECONDS = 2
+GUIDED_SESSION_TIMEOUT_SECONDS = 15 * 60
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 
-CREATE_RE = re.compile(
-    r"^\s*h\s*team\s*(?:create|save)\s+(.+?)\s*$", re.IGNORECASE
-)
-DELETE_RE = re.compile(
-    r"^\s*h\s*team\s*(?:delete|remove)\s+(.+?)\s*$", re.IGNORECASE
-)
-LIST_RE = re.compile(r"^\s*h\s*teams?\s*$", re.IGNORECASE)
-HELP_RE = re.compile(r"^\s*h\s*team\s*help\s*$", re.IGNORECASE)
+TEAM_COMMAND_PREFIXES = ("h teams", "h team", "hteam", "htm", "ht")
+
+
+def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
+    """Parse long and compact team-helper commands.
+
+    Supported examples:
+    - H team / HT / HTM
+    - H team create name / HT C name / HTC name / HTM C name
+    - HT3 / HTM3 / H team 3
+    - H team delete 3 / HT D 3 / HTD team-name
+    - H team help / HT help
+    - HT cancel
+    """
+    text = re.sub(r"\s+", " ", content or "").strip()
+    lowered = text.lower()
+    prefix = next((item for item in TEAM_COMMAND_PREFIXES if lowered.startswith(item)), None)
+    if prefix is None:
+        return None
+
+    rest = text[len(prefix):].strip()
+    if not rest:
+        return "list", None
+    if rest.isdigit():
+        return "open", rest
+
+    action_match = re.match(
+        r"^(create|save|c|s|delete|remove|d|r|help|h|cancel|stop|x)(?:\s+(.*))?$",
+        rest,
+        re.IGNORECASE,
+    )
+    if not action_match:
+        return None
+
+    action = action_match.group(1).lower()
+    argument = (action_match.group(2) or "").strip() or None
+    if action in {"create", "save", "c", "s"}:
+        return "create", argument
+    if action in {"delete", "remove", "d", "r"}:
+        return "delete", argument
+    if action in {"help", "h"}:
+        return "help", None
+    return "cancel", None
 
 TEAM_MARKERS = (
     "owo team add",
@@ -50,11 +93,37 @@ class TeamMember:
 class TeamTemplate:
     template_id: int
     user_id: int
+    slot: int
     name: str
     source_title: str
     members: tuple[TeamMember, ...]
     created_at: int
     updated_at: int
+
+
+@dataclass
+class GuidedTeamSession:
+    user_id: int
+    guild_id: int
+    channel_id: int
+    template_id: int
+    template_slot: int
+    template_name: str
+    identity_tokens: tuple[str, ...]
+    mode: str
+    commands: tuple[str, ...]
+    next_index: int = 0
+    ready_for_user: bool = False
+    waiting_for_owo: bool = False
+    command_message_id: int | None = None
+    command_sent_at: float = 0.0
+    last_activity: float = 0.0
+
+    @property
+    def expected_command(self) -> str | None:
+        if 0 <= self.next_index < len(self.commands):
+            return self.commands[self.next_index]
+        return None
 
 
 def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
@@ -230,20 +299,67 @@ def quick_replace_commands(template: TeamTemplate) -> list[str]:
 
 
 def format_command_packet(title: str, commands: Iterable[str], note: str) -> str:
+    command_list = list(commands)
     lines = [f"**{title}**", ""]
-    lines.extend(f"`{command}`" for command in commands)
+    lines.extend(f"`{command}`" for command in command_list)
     lines.extend(
         (
             "",
-            "⚠️ **Send the commands one at a time.** Wait for OwO to respond before "
-            "sending the next command; using roughly five seconds between commands is "
-            "a safe fallback when the bot is busy.",
+            "⚠️ **Guided mode is active.** The helper will post the first command "
+            "in the channel. After you send it and OwO confirms it, the helper waits "
+            f"{GUIDED_STEP_DELAY_SECONDS} seconds and posts the next command.",
             note,
-            "Afterward, run `wtm` or `owo team` and verify all three animals and "
-            "weapon IDs before battling.",
+            "The full packet stays here as a backup. At the end, the helper sends "
+            "`wtm` so you can verify all three animals and weapon IDs before battling.",
         )
     )
     return "\n".join(lines)
+
+
+def normalize_owo_command(value: str) -> str:
+    return re.sub(r"\s+", " ", value or "").strip().lower()
+
+
+def classify_team_confirmation(text: str, command: str) -> str | None:
+    """Return `success`, `retry`, or None for an OwO guided-step response."""
+    lowered = re.sub(r"\s+", " ", text or "").lower()
+    normalized = normalize_owo_command(command)
+
+    retry_phrases = (
+        "slow down",
+        "cooldown",
+        "please wait",
+        "try again",
+        "too fast",
+        "use this command again",
+    )
+    if any(phrase in lowered for phrase in retry_phrases):
+        return "retry"
+
+    if normalized.startswith("ww "):
+        if any(phrase in lowered for phrase in ("is now wielding", "now wielding", "equipped")):
+            return "success"
+        return None
+
+    if normalized.startswith("wtm d "):
+        if any(
+            phrase in lowered
+            for phrase in (
+                "team has been updated",
+                "your team has been updated",
+                "no animal",
+                "already empty",
+                "position is empty",
+            )
+        ):
+            return "success"
+        return None
+
+    if normalized.startswith("wtm a "):
+        if any(phrase in lowered for phrase in ("team has been updated", "your team has been updated")):
+            return "success"
+        return None
+    return None
 
 
 async def fetch_raw_message(
@@ -286,6 +402,7 @@ class TeamTemplateStore:
                 CREATE TABLE IF NOT EXISTS team_templates (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     user_id INTEGER NOT NULL,
+                    slot INTEGER,
                     name TEXT NOT NULL COLLATE NOCASE,
                     source_title TEXT NOT NULL DEFAULT '',
                     members_json TEXT NOT NULL,
@@ -295,9 +412,54 @@ class TeamTemplateStore:
                 )
                 """
             )
+
+            columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(team_templates)")
+            }
+            if "slot" not in columns:
+                connection.execute("ALTER TABLE team_templates ADD COLUMN slot INTEGER")
+
+            # Existing v0.6 databases did not have stable team numbers. Assign them
+            # once, in original creation order, and preserve valid slots thereafter.
+            user_rows = connection.execute(
+                "SELECT DISTINCT user_id FROM team_templates"
+            ).fetchall()
+            for user_row in user_rows:
+                user_id = int(user_row["user_id"])
+                rows = connection.execute(
+                    """
+                    SELECT id, slot FROM team_templates
+                    WHERE user_id = ?
+                    ORDER BY created_at ASC, id ASC
+                    """,
+                    (user_id,),
+                ).fetchall()
+                used: set[int] = set()
+                for row in rows:
+                    current = int(row["slot"] or 0)
+                    if 1 <= current <= MAX_TEMPLATES_PER_USER and current not in used:
+                        used.add(current)
+                        continue
+                    slot = next(
+                        number
+                        for number in range(1, MAX_TEMPLATES_PER_USER + 1)
+                        if number not in used
+                    )
+                    connection.execute(
+                        "UPDATE team_templates SET slot = ? WHERE id = ?",
+                        (slot, int(row["id"])),
+                    )
+                    used.add(slot)
+
+            connection.execute("DROP INDEX IF EXISTS idx_team_templates_user")
             connection.execute(
-                "CREATE INDEX IF NOT EXISTS idx_team_templates_user "
-                "ON team_templates(user_id, updated_at DESC)"
+                "CREATE INDEX idx_team_templates_user "
+                "ON team_templates(user_id, slot ASC)"
+            )
+            connection.execute(
+                "CREATE UNIQUE INDEX IF NOT EXISTS idx_team_templates_user_slot "
+                "ON team_templates(user_id, slot)"
             )
 
     async def save(
@@ -333,31 +495,45 @@ class TeamTemplateStore:
         )
         with self._connect() as connection:
             existing = connection.execute(
-                "SELECT id, created_at FROM team_templates WHERE user_id = ? AND name = ?",
+                """
+                SELECT id, slot, created_at FROM team_templates
+                WHERE user_id = ? AND name = ?
+                """,
                 (user_id, name),
             ).fetchone()
             if existing is None:
-                count = connection.execute(
-                    "SELECT COUNT(*) AS total FROM team_templates WHERE user_id = ?",
-                    (user_id,),
-                ).fetchone()["total"]
-                if int(count) >= MAX_TEMPLATES_PER_USER:
+                used_slots = {
+                    int(row["slot"])
+                    for row in connection.execute(
+                        "SELECT slot FROM team_templates WHERE user_id = ? AND slot IS NOT NULL",
+                        (user_id,),
+                    )
+                    if row["slot"] is not None
+                }
+                available_slots = [
+                    slot
+                    for slot in range(1, MAX_TEMPLATES_PER_USER + 1)
+                    if slot not in used_slots
+                ]
+                if not available_slots:
                     return None, (
                         f"You already have {MAX_TEMPLATES_PER_USER} templates. "
-                        "Delete one with `H team delete <name>` before saving another."
+                        "Delete one with `HT D <number or name>` before saving another."
                     )
+                slot = available_slots[0]
                 cursor = connection.execute(
                     """
                     INSERT INTO team_templates
-                        (user_id, name, source_title, members_json, created_at, updated_at)
-                    VALUES (?, ?, ?, ?, ?, ?)
+                        (user_id, slot, name, source_title, members_json, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
                     """,
-                    (user_id, name, source_title, members_json, now, now),
+                    (user_id, slot, name, source_title, members_json, now, now),
                 )
                 template_id = int(cursor.lastrowid)
                 created_at = now
             else:
                 template_id = int(existing["id"])
+                slot = int(existing["slot"])
                 created_at = int(existing["created_at"])
                 connection.execute(
                     """
@@ -372,6 +548,7 @@ class TeamTemplateStore:
             TeamTemplate(
                 template_id=template_id,
                 user_id=user_id,
+                slot=slot,
                 name=name,
                 source_title=source_title,
                 members=members,
@@ -391,7 +568,7 @@ class TeamTemplateStore:
                 """
                 SELECT * FROM team_templates
                 WHERE user_id = ?
-                ORDER BY updated_at DESC, name COLLATE NOCASE ASC
+                ORDER BY slot ASC
                 """,
                 (user_id,),
             ).fetchall()
@@ -409,17 +586,29 @@ class TeamTemplateStore:
             ).fetchone()
         return self._row_to_template(row) if row else None
 
-    async def delete_by_name(self, user_id: int, name: str) -> bool:
+    async def get_by_slot(self, user_id: int, slot: int) -> TeamTemplate | None:
         async with self.lock:
-            return await asyncio.to_thread(self._delete_by_name_sync, user_id, name)
+            return await asyncio.to_thread(self._get_by_slot_sync, user_id, slot)
 
-    def _delete_by_name_sync(self, user_id: int, name: str) -> bool:
+    def _get_by_slot_sync(self, user_id: int, slot: int) -> TeamTemplate | None:
         with self._connect() as connection:
-            cursor = connection.execute(
-                "DELETE FROM team_templates WHERE user_id = ? AND name = ?",
+            row = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND slot = ?",
+                (user_id, slot),
+            ).fetchone()
+        return self._row_to_template(row) if row else None
+
+    async def get_by_name(self, user_id: int, name: str) -> TeamTemplate | None:
+        async with self.lock:
+            return await asyncio.to_thread(self._get_by_name_sync, user_id, name)
+
+    def _get_by_name_sync(self, user_id: int, name: str) -> TeamTemplate | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND name = ?",
                 (user_id, name),
-            )
-        return cursor.rowcount > 0
+            ).fetchone()
+        return self._row_to_template(row) if row else None
 
     async def delete_by_id(self, user_id: int, template_id: int) -> bool:
         async with self.lock:
@@ -432,6 +621,37 @@ class TeamTemplateStore:
                 (user_id, template_id),
             )
         return cursor.rowcount > 0
+
+    async def delete_by_selector(
+        self, user_id: int, selector: str
+    ) -> TeamTemplate | None:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._delete_by_selector_sync, user_id, selector
+            )
+
+    def _delete_by_selector_sync(
+        self, user_id: int, selector: str
+    ) -> TeamTemplate | None:
+        with self._connect() as connection:
+            if selector.isdigit():
+                row = connection.execute(
+                    "SELECT * FROM team_templates WHERE user_id = ? AND slot = ?",
+                    (user_id, int(selector)),
+                ).fetchone()
+            else:
+                row = connection.execute(
+                    "SELECT * FROM team_templates WHERE user_id = ? AND name = ?",
+                    (user_id, selector),
+                ).fetchone()
+            if row is None:
+                return None
+            template = self._row_to_template(row)
+            connection.execute(
+                "DELETE FROM team_templates WHERE id = ? AND user_id = ?",
+                (template.template_id, user_id),
+            )
+            return template
 
     @staticmethod
     def _row_to_template(row: sqlite3.Row) -> TeamTemplate:
@@ -447,6 +667,7 @@ class TeamTemplateStore:
         return TeamTemplate(
             template_id=int(row["id"]),
             user_id=int(row["user_id"]),
+            slot=int(row["slot"]),
             name=str(row["name"]),
             source_title=str(row["source_title"]),
             members=members,
@@ -464,7 +685,7 @@ class OwnedView(discord.ui.View):
         if interaction.user.id == self.owner_id:
             return True
         await interaction.response.send_message(
-            "These team templates belong to another user. Send `H team` to open yours.",
+            "These team templates belong to another user. Send `HT` to open yours.",
             ephemeral=True,
         )
         return False
@@ -485,25 +706,33 @@ class TemplateActionView(OwnedView):
     async def quick_replace(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
+        commands = quick_replace_commands(self.template)
         packet = format_command_packet(
-            f"Quick replace — {self.template.name}",
-            quick_replace_commands(self.template),
-            "This replaces positions directly. If your saved template contains fewer "
-            "than three animals, any unmentioned position may remain unchanged.",
+            f"Quick replace — #{self.template.slot} {self.template.name}",
+            commands,
+            "This replaces positions directly. If the saved template contains fewer "
+            "than three animals, an unmentioned position may remain unchanged.",
         )
         await interaction.response.send_message(packet, ephemeral=True)
+        await self.cog.start_guided_session(
+            interaction, self.template, commands, "Quick replace"
+        )
 
     @discord.ui.button(label="Exact reset", emoji="🔄", style=discord.ButtonStyle.success)
     async def exact_reset(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
+        commands = exact_reset_commands(self.template)
         packet = format_command_packet(
-            f"Exact reset — {self.template.name}",
-            exact_reset_commands(self.template),
+            f"Exact reset — #{self.template.slot} {self.template.name}",
+            commands,
             "This clears all three positions first, then restores the saved animals and "
             "their exact weapon IDs.",
         )
         await interaction.response.send_message(packet, ephemeral=True)
+        await self.cog.start_guided_session(
+            interaction, self.template, commands, "Exact reset"
+        )
 
     @discord.ui.button(label="Delete", emoji="🗑️", style=discord.ButtonStyle.danger)
     async def delete_template(
@@ -514,7 +743,7 @@ class TemplateActionView(OwnedView):
         )
         if deleted:
             await interaction.response.edit_message(
-                content=f"🗑️ Deleted **{self.template.name}**.",
+                content=f"🗑️ Deleted **#{self.template.slot} — {self.template.name}**.",
                 embed=None,
                 view=None,
             )
@@ -537,7 +766,7 @@ class TemplateSelect(discord.ui.Select):
             animals = " / ".join(member.animal for member in template.members)
             options.append(
                 discord.SelectOption(
-                    label=template.name[:100],
+                    label=f"#{template.slot} — {template.name}"[:100],
                     value=str(template.template_id),
                     description=animals[:100] or "Saved OwO team",
                     emoji="🐾",
@@ -556,7 +785,7 @@ class TemplateSelect(discord.ui.Select):
         )
         if template is None:
             await interaction.response.send_message(
-                "That template no longer exists. Run `H team` again.", ephemeral=True
+                "That template no longer exists. Run `HT` again.", ephemeral=True
             )
             return
 
@@ -565,7 +794,7 @@ class TemplateSelect(discord.ui.Select):
             for member in template.members
         )
         embed = discord.Embed(
-            title=f"🐾 {template.name}",
+            title=f"🐾 #{template.slot} — {template.name}",
             description=(
                 f"Saved from **{template.source_title}**\n\n{member_lines}\n\n"
                 "Choose **Quick replace** to overwrite the listed positions, or "
@@ -598,6 +827,8 @@ class TeamTemplates(commands.Cog):
         self.bot = bot
         self.store = TeamTemplateStore(DATABASE_FILE)
         self.reaction_instruction_cooldowns: dict[tuple[int, int], float] = {}
+        self.guided_sessions: dict[tuple[int, int, int], GuidedTeamSession] = {}
+        self.guided_timeout_tasks: dict[tuple[int, int, int], asyncio.Task[None]] = {}
         self._original_boss_help: Any = None
 
     async def cog_load(self) -> None:
@@ -609,6 +840,10 @@ class TeamTemplates(commands.Cog):
         boss_cog = self.bot.get_cog("BossGenerator")
         if boss_cog is not None and self._original_boss_help is not None:
             boss_cog.send_prefix_help = self._original_boss_help
+        for task in self.guided_timeout_tasks.values():
+            task.cancel()
+        self.guided_timeout_tasks.clear()
+        self.guided_sessions.clear()
 
     def _patch_main_help(self) -> None:
         """Extend the existing H help command without coupling the two cog files."""
@@ -618,6 +853,283 @@ class TeamTemplates(commands.Cog):
             return
         self._original_boss_help = boss_cog.send_prefix_help
         boss_cog.send_prefix_help = self.send_combined_help
+
+
+    @staticmethod
+    def guided_key(guild_id: int, channel_id: int, user_id: int) -> tuple[int, int, int]:
+        return guild_id, channel_id, user_id
+
+    def clear_guided_session(self, key: tuple[int, int, int]) -> GuidedTeamSession | None:
+        session = self.guided_sessions.pop(key, None)
+        task = self.guided_timeout_tasks.pop(key, None)
+        if task and task is not asyncio.current_task():
+            task.cancel()
+        return session
+
+    def reset_guided_timeout(
+        self, key: tuple[int, int, int], session: GuidedTeamSession
+    ) -> None:
+        old_task = self.guided_timeout_tasks.pop(key, None)
+        if old_task and old_task is not asyncio.current_task():
+            old_task.cancel()
+        self.guided_timeout_tasks[key] = asyncio.create_task(
+            self.expire_guided_session(key, session)
+        )
+
+    async def expire_guided_session(
+        self, key: tuple[int, int, int], session: GuidedTeamSession
+    ) -> None:
+        try:
+            await asyncio.sleep(GUIDED_SESSION_TIMEOUT_SECONDS)
+            if self.guided_sessions.get(key) is not session:
+                return
+            self.guided_sessions.pop(key, None)
+            self.guided_timeout_tasks.pop(key, None)
+            logger.info(
+                "Expired guided team session for user %s in channel %s",
+                session.user_id,
+                session.channel_id,
+            )
+        except asyncio.CancelledError:
+            return
+
+    async def start_guided_session(
+        self,
+        interaction: discord.Interaction,
+        template: TeamTemplate,
+        commands_to_run: Iterable[str],
+        mode: str,
+    ) -> None:
+        if interaction.guild_id is None or interaction.channel_id is None:
+            return
+        channel = interaction.channel
+        if channel is None or not isinstance(channel, discord.abc.Messageable):
+            return
+
+        key = self.guided_key(
+            interaction.guild_id, interaction.channel_id, interaction.user.id
+        )
+        self.clear_guided_session(key)
+        identity_sources = [
+            getattr(interaction.user, "display_name", ""),
+            getattr(interaction.user, "global_name", ""),
+            getattr(interaction.user, "name", ""),
+        ]
+        identity_tokens = tuple(
+            sorted(
+                {
+                    token.lower()
+                    for source in identity_sources
+                    for token in re.findall(r"[A-Za-z0-9_]{4,}", source or "")
+                },
+                key=len,
+                reverse=True,
+            )
+        )
+        session = GuidedTeamSession(
+            user_id=interaction.user.id,
+            guild_id=interaction.guild_id,
+            channel_id=interaction.channel_id,
+            template_id=template.template_id,
+            template_slot=template.slot,
+            template_name=template.name,
+            identity_tokens=identity_tokens,
+            mode=mode,
+            commands=tuple(commands_to_run),
+            last_activity=time.monotonic(),
+        )
+        self.guided_sessions[key] = session
+        self.reset_guided_timeout(key, session)
+        await self.send_guided_step(channel, session)
+        logger.info(
+            "Started %s guided team session for user %s using team #%s",
+            mode,
+            interaction.user.id,
+            template.slot,
+        )
+
+    async def send_guided_step(
+        self, channel: discord.abc.Messageable, session: GuidedTeamSession
+    ) -> None:
+        expected = session.expected_command
+        if expected is None:
+            return
+        session.ready_for_user = True
+        session.waiting_for_owo = False
+        session.command_message_id = None
+        session.command_sent_at = 0.0
+        session.last_activity = time.monotonic()
+        await channel.send(
+            (
+                f"<@{session.user_id}> **{session.mode} — team "
+                f"#{session.template_slot} `{session.template_name}`**\n"
+                f"Step **{session.next_index + 1}/{len(session.commands)}**:\n"
+                f"`{expected}`\n"
+                "Send this exact command. I will wait for OwO to confirm it, then "
+                f"post the next step after {GUIDED_STEP_DELAY_SECONDS} seconds. "
+                "Use `HT cancel` to stop."
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True, roles=False, everyone=False, replied_user=False
+            ),
+        )
+
+    async def handle_guided_user_command(self, message: discord.Message) -> bool:
+        if message.guild is None:
+            return False
+        key = self.guided_key(message.guild.id, message.channel.id, message.author.id)
+        session = self.guided_sessions.get(key)
+        if session is None or not session.ready_for_user or session.waiting_for_owo:
+            return False
+        expected = session.expected_command
+        if expected is None:
+            return False
+        if normalize_owo_command(message.content) != normalize_owo_command(expected):
+            return False
+
+        session.ready_for_user = False
+        session.waiting_for_owo = True
+        session.command_message_id = message.id
+        session.command_sent_at = time.monotonic()
+        session.last_activity = session.command_sent_at
+        self.reset_guided_timeout(key, session)
+        logger.info(
+            "User %s sent guided team step %s/%s in channel %s",
+            message.author.id,
+            session.next_index + 1,
+            len(session.commands),
+            message.channel.id,
+        )
+        return True
+
+    def find_guided_session_for_owo_message(
+        self, message: discord.Message, text: str
+    ) -> tuple[tuple[int, int, int], GuidedTeamSession, str] | None:
+        if message.guild is None:
+            return None
+        waiting: list[tuple[tuple[int, int, int], GuidedTeamSession]] = []
+        for key, session in self.guided_sessions.items():
+            if session.guild_id != message.guild.id or session.channel_id != message.channel.id:
+                continue
+            if not session.waiting_for_owo or session.expected_command is None:
+                continue
+            if time.monotonic() - session.command_sent_at <= 45:
+                waiting.append((key, session))
+        if not waiting:
+            return None
+
+        reference_id = (
+            message.reference.message_id
+            if message.reference is not None
+            else None
+        )
+        if reference_id is not None:
+            for key, session in waiting:
+                if session.command_message_id == reference_id:
+                    status = classify_team_confirmation(text, session.expected_command or "")
+                    return key, session, status or "retry"
+
+        mentioned_ids = {user.id for user in message.mentions}
+        if mentioned_ids:
+            mentioned = [item for item in waiting if item[1].user_id in mentioned_ids]
+            for key, session in sorted(
+                mentioned, key=lambda item: item[1].command_sent_at
+            ):
+                status = classify_team_confirmation(text, session.expected_command or "")
+                if status is not None:
+                    return key, session, status
+
+        lowered_text = text.lower()
+        identified = [
+            item
+            for item in waiting
+            if any(token in lowered_text for token in item[1].identity_tokens)
+        ]
+        for key, session in sorted(
+            identified, key=lambda item: item[1].command_sent_at
+        ):
+            status = classify_team_confirmation(text, session.expected_command or "")
+            if status is not None:
+                return key, session, status
+
+        classified: list[
+            tuple[tuple[int, int, int], GuidedTeamSession, str]
+        ] = []
+        for key, session in waiting:
+            status = classify_team_confirmation(text, session.expected_command or "")
+            if status is not None:
+                classified.append((key, session, status))
+        if not classified:
+            return None
+
+        # OwO normally processes messages in channel order. FIFO is the safest
+        # fallback when its response does not reference or mention the requester.
+        return min(classified, key=lambda item: item[1].command_sent_at)
+
+    async def handle_guided_owo_confirmation(self, message: discord.Message) -> bool:
+        text = extract_message_text(message)
+        found = self.find_guided_session_for_owo_message(message, text)
+        if found is None:
+            return False
+        key, session, status = found
+        session.waiting_for_owo = False
+        session.command_message_id = None
+        session.last_activity = time.monotonic()
+
+        if status == "success":
+            session.next_index += 1
+        else:
+            logger.info(
+                "OwO did not confirm guided team step for user %s; retrying step %s",
+                session.user_id,
+                session.next_index + 1,
+            )
+        self.reset_guided_timeout(key, session)
+
+        await asyncio.sleep(GUIDED_STEP_DELAY_SECONDS)
+        if self.guided_sessions.get(key) is not session:
+            return True
+
+        channel = message.channel
+        if status == "success" and session.next_index >= len(session.commands):
+            self.clear_guided_session(key)
+            await channel.send(
+                (
+                    f"<@{session.user_id}> ✅ **Team #{session.template_slot} "
+                    f"`{session.template_name}` setup finished.**\n"
+                    "Run this final check and confirm every animal and weapon before battling:\n"
+                    "`wtm`"
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True, roles=False, everyone=False, replied_user=False
+                ),
+            )
+            logger.info(
+                "Completed guided team session for user %s using team #%s",
+                session.user_id,
+                session.template_slot,
+            )
+            return True
+
+        await self.send_guided_step(channel, session)
+        return True
+
+    async def cancel_guided_session(self, message: discord.Message) -> None:
+        if message.guild is None:
+            return
+        key = self.guided_key(message.guild.id, message.channel.id, message.author.id)
+        session = self.clear_guided_session(key)
+        if session is None:
+            await message.reply(
+                "You do not have an active guided team setup in this channel.",
+                mention_author=False,
+            )
+            return
+        await message.reply(
+            f"🛑 Stopped the guided setup for team **#{session.template_slot} "
+            f"{session.template_name}**.",
+            mention_author=False,
+        )
 
     async def send_combined_help(self, message: discord.Message) -> None:
         if message.guild is None:
@@ -651,9 +1163,9 @@ class TeamTemplates(commands.Cog):
         embed.add_field(
             name="💾 Save and restore teams",
             value=(
-                "Reply to an OwO team page with `H team create <name>` to save the "
-                "animals, positions, and exact weapon IDs. Use `H team` to open your "
-                "saved templates, or `H team help` for the complete guide."
+                "Reply to an OwO team page with `HT C <name>` (or the full "
+                "`H team create <name>`) to save animals, positions, and exact weapon "
+                "IDs. Use `HT`, `HT3`, or `HTM3` to open templates quickly."
             ),
             inline=False,
         )
@@ -677,47 +1189,54 @@ class TeamTemplates(commands.Cog):
         embed = discord.Embed(
             title="💾 OwO Team Templates",
             description=(
-                f"Save up to **{MAX_TEMPLATES_PER_USER}** personal team templates. "
-                "Each template stores the animal, its position, and the exact "
+                f"Save up to **{MAX_TEMPLATES_PER_USER}** personal templates. Each "
+                "template keeps a stable number, every animal position, and the exact "
                 "six-character weapon ID."
             ),
             color=0x5865F2,
         )
         embed.add_field(
-            name="1. Show the team you want",
-            value="Send `wtm` or `owo team`, then navigate to the correct team page.",
-            inline=False,
-        )
-        embed.add_field(
-            name="2. Save it",
+            name="Save a team",
             value=(
-                "Reply directly to that OwO message with `H team create <name>`. "
-                "Example: `H team create boss team`. Saving the same name again updates it."
+                "Run `wtm` or `owo team`, open the correct page, and reply to it with "
+                "`HT C <name>`. Full form: `H team create <name>`."
             ),
             inline=False,
         )
         embed.add_field(
-            name="3. Restore it later",
+            name="Open teams",
             value=(
-                "Send `H team`, choose a template from the dropdown, then choose "
-                "**Quick replace** or **Exact reset**."
+                "`HT` or `HTM` opens the dropdown. `HT3` or `HTM3` opens team #3 "
+                "directly without the extra selection step."
             ),
             inline=False,
         )
         embed.add_field(
-            name="Other command",
-            value="`H team delete <name>` removes a saved template.",
+            name="Delete and cancel",
+            value=(
+                "Use `HT D 3` / `HTD 3` to delete by number, or `HT D <name>` to "
+                "delete by name. Use `HT cancel` to stop an active guided setup."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="Guided setup",
+            value=(
+                "Choose **Quick replace** or **Exact reset**. The helper shows the full "
+                "packet, then posts one command at a time. After OwO confirms a step, "
+                f"the next command appears after {GUIDED_STEP_DELAY_SECONDS} seconds."
+            ),
             inline=False,
         )
         embed.set_footer(
-            text="Always wait for OwO's response between setup commands and verify the final team."
+            text="The final step is always wtm so you can verify the finished team."
         )
         await message.reply(embed=embed, mention_author=False)
 
     async def save_from_reply(self, message: discord.Message, requested_name: str) -> None:
         name = re.sub(r"\s+", " ", requested_name).strip()
         if not name:
-            await message.reply("Use `H team create <name>`.", mention_author=False)
+            await message.reply("Use `HT C <name>` or `H team create <name>`.", mention_author=False)
             return
         if len(name) > MAX_TEMPLATE_NAME_LENGTH:
             await message.reply(
@@ -728,7 +1247,7 @@ class TeamTemplates(commands.Cog):
         if message.reference is None or message.reference.message_id is None:
             await message.reply(
                 "Reply directly to the OwO team message you want to save, then send "
-                "`H team create <name>`.",
+                "`HT C <name>` or `H team create <name>`.",
                 mention_author=False,
             )
             return
@@ -775,9 +1294,10 @@ class TeamTemplates(commands.Cog):
             for member in template.members
         )
         embed = discord.Embed(
-            title=f"✅ Team saved: {template.name}",
+            title=f"✅ Team #{template.slot} saved: {template.name}",
             description=(
-                f"{member_lines}\n\nUse `H team` whenever you want to restore it."
+                f"{member_lines}\n\nUse `HT{template.slot}` to open it directly, or "
+                "`HT` to open the full list."
             ),
             color=0x57F287,
         )
@@ -789,21 +1309,48 @@ class TeamTemplates(commands.Cog):
             len(template.members),
         )
 
+    async def send_template_card(
+        self, message: discord.Message, template: TeamTemplate
+    ) -> None:
+        member_lines = "\n".join(
+            f"**{member.position}.** `{member.animal}` — weapon `{member.weapon_id}`"
+            for member in template.members
+        )
+        embed = discord.Embed(
+            title=f"🐾 #{template.slot} — {template.name}",
+            description=(
+                f"Saved from **{template.source_title}**\n\n{member_lines}\n\n"
+                "Choose **Quick replace** to overwrite the listed positions, or "
+                "**Exact reset** to clear all three positions first. Guided mode will "
+                "post each command as OwO confirms the previous one."
+            ),
+            color=0x5865F2,
+        )
+        await message.reply(
+            embed=embed,
+            view=TemplateActionView(self, message.author.id, template),
+            mention_author=False,
+        )
+
     async def show_templates(self, message: discord.Message) -> None:
         templates = await self.store.list_for_user(message.author.id)
         if not templates:
             await message.reply(
                 "You do not have any saved teams yet. Reply to an OwO `wtm` / "
-                "`owo team` message with `H team create <name>`.",
+                "`owo team` message with `HT C <name>`.",
                 mention_author=False,
             )
             return
 
+        numbered = "\n".join(
+            f"`#{template.slot}` **{template.name}**"
+            for template in templates
+        )
         embed = discord.Embed(
             title="🐾 Your saved OwO teams",
             description=(
-                f"You have **{len(templates)}/{MAX_TEMPLATES_PER_USER}** templates. "
-                "Choose one below to view its animals and exact weapon IDs."
+                f"You have **{len(templates)}/{MAX_TEMPLATES_PER_USER}** templates.\n\n"
+                f"{numbered}\n\nChoose one below, or use `HT<number>` such as `HT3`."
             ),
             color=0x5865F2,
         )
@@ -814,17 +1361,49 @@ class TeamTemplates(commands.Cog):
             delete_after=300,
         )
 
-    async def delete_template(self, message: discord.Message, requested_name: str) -> None:
-        name = re.sub(r"\s+", " ", requested_name).strip()
-        deleted = await self.store.delete_by_name(message.author.id, name)
-        if deleted:
-            await message.reply(f"🗑️ Deleted **{name}**.", mention_author=False)
-            logger.info("Deleted team template named %s for user %s", name, message.author.id)
-        else:
+    async def show_template_by_slot(self, message: discord.Message, slot: int) -> None:
+        if not 1 <= slot <= MAX_TEMPLATES_PER_USER:
             await message.reply(
-                f"I could not find a saved template named **{name}**.",
+                f"Team numbers are between **1** and **{MAX_TEMPLATES_PER_USER}**.",
                 mention_author=False,
             )
+            return
+        template = await self.store.get_by_slot(message.author.id, slot)
+        if template is None:
+            await message.reply(
+                f"You do not have a saved team in slot **#{slot}**. Use `HT` to see "
+                "your current list.",
+                mention_author=False,
+            )
+            return
+        await self.send_template_card(message, template)
+
+    async def delete_template(self, message: discord.Message, selector: str | None) -> None:
+        value = re.sub(r"\s+", " ", selector or "").strip()
+        if not value:
+            await message.reply(
+                "Use `HT D <number or name>`, for example `HTD 3` or "
+                "`HT D boss team`.",
+                mention_author=False,
+            )
+            return
+        deleted = await self.store.delete_by_selector(message.author.id, value)
+        if deleted is None:
+            await message.reply(
+                f"I could not find a saved team matching **{value}**.",
+                mention_author=False,
+            )
+            return
+        await message.reply(
+            f"🗑️ Deleted team **#{deleted.slot} — {deleted.name}**.",
+            mention_author=False,
+        )
+        logger.info(
+            "Deleted team template %s (slot %s) for user %s",
+            deleted.template_id,
+            deleted.slot,
+            message.author.id,
+        )
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -832,6 +1411,13 @@ class TeamTemplates(commands.Cog):
             if message.author.bot:
                 if message.author.id != OWO_BOT_ID or message.guild is None:
                     return
+
+                # Guided setup confirmations are handled before normal team-page
+                # detection. Multiple users can have independent sessions in the
+                # same channel; reply/mention matching is preferred, with FIFO as a
+                # fallback for OwO responses that contain neither.
+                await self.handle_guided_owo_confirmation(message)
+
                 text = extract_message_text(message)
                 if parse_team_message(text) is not None:
                     try:
@@ -842,24 +1428,31 @@ class TeamTemplates(commands.Cog):
 
             if message.guild is None:
                 return
-            content = message.content or ""
 
-            match = CREATE_RE.match(content)
-            if match:
-                await self.save_from_reply(message, match.group(1))
+            if await self.handle_guided_user_command(message):
                 return
 
-            match = DELETE_RE.match(content)
-            if match:
-                await self.delete_template(message, match.group(1))
+            parsed = parse_team_helper_command(message.content or "")
+            if parsed is None:
                 return
+            action, argument = parsed
 
-            if HELP_RE.match(content):
+            if action == "create":
+                await self.save_from_reply(message, argument or "")
+                return
+            if action == "delete":
+                await self.delete_template(message, argument)
+                return
+            if action == "help":
                 await self.send_team_help(message)
                 return
-
-            if LIST_RE.match(content):
-                await self.show_templates(message)
+            if action == "cancel":
+                await self.cancel_guided_session(message)
+                return
+            if action == "open":
+                await self.show_template_by_slot(message, int(argument or 0))
+                return
+            await self.show_templates(message)
         except Exception as exc:
             logger.exception("Unhandled team-template message error: %s", exc)
 
@@ -899,9 +1492,9 @@ class TeamTemplates(commands.Cog):
         mention = user.mention if user else f"<@{payload.user_id}>"
         try:
             await channel.send(
-                f"{mention} Reply to this OwO team message with "
-                "`H team create <name>` to save its animals and exact weapon IDs. "
-                "Use `H team help` for the full guide.",
+                f"{mention} Reply to this OwO team message with `HT C <name>` "
+                "(or `H team create <name>`) to save its animals and exact weapon IDs. "
+                "Use `HT help` for the full guide.",
                 reference=discord.MessageReference(
                     message_id=payload.message_id,
                     channel_id=payload.channel_id,
