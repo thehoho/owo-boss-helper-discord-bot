@@ -7,7 +7,7 @@ A focused Discord bot that helps with OwO guild-boss fights by generating Neon b
 - Automatically reads `owo boss i` and `w boss i`.
 - Keeps bosses in OwO's authoritative `1/3`, `2/3`, `3/3` order.
 - Extracts current HP from each individual boss image using bundled digit templates.
-- Generates a mobile-friendly Neon command using inline code.
+- Sends the generated Neon command as a normal inline-code message for easier mobile copying.
 - Tracks the latest active guild-boss status message in each configured server.
 - Uses Discord gateway payloads for discovery instead of fetching every OwO response.
 - Checks only the single latest tracked boss message every **15 seconds**.

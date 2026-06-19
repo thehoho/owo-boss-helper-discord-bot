@@ -59,6 +59,7 @@ PREFIX_HELP_TRIGGERS = {"hhelp"}
 SESSION_TIMEOUT_SECONDS = 180
 BOSS_COOLDOWN_SECONDS = 5 * 60
 OUTCOME_DEDUP_SECONDS = 20
+OUTCOME_SETTLE_SECONDS = 1.25
 BOSS_WATCH_INTERVAL_SECONDS = 15
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -1090,6 +1091,7 @@ class BossGenerator(commands.Cog):
         self.processed_outcome_messages: set[tuple[int, int]] = set()
         self.guild_boss_watch_tasks: dict[int, asyncio.Task] = {}
         self.guild_boss_fetch_locks: dict[int, asyncio.Lock] = {}
+        self.guild_boss_outcome_locks: dict[int, asyncio.Lock] = {}
         self.http_session: aiohttp.ClientSession | None = None
         self.hp_templates = load_hp_templates()
         self._restored = False
@@ -1404,6 +1406,10 @@ class BossGenerator(commands.Cog):
     def get_guild_boss_fetch_lock(self, guild_id: int) -> asyncio.Lock:
         return self.guild_boss_fetch_locks.setdefault(guild_id, asyncio.Lock())
 
+    def get_guild_boss_outcome_lock(self, guild_id: int) -> asyncio.Lock:
+        """Serialize defeat/escape handling so one boss emits one alert."""
+        return self.guild_boss_outcome_locks.setdefault(guild_id, asyncio.Lock())
+
     async def refresh_tracked_guild_boss_status(self, guild_id: int) -> None:
         """Fetch the one tracked boss message and process its latest state."""
         config = self.cooldown_config.get(str(guild_id), {})
@@ -1435,6 +1441,7 @@ class BossGenerator(commands.Cog):
                 guild_id,
                 message_id,
                 expiry,
+                boss_key=expiry,
             )
 
     async def track_latest_guild_boss_message(self, guild_id: int, channel_id: int, message_id: int, data: dict[str, Any]) -> None:
@@ -1541,6 +1548,7 @@ class BossGenerator(commands.Cog):
                             guild_id,
                             message_id,
                             expiry,
+                            boss_key=expiry,
                         )
                         return
                 await asyncio.sleep(BOSS_WATCH_INTERVAL_SECONDS)
@@ -1724,18 +1732,14 @@ class BossGenerator(commands.Cog):
             await channel.send(f"❌ I could not build the boss command: `{exc}`")
             return
 
-        embed = discord.Embed(
-            title="⚔️ Boss Command Ready",
-            description=f"`{command}`",
-            color=0x57F287,
-        )
+        # Send the command as normal message content rather than inside an embed.
+        # Inline code in a regular message is much easier to copy on Discord mobile.
+        await channel.send(f"`{command}`")
         if warnings:
-            embed.add_field(
-                name="Parser note",
-                value="\n".join(f"• {warning}" for warning in warnings[:4]),
-                inline=False,
+            await channel.send(
+                "⚠️ **Parser note**\n"
+                + "\n".join(f"• {warning}" for warning in warnings[:4])
             )
-        await channel.send(embed=embed)
         logger.info(
             "Generated boss command for user %s in channel %s with HP %s",
             session.user_id,
@@ -1765,17 +1769,26 @@ class BossGenerator(commands.Cog):
 
         now = int(time.time())
         event_time = extract_relevant_timestamp(data, now) or now
+
+        # The tracked escape timestamp is a stable identity for the current boss.
+        # OwO can publish/edit more than one result message for the same boss, and
+        # those messages do not always expose exactly the same result timestamp.
+        config = self.cooldown_config.get(str(guild_id), {})
+        boss_key = int(config.get("active_boss_expires_at") or 0) or event_time
+
         if outcome == "escaped":
             await self.finish_boss_escape(
                 guild_id,
                 source_message_id,
                 event_time,
+                boss_key=boss_key,
             )
         else:
             await self.start_defeat_cooldown(
                 guild_id,
                 source_message_id,
                 event_time,
+                boss_key=boss_key,
             )
 
     def claim_boss_outcome(
@@ -1784,6 +1797,7 @@ class BossGenerator(commands.Cog):
         source_message_id: int,
         outcome: str,
         event_time: int,
+        boss_key: int,
     ) -> tuple[dict[str, Any], int] | None:
         """Deduplicate an outcome, clear the active boss, and persist its result."""
         message_key = (guild_id, source_message_id)
@@ -1792,6 +1806,31 @@ class BossGenerator(commands.Cog):
 
         if int(config.get("last_source_message_id") or 0) == source_message_id:
             self.processed_outcome_messages.add(message_key)
+            return None
+
+        previous_boss_key = int(config.get("last_boss_key") or 0)
+        if boss_key and previous_boss_key == boss_key:
+            self.processed_outcome_messages.add(message_key)
+            logger.info(
+                "Ignored duplicate %s result for guild %s boss key %s",
+                outcome,
+                guild_id,
+                boss_key,
+            )
+            return None
+
+        # If a new boss appeared while an older result was settling, never clear
+        # or announce the stale result over the newer active boss.
+        current_boss_key = int(config.get("active_boss_expires_at") or 0)
+        if current_boss_key and boss_key and current_boss_key != boss_key:
+            self.processed_outcome_messages.add(message_key)
+            logger.info(
+                "Ignored stale %s result for guild %s boss key %s; current key is %s",
+                outcome,
+                guild_id,
+                boss_key,
+                current_boss_key,
+            )
             return None
 
         # OwO can publish the same result through more than one replacement
@@ -1817,6 +1856,7 @@ class BossGenerator(commands.Cog):
         config["last_detected_at"] = now
         config["last_outcome_event_time"] = event_time
         config["last_source_message_id"] = source_message_id
+        config["last_boss_key"] = boss_key
         config.pop("message_id", None)
         config.pop("active_boss_channel_id", None)
         config.pop("active_boss_message_id", None)
@@ -1833,69 +1873,91 @@ class BossGenerator(commands.Cog):
         guild_id: int,
         source_message_id: int,
         event_time: int,
+        *,
+        boss_key: int | None = None,
     ) -> None:
         """Start the five-minute cooldown that follows a defeated guild boss."""
-        claimed = self.claim_boss_outcome(
-            guild_id, source_message_id, "defeated", event_time
-        )
-        if claimed is None:
-            return
+        # OwO can emit several edits/replacement messages almost simultaneously.
+        # Let that burst settle, then serialize the final outcome per guild.
+        await asyncio.sleep(OUTCOME_SETTLE_SECONDS)
+        async with self.get_guild_boss_outcome_lock(guild_id):
+            effective_boss_key = int(boss_key or 0) or event_time
+            claimed = self.claim_boss_outcome(
+                guild_id,
+                source_message_id,
+                "defeated",
+                event_time,
+                effective_boss_key,
+            )
+            if claimed is None:
+                return
 
-        config, now = claimed
-        cooldown_end = event_time + BOSS_COOLDOWN_SECONDS
-        config["cooldown_end"] = cooldown_end
-        save_cooldown_config(self.cooldown_config)
-
-        # Ignore an old result whose five-minute defeat cooldown already ended.
-        if cooldown_end <= now:
-            config["cooldown_end"] = 0
-            config["last_result"] = "ready"
+            config, now = claimed
+            cooldown_end = event_time + BOSS_COOLDOWN_SECONDS
+            config["cooldown_end"] = cooldown_end
             save_cooldown_config(self.cooldown_config)
-            logger.info("Ignored old defeated result from %s", event_time)
-            return
 
-        logger.info(
-            "Guild %s boss defeated; cooldown ends at %s",
-            guild_id,
-            cooldown_end,
-        )
-        await self.send_cooldown_started_message(guild_id)
-        self.schedule_ready_update(guild_id, cooldown_end)
+            # Ignore an old result whose five-minute defeat cooldown already ended.
+            if cooldown_end <= now:
+                config["cooldown_end"] = 0
+                config["last_result"] = "ready"
+                save_cooldown_config(self.cooldown_config)
+                logger.info("Ignored old defeated result from %s", event_time)
+                return
+
+            logger.info(
+                "Guild %s boss defeated; cooldown ends at %s",
+                guild_id,
+                cooldown_end,
+            )
+            await self.send_cooldown_started_message(guild_id)
+            self.schedule_ready_update(guild_id, cooldown_end)
 
     async def finish_boss_escape(
         self,
         guild_id: int,
         source_message_id: int,
         event_time: int,
+        *,
+        boss_key: int | None = None,
     ) -> None:
         """Mark the guild ready immediately because escapes have no cooldown."""
-        claimed = self.claim_boss_outcome(
-            guild_id, source_message_id, "escaped", event_time
-        )
-        if claimed is None:
-            return
+        # Wait briefly for OwO's edit burst to settle, then let exactly one task
+        # claim and announce this boss outcome.
+        await asyncio.sleep(OUTCOME_SETTLE_SECONDS)
+        async with self.get_guild_boss_outcome_lock(guild_id):
+            effective_boss_key = int(boss_key or 0) or event_time
+            claimed = self.claim_boss_outcome(
+                guild_id,
+                source_message_id,
+                "escaped",
+                event_time,
+                effective_boss_key,
+            )
+            if claimed is None:
+                return
 
-        config, now = claimed
-        config["cooldown_end"] = 0
+            config, now = claimed
+            config["cooldown_end"] = 0
 
-        old_task = self.cooldown_tasks.pop(guild_id, None)
-        if old_task:
-            old_task.cancel()
+            old_task = self.cooldown_tasks.pop(guild_id, None)
+            if old_task:
+                old_task.cancel()
 
-        save_cooldown_config(self.cooldown_config)
+            save_cooldown_config(self.cooldown_config)
 
-        # Do not publish a fresh alert for a very old escaped card encountered
-        # during history restoration or after a long offline period.
-        if now - event_time > BOSS_COOLDOWN_SECONDS:
-            logger.info("Ignored old escaped result from %s", event_time)
-            return
+            # Do not publish a fresh alert for a very old escaped card encountered
+            # during history restoration or after a long offline period.
+            if now - event_time > BOSS_COOLDOWN_SECONDS:
+                logger.info("Ignored old escaped result from %s", event_time)
+                return
 
-        logger.info(
-            "Guild %s boss escaped at %s; no cooldown applies",
-            guild_id,
-            event_time,
-        )
-        await self.send_escape_ready_message(guild_id)
+            logger.info(
+                "Guild %s boss escaped at %s; no cooldown applies",
+                guild_id,
+                event_time,
+            )
+            await self.send_escape_ready_message(guild_id)
 
     def schedule_ready_update(self, guild_id: int, cooldown_end: int) -> None:
         old_task = self.cooldown_tasks.pop(guild_id, None)
