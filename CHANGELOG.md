@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.6.2-beta
+
+- Removed the artificial delay between confirmed guided setup steps.
+- Interleaved animal-add and weapon-equip commands for faster team switching.
+- Added `HS`, `H skip`, `H escape`, and `HT skip` guided-step shortcuts.
+- Added owner-only **Skip step** and **Cancel** buttons to each guided prompt.
+- Added live handling for OwO's short-lived `This animal is already in your team!` error.
+- Simplified duplicate-animal recovery with `wtm d <animal>` before retrying the add command.
+- Added occupied-position handling while keeping the current step active.
+- Treated already-equipped weapon responses as successful steps.
+- Added optional cleanup of completed user command messages after OwO responds.
+- Preserved concurrent guided sessions by server, channel, and user.
+
 ## 0.6.1-beta
 
 - Increased the personal team-template limit from 10 to 25.

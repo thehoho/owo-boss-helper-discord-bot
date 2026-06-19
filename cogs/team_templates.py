@@ -1,7 +1,8 @@
 """OwO team-template storage, shortcuts, and guided team restoration.
 
 Templates are stored per Discord user in SQLite with stable slots 1-25.
-Guided mode waits for OwO confirmations and supports concurrent users.
+Guided mode alternates animal/weapon commands, waits for OwO confirmations,
+supports skip controls, and safely handles concurrent users.
 """
 
 from __future__ import annotations
@@ -25,7 +26,7 @@ OWO_BOT_ID = 408785106942164992
 TEAM_SAVE_EMOJI = "💾"
 MAX_TEMPLATES_PER_USER = 25
 MAX_TEMPLATE_NAME_LENGTH = 40
-GUIDED_STEP_DELAY_SECONDS = 2
+DELETE_CONFIRMED_USER_COMMANDS = True
 GUIDED_SESSION_TIMEOUT_SECONDS = 15 * 60
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
@@ -42,10 +43,18 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
     - HT3 / HTM3 / H team 3
     - H team delete 3 / HT D 3 / HTD team-name
     - H team help / HT help
+    - HS / H skip / H escape / HT skip
     - HT cancel
     """
     text = re.sub(r"\s+", " ", content or "").strip()
     lowered = text.lower()
+    compact = re.sub(r"\s+", "", lowered)
+
+    # Fast guided-step shortcuts are intentionally separate from HTS because
+    # HTS already means "save" in the compact team command family.
+    if compact in {"hs", "hskip", "hescape"}:
+        return "skip", None
+
     prefix = next((item for item in TEAM_COMMAND_PREFIXES if lowered.startswith(item)), None)
     if prefix is None:
         return None
@@ -57,7 +66,7 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
         return "open", rest
 
     action_match = re.match(
-        r"^(create|save|c|s|delete|remove|d|r|help|h|cancel|stop|x)(?:\s+(.*))?$",
+        r"^(create|save|c|s|delete|remove|d|r|help|h|skip|escape|cancel|stop|x)(?:\s+(.*))?$",
         rest,
         re.IGNORECASE,
     )
@@ -72,6 +81,8 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
         return "delete", argument
     if action in {"help", "h"}:
         return "help", None
+    if action in {"skip", "escape"}:
+        return "skip", None
     return "cancel", None
 
 TEAM_MARKERS = (
@@ -116,6 +127,7 @@ class GuidedTeamSession:
     ready_for_user: bool = False
     waiting_for_owo: bool = False
     command_message_id: int | None = None
+    prompt_message_id: int | None = None
     command_sent_at: float = 0.0
     last_activity: float = 0.0
 
@@ -277,25 +289,23 @@ def parse_team_message(text: str) -> tuple[str, tuple[TeamMember, ...]] | None:
     return source_title[:100], tuple(members)
 
 
+def interleaved_member_commands(template: TeamTemplate) -> list[str]:
+    """Alternate team edits and weapon equips to avoid same-action cooldowns."""
+    commands: list[str] = []
+    for member in template.members:
+        commands.append(f"wtm a {member.animal} {member.position}")
+        commands.append(f"ww {member.weapon_id} {member.position}")
+    return commands
+
+
 def exact_reset_commands(template: TeamTemplate) -> list[str]:
     commands = [f"wtm d {position}" for position in (1, 2, 3)]
-    commands.extend(
-        f"wtm a {member.animal} {member.position}" for member in template.members
-    )
-    commands.extend(
-        f"ww {member.weapon_id} {member.position}" for member in template.members
-    )
+    commands.extend(interleaved_member_commands(template))
     return commands
 
 
 def quick_replace_commands(template: TeamTemplate) -> list[str]:
-    commands = [
-        f"wtm a {member.animal} {member.position}" for member in template.members
-    ]
-    commands.extend(
-        f"ww {member.weapon_id} {member.position}" for member in template.members
-    )
-    return commands
+    return interleaved_member_commands(template)
 
 
 def format_command_packet(title: str, commands: Iterable[str], note: str) -> str:
@@ -305,10 +315,12 @@ def format_command_packet(title: str, commands: Iterable[str], note: str) -> str
     lines.extend(
         (
             "",
-            "⚠️ **Guided mode is active.** The helper will post the first command "
-            "in the channel. After you send it and OwO confirms it, the helper waits "
-            f"{GUIDED_STEP_DELAY_SECONDS} seconds and posts the next command.",
+            "⚠️ **Guided mode is active.** The helper posts one command at a time. "
+            "As soon as OwO confirms a command, the next command appears immediately.",
+            "Animal additions and weapon equips alternate to avoid unnecessary same-action cooldowns.",
             note,
+            "Use `HS` / `H skip` or the **Skip step** button when a saved animal or "
+            "weapon is already correct. Use `HT cancel` to stop.",
             "The full packet stays here as a backup. At the end, the helper sends "
             "`wtm` so you can verify all three animals and weapon IDs before battling.",
         )
@@ -320,8 +332,19 @@ def normalize_owo_command(value: str) -> str:
     return re.sub(r"\s+", " ", value or "").strip().lower()
 
 
+def parse_team_add_target(command: str) -> tuple[str, int] | None:
+    """Return the animal and target position from a guided `wtm a` command."""
+    match = re.fullmatch(
+        r"wtm\s+a\s+(.+?)\s+([1-3])",
+        normalize_owo_command(command),
+    )
+    if not match:
+        return None
+    return match.group(1), int(match.group(2))
+
+
 def classify_team_confirmation(text: str, command: str) -> str | None:
-    """Return `success`, `retry`, or None for an OwO guided-step response."""
+    """Classify OwO success, cooldown, and team-conflict responses."""
     lowered = re.sub(r"\s+", " ", text or "").lower()
     normalized = normalize_owo_command(command)
 
@@ -337,7 +360,16 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
         return "retry"
 
     if normalized.startswith("ww "):
-        if any(phrase in lowered for phrase in ("is now wielding", "now wielding", "equipped")):
+        if any(
+            phrase in lowered
+            for phrase in (
+                "is now wielding",
+                "now wielding",
+                "already wielding",
+                "already equipped",
+                "equipped",
+            )
+        ):
             return "success"
         return None
 
@@ -356,6 +388,25 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
         return None
 
     if normalized.startswith("wtm a "):
+        if any(
+            phrase in lowered
+            for phrase in (
+                "this animal is already in your team",
+                "animal is already in your team",
+                "already on your team",
+            )
+        ):
+            return "animal_already_in_team"
+        if any(
+            phrase in lowered
+            for phrase in (
+                "position is occupied",
+                "position is already occupied",
+                "already an animal in",
+                "already a pet in",
+            )
+        ):
+            return "position_occupied"
         if any(phrase in lowered for phrase in ("team has been updated", "your team has been updated")):
             return "success"
         return None
@@ -691,6 +742,52 @@ class OwnedView(discord.ui.View):
         return False
 
 
+class GuidedStepView(discord.ui.View):
+    """Owner-only controls for one specific guided-session step."""
+
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        session: GuidedTeamSession,
+        step_index: int,
+    ) -> None:
+        super().__init__(timeout=GUIDED_SESSION_TIMEOUT_SECONDS)
+        self.cog = cog
+        self.owner_id = session.user_id
+        self.key = cog.guided_key(
+            session.guild_id, session.channel_id, session.user_id
+        )
+        self.step_index = step_index
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.owner_id:
+            return True
+        await interaction.response.send_message(
+            "This guided setup belongs to another user.", ephemeral=True
+        )
+        return False
+
+    @discord.ui.button(
+        label="Skip step", emoji="⏭️", style=discord.ButtonStyle.secondary
+    )
+    async def skip_step(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await self.cog.skip_guided_step_from_interaction(
+            interaction, self.key, self.step_index
+        )
+
+    @discord.ui.button(
+        label="Cancel", emoji="🛑", style=discord.ButtonStyle.danger
+    )
+    async def cancel(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await self.cog.cancel_guided_session_from_interaction(
+            interaction, self.key, self.step_index
+        )
+
+
 class TemplateActionView(OwnedView):
     def __init__(
         self,
@@ -710,8 +807,9 @@ class TemplateActionView(OwnedView):
         packet = format_command_packet(
             f"Quick replace — #{self.template.slot} {self.template.name}",
             commands,
-            "This replaces positions directly. If the saved template contains fewer "
-            "than three animals, an unmentioned position may remain unchanged.",
+            "This replaces positions directly. If an animal already exists in a "
+            "different slot, OwO may reject the add step; the helper will catch that "
+            "brief error and tell you how to move it. Unmentioned positions remain unchanged.",
         )
         await interaction.response.send_message(packet, ephemeral=True)
         await self.cog.start_guided_session(
@@ -726,8 +824,8 @@ class TemplateActionView(OwnedView):
         packet = format_command_packet(
             f"Exact reset — #{self.template.slot} {self.template.name}",
             commands,
-            "This clears all three positions first, then restores the saved animals and "
-            "their exact weapon IDs.",
+            "This clears all three positions first, then restores each animal and its "
+            "weapon as an alternating pair.",
         )
         await interaction.response.send_message(packet, ephemeral=True)
         await self.cog.start_guided_session(
@@ -949,7 +1047,11 @@ class TeamTemplates(commands.Cog):
         )
 
     async def send_guided_step(
-        self, channel: discord.abc.Messageable, session: GuidedTeamSession
+        self,
+        channel: discord.abc.Messageable,
+        session: GuidedTeamSession,
+        *,
+        notice: str | None = None,
     ) -> None:
         expected = session.expected_command
         if expected is None:
@@ -959,19 +1061,139 @@ class TeamTemplates(commands.Cog):
         session.command_message_id = None
         session.command_sent_at = 0.0
         session.last_activity = time.monotonic()
+
+        lines = [
+            f"<@{session.user_id}> **{session.mode} — team "
+            f"#{session.template_slot} `{session.template_name}`**",
+        ]
+        if notice:
+            lines.extend((notice, ""))
+        lines.extend(
+            (
+                f"Step **{session.next_index + 1}/{len(session.commands)}**:",
+                f"`{expected}`",
+                "Send this exact command. The next step appears immediately after "
+                "OwO confirms it.",
+                "Use `HS` / `H skip` / `H escape` or **Skip step** when this step is already "
+                "correct. Use `HT cancel` to stop.",
+            )
+        )
+        sent = await channel.send(
+            "\n".join(lines),
+            view=GuidedStepView(self, session, session.next_index),
+            allowed_mentions=discord.AllowedMentions(
+                users=True, roles=False, everyone=False, replied_user=False
+            ),
+        )
+        session.prompt_message_id = sent.id
+
+    async def delete_message_safely(
+        self,
+        channel: discord.abc.Messageable,
+        message_id: int | None,
+        *,
+        member_message: bool = False,
+    ) -> None:
+        """Delete a guided message without making cleanup a workflow dependency."""
+        if not message_id:
+            return
+        get_partial = getattr(channel, "get_partial_message", None)
+        if get_partial is None:
+            return
+        try:
+            await get_partial(message_id).delete()
+        except discord.Forbidden:
+            if member_message:
+                logger.debug(
+                    "Manage Messages is unavailable; kept guided user command %s",
+                    message_id,
+                )
+        except (discord.NotFound, discord.HTTPException):
+            return
+
+    async def finish_guided_session(
+        self,
+        channel: discord.abc.Messageable,
+        key: tuple[int, int, int],
+        session: GuidedTeamSession,
+    ) -> None:
+        self.clear_guided_session(key)
         await channel.send(
             (
-                f"<@{session.user_id}> **{session.mode} — team "
-                f"#{session.template_slot} `{session.template_name}`**\n"
-                f"Step **{session.next_index + 1}/{len(session.commands)}**:\n"
-                f"`{expected}`\n"
-                "Send this exact command. I will wait for OwO to confirm it, then "
-                f"post the next step after {GUIDED_STEP_DELAY_SECONDS} seconds. "
-                "Use `HT cancel` to stop."
+                f"<@{session.user_id}> ✅ **Team #{session.template_slot} "
+                f"`{session.template_name}` setup finished.**\n"
+                "Run this final check and confirm every animal and weapon before battling:\n"
+                "`wtm`"
             ),
             allowed_mentions=discord.AllowedMentions(
                 users=True, roles=False, everyone=False, replied_user=False
             ),
+        )
+        logger.info(
+            "Completed guided team session for user %s using team #%s",
+            session.user_id,
+            session.template_slot,
+        )
+
+    async def skip_guided_step_from_interaction(
+        self,
+        interaction: discord.Interaction,
+        key: tuple[int, int, int],
+        step_index: int,
+    ) -> None:
+        session = self.guided_sessions.get(key)
+        if session is None or session.next_index != step_index:
+            await interaction.response.send_message(
+                "That step is no longer active.", ephemeral=True
+            )
+            return
+        if session.waiting_for_owo:
+            await interaction.response.send_message(
+                "OwO is still responding to the command you sent. Wait for that "
+                "response before skipping.",
+                ephemeral=True,
+            )
+            return
+
+        skipped = session.expected_command or "this step"
+        session.next_index += 1
+        session.ready_for_user = False
+        session.prompt_message_id = None
+        session.last_activity = time.monotonic()
+        self.reset_guided_timeout(key, session)
+        await interaction.response.edit_message(
+            content=f"⏭️ Skipped `{skipped}`.", view=None
+        )
+
+        channel = interaction.channel
+        if channel is None or not isinstance(channel, discord.abc.Messageable):
+            return
+        if session.next_index >= len(session.commands):
+            await self.finish_guided_session(channel, key, session)
+        else:
+            await self.send_guided_step(
+                channel, session, notice=f"⏭️ Skipped `{skipped}`."
+            )
+
+    async def cancel_guided_session_from_interaction(
+        self,
+        interaction: discord.Interaction,
+        key: tuple[int, int, int],
+        step_index: int,
+    ) -> None:
+        session = self.guided_sessions.get(key)
+        if session is None or session.next_index != step_index:
+            await interaction.response.send_message(
+                "That guided setup is no longer active.", ephemeral=True
+            )
+            return
+        self.clear_guided_session(key)
+        await interaction.response.edit_message(
+            content=(
+                f"🛑 Stopped the guided setup for team "
+                f"**#{session.template_slot} {session.template_name}**."
+            ),
+            view=None,
         )
 
     async def handle_guided_user_command(self, message: discord.Message) -> bool:
@@ -993,6 +1215,14 @@ class TeamTemplates(commands.Cog):
         session.command_sent_at = time.monotonic()
         session.last_activity = session.command_sent_at
         self.reset_guided_timeout(key, session)
+
+        # Remove the helper's previous prompt as soon as the user sends the expected
+        # command. The member's command stays visible until OwO has responded, so we
+        # never race OwO's message listener.
+        previous_prompt_id = session.prompt_message_id
+        session.prompt_message_id = None
+        await self.delete_message_safely(message.channel, previous_prompt_id)
+
         logger.info(
             "User %s sent guided team step %s/%s in channel %s",
             message.author.id,
@@ -1067,52 +1297,134 @@ class TeamTemplates(commands.Cog):
         return min(classified, key=lambda item: item[1].command_sent_at)
 
     async def handle_guided_owo_confirmation(self, message: discord.Message) -> bool:
+        # OwO error messages can disappear after only a few seconds, but the gateway
+        # event reaches this listener immediately, so no polling or OCR is needed.
         text = extract_message_text(message)
         found = self.find_guided_session_for_owo_message(message, text)
         if found is None:
             return False
         key, session, status = found
+        user_command_message_id = session.command_message_id
         session.waiting_for_owo = False
         session.command_message_id = None
         session.last_activity = time.monotonic()
 
+        if DELETE_CONFIRMED_USER_COMMANDS:
+            # OwO has already responded, so deleting the member's command now cannot
+            # race the OwO listener. Manage Messages is optional; failure is harmless.
+            await self.delete_message_safely(
+                message.channel,
+                user_command_message_id,
+                member_message=True,
+            )
+
+        notice: str | None = None
         if status == "success":
             session.next_index += 1
+        elif status == "animal_already_in_team":
+            target = parse_team_add_target(session.expected_command or "")
+            if target is None:
+                notice = (
+                    "⚠️ This animal is already in your team. If it is in the wrong "
+                    "position, run `wtm d <animal>` and retry this step; if it is already "
+                    "correct, press **Skip step** or type `HS` / `H escape`."
+                )
+            else:
+                animal, target_position = target
+                retry_command = f"wtm a {animal} {target_position}"
+                notice = (
+                    f"⚠️ `{animal}` is already in your team. If it is in the wrong "
+                    f"position, run `wtm d {animal}` then resend `{retry_command}`; if "
+                    "it is already correct, press **Skip step** or type `HS` / `H escape`."
+                )
+            logger.info(
+                "Guided add conflict for user %s at step %s",
+                session.user_id,
+                session.next_index + 1,
+            )
+        elif status == "position_occupied":
+            target = parse_team_add_target(session.expected_command or "")
+            position = target[1] if target else None
+            remove_command = f"`wtm d {position}`" if position else "`wtm d <position>`"
+            notice = (
+                "⚠️ The target team position is occupied. Remove the current animal "
+                f"with {remove_command}, then retry this step. Use `HS` only when the "
+                "saved animal is already correct."
+            )
         else:
+            notice = (
+                "⏳ OwO did not confirm that step, usually because of a temporary "
+                "cooldown. Retry the same command when OwO is ready, or use `HS` to skip it."
+            )
             logger.info(
                 "OwO did not confirm guided team step for user %s; retrying step %s",
                 session.user_id,
                 session.next_index + 1,
             )
-        self.reset_guided_timeout(key, session)
 
-        await asyncio.sleep(GUIDED_STEP_DELAY_SECONDS)
+        self.reset_guided_timeout(key, session)
         if self.guided_sessions.get(key) is not session:
             return True
 
         channel = message.channel
         if status == "success" and session.next_index >= len(session.commands):
-            self.clear_guided_session(key)
-            await channel.send(
-                (
-                    f"<@{session.user_id}> ✅ **Team #{session.template_slot} "
-                    f"`{session.template_name}` setup finished.**\n"
-                    "Run this final check and confirm every animal and weapon before battling:\n"
-                    "`wtm`"
-                ),
-                allowed_mentions=discord.AllowedMentions(
-                    users=True, roles=False, everyone=False, replied_user=False
-                ),
-            )
-            logger.info(
-                "Completed guided team session for user %s using team #%s",
-                session.user_id,
-                session.template_slot,
-            )
+            await self.finish_guided_session(channel, key, session)
             return True
 
-        await self.send_guided_step(channel, session)
+        # No artificial delay: alternating add/equip commands avoids the repeated
+        # action cooldown, and the next prompt appears as soon as OwO responds.
+        await self.send_guided_step(channel, session, notice=notice)
         return True
+
+    async def skip_guided_session(self, message: discord.Message) -> None:
+        if message.guild is None:
+            return
+        key = self.guided_key(message.guild.id, message.channel.id, message.author.id)
+        session = self.guided_sessions.get(key)
+        if session is None:
+            await message.reply(
+                "You do not have an active guided team step in this channel.",
+                mention_author=False,
+            )
+            return
+        if session.waiting_for_owo:
+            await message.reply(
+                "OwO is still responding to the command you sent. Wait for that "
+                "response before using `HS` / `H skip` / `H escape`.",
+                mention_author=False,
+            )
+            return
+
+        skipped = session.expected_command
+        if skipped is None:
+            return
+        previous_prompt_id = session.prompt_message_id
+        session.prompt_message_id = None
+        session.ready_for_user = False
+        session.next_index += 1
+        session.last_activity = time.monotonic()
+        self.reset_guided_timeout(key, session)
+
+        await self.delete_message_safely(message.channel, previous_prompt_id)
+        if DELETE_CONFIRMED_USER_COMMANDS:
+            await self.delete_message_safely(
+                message.channel, message.id, member_message=True
+            )
+
+        logger.info(
+            "User %s skipped guided team step %s in channel %s",
+            message.author.id,
+            session.next_index,
+            message.channel.id,
+        )
+        if session.next_index >= len(session.commands):
+            await self.finish_guided_session(message.channel, key, session)
+            return
+        await self.send_guided_step(
+            message.channel,
+            session,
+            notice=f"⏭️ Skipped `{skipped}`.",
+        )
 
     async def cancel_guided_session(self, message: discord.Message) -> None:
         if message.guild is None:
@@ -1125,10 +1437,18 @@ class TeamTemplates(commands.Cog):
                 mention_author=False,
             )
             return
-        await message.reply(
-            f"🛑 Stopped the guided setup for team **#{session.template_slot} "
-            f"{session.template_name}**.",
-            mention_author=False,
+
+        await self.delete_message_safely(message.channel, session.prompt_message_id)
+        if DELETE_CONFIRMED_USER_COMMANDS:
+            await self.delete_message_safely(
+                message.channel, message.id, member_message=True
+            )
+        await message.channel.send(
+            f"<@{message.author.id}> 🛑 Stopped the guided setup for team "
+            f"**#{session.template_slot} {session.template_name}**.",
+            allowed_mentions=discord.AllowedMentions(
+                users=True, roles=False, everyone=False, replied_user=False
+            ),
         )
 
     async def send_combined_help(self, message: discord.Message) -> None:
@@ -1165,7 +1485,8 @@ class TeamTemplates(commands.Cog):
             value=(
                 "Reply to an OwO team page with `HT C <name>` (or the full "
                 "`H team create <name>`) to save animals, positions, and exact weapon "
-                "IDs. Use `HT`, `HT3`, or `HTM3` to open templates quickly."
+                "IDs. Use `HT`, `HT3`, or `HTM3` to open templates quickly. During "
+                "guided setup, use `HS` / `H skip` / `H escape` when a step is already correct."
             ),
             inline=False,
         )
@@ -1212,10 +1533,11 @@ class TeamTemplates(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="Delete and cancel",
+            name="Delete, skip, and cancel",
             value=(
                 "Use `HT D 3` / `HTD 3` to delete by number, or `HT D <name>` to "
-                "delete by name. Use `HT cancel` to stop an active guided setup."
+                "delete by name. During guided setup, use `HS` / `H skip` / `H escape` to skip "
+                "the current step, or `HT cancel` to stop."
             ),
             inline=False,
         )
@@ -1223,8 +1545,8 @@ class TeamTemplates(commands.Cog):
             name="Guided setup",
             value=(
                 "Choose **Quick replace** or **Exact reset**. The helper shows the full "
-                "packet, then posts one command at a time. After OwO confirms a step, "
-                f"the next command appears after {GUIDED_STEP_DELAY_SECONDS} seconds."
+                "packet, then posts one command at a time. Animal adds and weapon equips "
+                "alternate, and the next command appears immediately after OwO confirms."
             ),
             inline=False,
         )
@@ -1445,6 +1767,9 @@ class TeamTemplates(commands.Cog):
                 return
             if action == "help":
                 await self.send_team_help(message)
+                return
+            if action == "skip":
+                await self.skip_guided_session(message)
                 return
             if action == "cancel":
                 await self.cancel_guided_session(message)

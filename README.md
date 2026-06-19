@@ -177,6 +177,56 @@ The helper does not send commands to OwO on a user's behalf. It only presents an
 
 Templates remain in the local `team_templates.db` SQLite database. Runtime diagnostics remain in rotating text files under `logs/`; logs are not moved into the database because they are append-only operational records rather than structured user data.
 
+## Faster guided team restoration
+
+Guided team setup now alternates each animal add with that animal's weapon equip:
+
+```text
+wtm a hsnake 1
+ww AZWWZV 1
+wtm a 2025dec_daisy 2
+ww DYLYU5 2
+wtm a 2026feb_huba 3
+ww EEK29J 3
+```
+
+The next command appears immediately after OwO confirms the current command. There is no artificial five-second helper delay.
+
+### Skip a step
+
+During an active guided setup, use either:
+
+```text
+HS
+H skip
+H escape
+HT skip
+```
+
+You can also press the **Skip step** button under the current command. This is useful when the animal is already in the correct position or the correct weapon is already equipped.
+
+### Animal conflicts
+
+OwO may briefly respond with `This animal is already in your team!`. The helper catches this short-lived response immediately and keeps the same guided step active.
+
+If the animal is in the wrong position, remove it directly by name:
+
+```text
+wtm d <animal>
+```
+
+Then resend the displayed add command. If the animal is already in the correct position, press **Skip step** or use `HS`, `H skip`, or `H escape`.
+
+### Cleaner guided channels
+
+After OwO responds, the helper attempts to delete the user's completed command message. This cleanup is optional and requires **Manage Messages**. Without that permission, guided setup still works normally and the command remains visible.
+
+The helper also removes its previous step prompt after the user sends the expected command.
+
+### Exact reset note
+
+**Quick replace** alternates animal and weapon commands immediately. **Exact reset** must still clear positions 1–3 before rebuilding the team so animals can safely move between slots. If OwO applies a temporary delete cooldown, the helper keeps the same step active for retrying.
+
 ## Rate-limit-friendly tracking
 
 The bot does not REST-fetch every OwO message in busy grinding channels.
