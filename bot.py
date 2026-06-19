@@ -41,7 +41,6 @@ def configure_logging() -> None:
     file_handler.setFormatter(formatter)
     root_logger.addHandler(file_handler)
 
-    # Keep routine Discord internals quiet while preserving warnings and errors.
     logging.getLogger("discord").setLevel(logging.WARNING)
     logging.getLogger("aiohttp.access").setLevel(logging.WARNING)
 
@@ -59,9 +58,8 @@ intents = discord.Intents.default()
 intents.guilds = True
 intents.messages = True
 intents.message_content = True
+intents.reactions = True
 
-# Text commands are handled intentionally inside the boss cog. Mentioning the bot
-# remains a harmless fallback required by commands.Bot.
 bot = commands.Bot(
     command_prefix=commands.when_mentioned,
     intents=intents,
@@ -83,6 +81,8 @@ async def main() -> None:
     async with bot:
         await bot.load_extension("cogs.boss_generator")
         logger.info("Boss generator and cooldown tracker loaded")
+        await bot.load_extension("cogs.team_templates")
+        logger.info("Team template manager loaded")
         await bot.start(TOKEN)
 
 

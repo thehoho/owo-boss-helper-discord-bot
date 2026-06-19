@@ -6,6 +6,9 @@
 # Runtime state
 boss_cooldown_config.json
 prefix_config.json
+team_templates.db
+team_templates.db-shm
+team_templates.db-wal
 *.json.tmp
 *.log
 logs/

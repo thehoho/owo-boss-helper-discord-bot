@@ -101,6 +101,34 @@ Whitespace and capitalization are ignored. These commands show one of:
 
 `/boss-cooldown-channel` selects where automatic new-boss, cooldown, and ready alerts are sent. It requires Manage Server permission by default.
 
+## Team templates
+
+The helper can save up to 10 personal OwO team templates per Discord user. Each template preserves the animal name, position, and exact six-character weapon ID.
+
+### Save a team
+
+1. Run `wtm` or `owo team` and navigate to the team page you want.
+2. Reply directly to the OwO message with:
+
+`H team create <name>`
+
+Example: `H team create boss team`
+
+Saving an existing name updates that template.
+
+### Restore a team
+
+Run `H team`, select a saved template, then choose:
+
+- **Quick replace** — replaces the listed animal positions and equips their weapons.
+- **Exact reset** — deletes positions 1–3 first, then adds the saved animals and equips the exact weapon IDs.
+
+The bot outputs each OwO command as its own inline-code line for easy mobile copying. Send the commands one at a time, wait for OwO's response between commands, and verify the final team with `wtm` before battling.
+
+### Other commands
+
+- `H team help` — opens the team-template guide.
+- `H team delete <name>` — deletes a template.
 
 ## Rate-limit-friendly tracking
 

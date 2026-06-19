@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.0-beta
+
+- Added personal OwO team templates with a limit of 10 per user.
+- Added `H team create <name>` / `H team save <name>` by replying to an OwO team page.
+- Preserved exact six-character weapon IDs alongside animal names and positions.
+- Added `H team` with a private dropdown-based template selector.
+- Added Quick Replace and Exact Reset command packets.
+- Added `H team delete <name>` and `H team help`.
+- Added a save reaction to recognized OwO team pages.
+- Added persistent SQLite storage in `team_templates.db`.
+- Extended `H help` with team-template instructions.
+
 ## 0.5.1-beta — 2026-06-19
 
 - Sends generated Neon commands as normal Discord messages using single-backtick inline code instead of placing them inside embeds.
