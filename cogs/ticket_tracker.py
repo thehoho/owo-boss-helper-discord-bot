@@ -47,17 +47,11 @@ TICKET_LIST_COMMANDS = {
     "hbosst",
     "hbossticket",
     "hbosstickets",
-    "hbuzzlist",
-    "hbuzzt",
-    "hbuzztickets",
     "hticket",
     "htickets",
     "hticketlist",
     "hticketslist",
     "htl",
-    "ticketlist",
-    "ticketslist",
-    "tlist",
 }
 
 TICKET_COUNT_RE = re.compile(

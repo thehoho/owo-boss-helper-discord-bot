@@ -4,16 +4,6 @@ A community Discord bot for OwO guild-boss fights. It generates Neon battle comm
 
 Made by **Hassaan**.
 
-## Credits
-
-Special thanks to **Pencilvester** for:
-
-- Sharing the original exact-command parsing logic and weapon/passive rarity ranges that helped form the foundation of the boss command generator.
-- Suggesting the original saved team-template concept that inspired the team-management system.
-
-The project has since been substantially expanded with automatic boss reading, HP detection, guild-boss tracking, exact weapon-ID preservation, numbered team slots, and guided team restoration.
-> Independent community project. Not affiliated with Discord, OwO Bot, or NeonUtil.
-
 ## Features
 
 ### Boss command generator
@@ -304,9 +294,6 @@ H ticket list
 H tickets
 H boss list
 H boss t
-H buzz list
-H buzz t
-T list
 HTL
 ```
 
