@@ -12,6 +12,7 @@
 - Treated already-equipped weapon responses as successful steps.
 - Added optional cleanup of completed user command messages after OwO responds.
 - Preserved concurrent guided sessions by server, channel, and user.
+- Expanded the project credits to recognize Pencilvester's original saved team-template with weapon-ID idea.
 
 ## 0.6.1-beta
 

@@ -23,7 +23,12 @@ Made by Hassaan.
 
 ## Credits
 
-Special thanks to **Pencilvester** for sharing the original exact-command parsing logic and the weapon/passive rarity ranges that helped form the foundation of the command generator. The project has since been substantially expanded, adapted, and integrated into this Discord bot.
+Special thanks to **Pencilvester** for:
+
+- Sharing the original exact-command parsing logic and weapon/passive rarity ranges that helped form the foundation of the boss command generator.
+- Suggesting the original saved team-template concept that inspired the team-management system.
+
+The project has since been substantially expanded with automatic boss reading, HP detection, guild-boss tracking, exact weapon-ID preservation, numbered team slots, and guided team restoration.
 
 > This is an independent community project. It is not affiliated with Discord, OwO Bot, or NeonUtil.
 
