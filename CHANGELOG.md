@@ -1,5 +1,25 @@
 # Changelog
 
+## 0.7.1-beta
+
+- Fixed ticket responses being armed but not recorded when OwO's Components V2 text was missing from the high-level message object.
+- Added bounded raw-message fallback reads only for explicitly awaited ticket responses.
+- Added `on_raw_message_edit` handling for OwO ticket responses that finish rendering through an edit.
+- Broadened ticket-count parsing to support both `3/3 boss tickets` and `3/3 tickets` wording.
+- Increased the pending ticket-response window from 25 to 60 seconds.
+- Added manual ticket-list and persistent-board refresh commands:
+  - `H ticket list`
+  - `H tickets`
+  - `H boss list`
+  - `H boss t`
+  - `H buzz list` / `H buzz t`
+  - `T list`
+  - `HTL`
+  - `/boss-ticket-list`
+- Added ticket-board refresh logs showing entry and page counts.
+- Updated `H help` with the new ticket-list commands.
+- Replaced the accumulated README with a single cleaned and current guide.
+
 ## 0.7.0-beta
 
 - Added persistent per-server guild-boss ticket tracking.

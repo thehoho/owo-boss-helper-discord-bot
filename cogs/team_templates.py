@@ -1801,8 +1801,9 @@ class TeamTemplates(commands.Cog):
             name="🎟️ Boss tickets",
             value=(
                 "Run `owo boss t` / `w boss t` anywhere in the server. The helper records "
-                "the reported ticket count and updates the configured ticket board. A server "
-                "manager can select that board channel with `/boss-ticket-channel`."
+                "the reported count and updates the configured board. Use `H ticket list`, "
+                "`H boss t`, `T list`, or `/boss-ticket-list` to show and refresh the list. "
+                "A server manager selects the board channel with `/boss-ticket-channel`."
             ),
             inline=False,
         )

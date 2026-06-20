@@ -1,25 +1,8 @@
 # OwO Boss Helper
 
-A focused Discord bot that helps with OwO guild-boss fights by generating Neon battle commands and tracking guild-boss timing.
+A community Discord bot for OwO guild-boss fights. It generates Neon battle commands, tracks guild-boss timing, saves reusable teams with exact weapon IDs, and maintains a per-server boss-ticket board.
 
-## Features
-
-- Automatically reads `owo boss i` and `w boss i`.
-- Keeps bosses in OwO's authoritative `1/3`, `2/3`, `3/3` order.
-- Extracts current HP from each individual boss image using bundled digit templates.
-- Sends the generated Neon command as a normal inline-code message for easier mobile copying.
-- Tracks the latest active guild-boss status message in each configured server.
-- Uses Discord gateway payloads for discovery instead of fetching every OwO response.
-- Checks only the single latest tracked boss message every **15 seconds**.
-- Announces when a new guild boss appears.
-- Announces the five-minute cooldown after a defeat.
-- Marks the guild ready immediately after an escape.
-- Announces when a defeat cooldown ends.
-- Supports both slash commands and the lightweight `H` helper prefix.
-- Persists the selected notification channel and active watcher state across restarts.
-- Writes rotating runtime logs to `logs/bot.log`.
-
-Made by Hassaan.
+Made by **Hassaan**.
 
 ## Credits
 
@@ -29,8 +12,76 @@ Special thanks to **Pencilvester** for:
 - Suggesting the original saved team-template concept that inspired the team-management system.
 
 The project has since been substantially expanded with automatic boss reading, HP detection, guild-boss tracking, exact weapon-ID preservation, numbered team slots, and guided team restoration.
+> Independent community project. Not affiliated with Discord, OwO Bot, or NeonUtil.
 
-> This is an independent community project. It is not affiliated with Discord, OwO Bot, or NeonUtil.
+## Features
+
+### Boss command generator
+
+- Automatically reacts to `owo boss i` and `w boss i`.
+- Reads all three boss pages in OwO's visible `1/3 → 2/3 → 3/3` order.
+- Extracts current HP from each individual boss image using bundled digit templates.
+- Generates the finished Neon battle command as normal inline-code text for easier mobile copying.
+- Handles touching HP digits and validates suspicious readings.
+- Uses current Bleeding Gaze blueprint ordering with Weapon Cost last.
+
+### Guild-boss tracking
+
+- Detects newly appeared guild bosses.
+- Tracks only the latest active guild-boss message.
+- Polls that one message every 15 seconds instead of fetching every OwO response.
+- Shows the active boss's escape time using Discord timestamps.
+- Starts a five-minute cooldown only after a defeat.
+- Marks the guild ready immediately after an escape.
+- Sends cooldown-complete alerts.
+- Persists configured channels and active watcher state across restarts.
+- Includes duplicate outcome protection and per-guild request locking.
+
+### Team templates
+
+- Saves up to 25 personal templates per Discord user.
+- Stores stable slot numbers from 1–25.
+- Preserves animal positions and exact six-character weapon IDs.
+- Reads animal identity from the OwO emoji alias rather than a renameable nickname.
+- Normalizes standard aliases such as `gfish → fish`, `gspider → spider`, and `hlizard → lizard`.
+- Preserves unknown custom-pet aliases exactly.
+- Supports Quick replace and Exact reset.
+- Guides users one command at a time and waits for OwO's response before advancing.
+- Alternates animal-add and weapon-equip commands for faster restoration.
+- Supports concurrent guided sessions by server, channel, and user.
+- Handles already-present animals, occupied positions, missing weapons, retries, skips, and cancellations.
+- Can optionally clean completed command messages when the bot has **Manage Messages**.
+
+### Boss-ticket board
+
+- Watches explicit ticket checks:
+  - `owo boss t`
+  - `owo boss ticket`
+  - `w boss t`
+  - `w boss ticket`
+- Associates each OwO response with the requesting Discord user.
+- Stores reported `0/3`–`3/3` counts per server.
+- Maintains one persistent board in a configured channel.
+- Shows username, Discord user ID, ticket count, update time, and next replenishment.
+- Splits large lists into multiple pages.
+- Uses `America/Los_Angeles` so Pacific daylight-saving changes are handled automatically.
+- Supports manual list display and board refresh commands.
+- Reads Components V2 ticket responses from both message-create and message-edit events, with a bounded raw-message fallback only after an explicit ticket request.
+
+### Logging
+
+- Writes runtime activity to `logs/bot.log`.
+- Rotates at 5 MB with up to five backup files.
+- Does not log the bot token or `.env` contents.
+
+## Credits
+
+Special thanks to **Pencilvester** for:
+
+- Sharing the original exact-command parsing logic and weapon/passive rarity ranges that helped form the foundation of the boss command generator.
+- Suggesting the original saved team-template concept that inspired the team-management system.
+
+The project has since been substantially expanded with automatic boss reading, HP detection, rate-limit-friendly guild-boss tracking, exact weapon-ID preservation, numbered team slots, guided restoration, and boss-ticket tracking.
 
 ## Requirements
 
@@ -38,27 +89,37 @@ The project has since been substantially expanded with automatic boss reading, H
 - A Discord bot application
 - Message Content Intent enabled
 
+Install dependencies:
+
+```bat
+py -m pip install --upgrade -r requirements.txt
+```
+
 ## Setup on Windows
 
 ```bat
 cd /d D:\owo-boss-helper-discord-bot
-py -m pip install -r requirements.txt
 copy .env.example .env
 notepad .env
 py bot.py
 ```
 
-Put your private bot token in `.env`:
+Add your private token to `.env`:
 
 ```env
 DISCORD_TOKEN=your_real_bot_token_here
 ```
 
-Never upload `.env` or share your token.
+Never upload `.env` or share the token.
 
-## Discord permissions
+## Discord installation
 
-The bot needs:
+Recommended scopes:
+
+- `bot`
+- `applications.commands`
+
+Required permissions:
 
 - View Channels
 - Send Messages
@@ -66,96 +127,112 @@ The bot needs:
 - Read Message History
 - Add Reactions
 
-Installation scopes:
+Optional permission:
 
-- `bot`
-- `applications.commands`
+- Manage Messages — allows guided team setup to remove completed user command messages.
+
+The bot does not require Administrator permission.
 
 ## Commands
 
-### Boss command generator
-
-Run either:
+### Boss generator
 
 ```text
 owo boss i
 w boss i
 ```
 
-Open all three boss pages. The bot reads the visible page counter and emits the final command in `1/3 → 2/3 → 3/3` order.
+Open all three pages. The helper captures each visible page number and emits the final command in the correct order.
 
-### Public cooldown status
+### Guild-boss status
 
 ```text
 H boss cd
 H boss cooldown
-```
-
-Whitespace and capitalization are ignored. These commands show one of:
-
-- Active boss and its escape time
-- Running five-minute cooldown
-- Ready state
-
-### Slash commands
-
-```text
-/boss-cooldown-channel
 /boss-cooldown
 ```
 
-`/boss-cooldown-channel` selects where automatic new-boss, cooldown, and ready alerts are sent. It requires Manage Server permission by default.
+Possible states:
 
-## Team-template shortcuts and guided setup
+- Guild boss active, with escape time
+- Five-minute defeat cooldown
+- Ready for a new boss
 
-Users can save up to **25** personal OwO team templates. Each template receives a stable number from 1–25 and stores every animal position together with its exact six-character weapon ID.
+Server setup:
+
+```text
+/boss-cooldown-channel
+```
+
+This selects the channel for new-boss, defeat, escape, cooldown, and ready alerts.
+
+### Help
+
+```text
+H help
+```
+
+## Team templates
 
 ### Save a team
 
-Run `wtm` or `owo team`, open the correct team page, then reply directly to that OwO message with one of these:
+Run `wtm` or `owo team`, open the correct team page, and reply directly to the OwO message:
 
-- `HT C <name>`
-- `HTC <name>`
-- `HTM C <name>`
-- `H team create <name>`
+```text
+HT C <name>
+HTC <name>
+HTM C <name>
+H team create <name>
+```
 
-Saving the same name updates the existing team without changing its number.
+Saving the same name updates that template without changing its stable slot.
 
-### Open saved teams
+### Update a team by slot or name
 
-- `HT`, `HTM`, or `H team` — open the numbered dropdown.
-- `HT3`, `HTM3`, or `H team 3` — open team #3 directly.
+Reply to a fresh OwO team page:
 
-Team numbers remain stable after edits. Deleting a team frees that number for a future template.
+```text
+HT U 3
+HTU 3
+HT U boss team
+H team update boss team
+```
 
-### Delete teams
+The helper shows the previous and updated animals and weapon IDs.
 
-- `HT D 3` or `HTD 3` — delete team #3.
-- `HT D <name>` — delete by name.
-- `H team delete <number or name>` — full command.
+### Open templates
 
-### Guided team restoration
+```text
+HT
+HTM
+H team
+```
 
-Selecting **Quick replace** or **Exact reset** now starts guided mode:
+Open a specific slot directly:
 
-1. The complete command packet is shown privately as a backup.
-2. The helper posts the first command in the channel.
-3. The user sends that exact command.
-4. The helper waits for OwO to confirm it.
-5. After a five-second safety delay, the helper posts the next command.
-6. After the final confirmed step, the helper posts `wtm` for verification.
+```text
+HT3
+HTM3
+H team 3
+```
 
-Guided sessions are isolated by server, channel, and user, so multiple people can restore teams at the same time. Use `HT cancel` to stop your current session.
+### Delete templates
 
-The helper does not send commands to OwO on a user's behalf. It only presents and advances the commands after confirmation.
+```text
+HT D 3
+HTD 3
+HT D <name>
+H team delete <number or name>
+```
 
-### Storage
+### Guided restoration
 
-Templates remain in the local `team_templates.db` SQLite database. Runtime diagnostics remain in rotating text files under `logs/`; logs are not moved into the database because they are append-only operational records rather than structured user data.
+Choose one of the buttons on a saved team:
 
-## Faster guided team restoration
+- **Quick replace** — overwrites listed positions and equips each saved weapon.
+- **Exact reset** — clears positions 1–3, then rebuilds the team.
 
-Guided team setup now alternates each animal add with that animal's weapon equip:
+Quick replace alternates commands:
 
 ```text
 wtm a hsnake 1
@@ -166,11 +243,9 @@ wtm a 2026feb_huba 3
 ww EEK29J 3
 ```
 
-The next command appears immediately after OwO confirms the current command. There is no artificial five-second helper delay.
+The next command appears immediately after OwO confirms the current one.
 
-### Skip a step
-
-During an active guided setup, use either:
+Skip the current step:
 
 ```text
 HS
@@ -179,85 +254,37 @@ H escape
 HT skip
 ```
 
-You can also press the **Skip step** button under the current command. This is useful when the animal is already in the correct position or the correct weapon is already equipped.
-
-### Animal conflicts
-
-OwO may briefly respond with `This animal is already in your team!`. The helper catches this short-lived response immediately and keeps the same guided step active.
-
-If the animal is in the wrong position, remove it directly by name:
+Stop the setup:
 
 ```text
-wtm d <animal>
+HT cancel
 ```
 
-Then resend the displayed add command. If the animal is already in the correct position, press **Skip step** or use `HS`, `H skip`, or `H escape`.
+The prompt also provides owner-only **Skip step** and **Cancel** buttons.
 
-## Renamed and custom pet support
+### Team validation
 
-Team templates now identify each animal from the first OwO animal emoji alias on the team card instead of trusting the visible pet nickname.
+- All three animal positions are required.
+- Animals with missing weapons are preserved and shown in a confirmation prompt.
+- Saving without a missing weapon omits only that position's invalid `ww` command.
+- Renamed animals use the OwO emoji alias, not the visible nickname.
+- Previously saved templates containing incorrect custom nicknames should be saved again from a fresh OwO team page.
 
-This means renamed pets such as:
+## Boss tickets
 
-```text
-:gspider: just
-:gfish: f i s h
-:hlizard: l i z a r d
-```
+### Configure the persistent board
 
-are saved as:
-
-```text
-spider
-fish
-lizard
-```
-
-Known standard animals automatically drop their rank prefix when OwO accepts the normal animal name. Examples include `gfish → fish`, `gspider → spider`, `llion → lion`, `deagle → eagle`, and `hlizard → lizard`.
-
-Unknown custom or event pet aliases are preserved exactly instead of being guessed. For example, `:custompet231:` is stored as `custompet231` and used in the guided `wtm a` command.
-
-Templates saved before this update with renamed pets must be saved again from their OwO team page because the old database record contains only the incorrect visible nickname and cannot recover the original emoji alias.
-
-### Cleaner guided channels
-
-After OwO responds, the helper attempts to delete the user's completed command message. This cleanup is optional and requires **Manage Messages**. Without that permission, guided setup still works normally and the command remains visible.
-
-The helper also removes its previous step prompt after the user sends the expected command.
-
-### Exact reset note
-
-**Quick replace** alternates animal and weapon commands immediately. **Exact reset** must still clear positions 1–3 before rebuilding the team so animals can safely move between slots. If OwO applies a temporary delete cooldown, the helper keeps the same step active for retrying.
-
-## Team completeness and updates
-
-Team templates now validate all three positions before saving or updating.
-
-- Empty positions are rejected with a clear warning.
-- Animals without a weapon are kept instead of being silently dropped.
-- When one or more weapons are missing, the user must choose **Save without weapons** or **Cancel**.
-- Templates saved without a weapon still restore the animal, but no `ww` command is generated for that position.
-
-Reply to a fresh OwO team page to update an existing template by number or name:
-
-```text
-HT U 3
-HTU 3
-HT U boss team
-H team update boss team
-```
-
-The existing stable team number and template name are preserved. The bot shows the previous and updated animals and weapon IDs after a successful update.
-
-## Guild boss ticket tracking
-
-A server manager can choose a ticket-board channel with:
+A server manager runs:
 
 ```text
 /boss-ticket-channel
 ```
 
-Users can refresh their current count anywhere the bot can read messages by running:
+Choose the channel where the board should be created and maintained.
+
+### Update a user's count
+
+A user runs any ticket command anywhere the helper can read messages:
 
 ```text
 owo boss t
@@ -266,68 +293,60 @@ w boss t
 w boss ticket
 ```
 
-The helper associates the OwO response with the requesting Discord user, stores the reported `0/3`–`3/3` count, and edits the persistent ticket board in the configured channel.
+The tracker records only the ticket count OwO actually reports. It does not infer ticket usage from battles or other servers.
 
-The board includes:
+### Show and refresh the complete list
 
-- Discord username
-- Discord user ID
-- Current reported boss tickets
-- How recently the user checked
-- The next daily replenishment time using Discord timestamps
-
-Large servers are split into multiple board pages automatically. Counts are stored separately for each Discord server.
-
-Boss tickets reset to three at midnight in `America/Los_Angeles`. This timezone automatically follows PST/PDT daylight-saving changes, so the displayed Discord timestamp remains correct for every viewer throughout the year.
-
-Ticket data is stored locally in:
+Public text aliases:
 
 ```text
-boss_tickets.db
+H ticket list
+H tickets
+H boss list
+H boss t
+H buzz list
+H buzz t
+T list
+HTL
 ```
 
-Keep this database when moving the bot to another computer or host. It is ignored by Git together with its SQLite sidecar files.
-
-## Rate-limit-friendly tracking
-
-The bot does not REST-fetch every OwO message in busy grinding channels.
-
-- While a boss is active, incoming gateway payloads are inspected locally so newer status cards can replace the tracked message.
-- During a five-minute defeat cooldown, unrelated OwO traffic is ignored because a new boss cannot appear.
-- When the guild is ready to spawn, gateway payloads are inspected locally for the next boss card.
-- Only the one currently tracked boss message is fetched every 15 seconds.
-- The three-page generator may make a small, bounded number of fetches after a user explicitly runs `owo boss i` or `w boss i`.
-
-## Logging
-
-Runtime activity is written to:
+Private slash command:
 
 ```text
-logs/bot.log
+/boss-ticket-list
 ```
 
-Logs rotate automatically at 5 MB, with up to five backup files:
+These commands display the current list and also refresh the configured persistent board when one exists.
+
+### Ticket replenishment
+
+Ticket cycles follow midnight in:
 
 ```text
-bot.log
-bot.log.1
-bot.log.2
-...
+America/Los_Angeles
 ```
 
-The logs include startup, boss-page captures, HP detection, generated commands, active-boss tracking, cooldown events, alerts, and errors. Tokens and `.env` contents are never logged.
+Discord timestamps display the corresponding local time for every viewer.
 
-## Private runtime files
+## Storage
 
-These remain local and are ignored by Git:
+Runtime state remains local:
 
 ```text
 .env
 boss_cooldown_config.json
+team_templates.db
+team_templates.db-shm
+team_templates.db-wal
+boss_tickets.db
+boss_tickets.db-shm
+boss_tickets.db-wal
 logs/
-__pycache__/
-*.pyc
 ```
+
+These files are ignored by Git.
+
+When moving the bot to another computer or host, copy both SQLite databases and `boss_cooldown_config.json` to preserve saved teams, ticket data, board configuration, and boss watcher state.
 
 ## Project structure
 
@@ -335,12 +354,12 @@ __pycache__/
 owo-boss-helper-discord-bot/
 ├── assets/
 │   └── hp_digits/
-cogs/
-├── __init__.py
-├── boss_generator.py
-└── team_templates.py
-│── team_templates.db        # created automatically, ignored by Git
-├── logs/                  # created automatically
+├── cogs/
+│   ├── __init__.py
+│   ├── boss_generator.py
+│   ├── team_templates.py
+│   └── ticket_tracker.py
+├── logs/                         # created automatically
 ├── .env.example
 ├── .gitignore
 ├── bot.py
@@ -349,6 +368,26 @@ cogs/
 ├── README.md
 └── requirements.txt
 ```
+
+Generated locally and ignored by Git:
+
+```text
+boss_cooldown_config.json
+team_templates.db
+boss_tickets.db
+```
+
+## Updating
+
+Stop the running bot, replace the updated source files, then run:
+
+```bat
+py -m pip install --upgrade -r requirements.txt
+rmdir /s /q cogs\__pycache__ 2>nul
+py bot.py
+```
+
+Do not delete `.env`, `boss_cooldown_config.json`, `team_templates.db`, `boss_tickets.db`, or `logs/` during an update.
 
 ## License
 

@@ -29,7 +29,7 @@ OWO_BOT_ID = 408785106942164992
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 PACIFIC = ZoneInfo("America/Los_Angeles")
-PENDING_REQUEST_SECONDS = 25
+PENDING_REQUEST_SECONDS = 60
 BOARD_PAGE_SIZE = 20
 MAX_TICKETS = 3
 
@@ -42,8 +42,26 @@ TICKET_COMMANDS = {
     "wbosstickets",
 }
 
+TICKET_LIST_COMMANDS = {
+    "hbosslist",
+    "hbosst",
+    "hbossticket",
+    "hbosstickets",
+    "hbuzzlist",
+    "hbuzzt",
+    "hbuzztickets",
+    "hticket",
+    "htickets",
+    "hticketlist",
+    "hticketslist",
+    "htl",
+    "ticketlist",
+    "ticketslist",
+    "tlist",
+}
+
 TICKET_COUNT_RE = re.compile(
-    r"(?:currently\s+have|have)\s+([0-3])\s*/\s*3\s+boss\s+tickets?",
+    r"(?<!\d)([0-3])\s*/\s*3\s+(?:boss\s+)?tickets?\b",
     re.IGNORECASE,
 )
 
@@ -75,6 +93,10 @@ def normalize_ticket_command(content: str) -> str:
 
 def is_ticket_command(content: str) -> bool:
     return normalize_ticket_command(content) in TICKET_COMMANDS
+
+
+def is_ticket_list_command(content: str) -> bool:
+    return normalize_ticket_command(content) in TICKET_LIST_COMMANDS
 
 
 def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
@@ -140,6 +162,29 @@ def extract_message_text(message: discord.Message) -> str:
             chunks.extend((field.name, field.value))
     _walk_text(message.components, chunks, set())
     return "\n".join(chunk.strip() for chunk in chunks if chunk and chunk.strip())
+
+
+def extract_raw_text(data: dict[str, Any]) -> str:
+    chunks: list[str] = []
+    _walk_text(data, chunks, set())
+    return "\n".join(chunk.strip() for chunk in chunks if chunk and chunk.strip())
+
+
+async def fetch_raw_message(
+    bot: commands.Bot, channel_id: int, message_id: int
+) -> dict[str, Any] | None:
+    try:
+        route = discord.http.Route(
+            "GET",
+            "/channels/{channel_id}/messages/{message_id}",
+            channel_id=channel_id,
+            message_id=message_id,
+        )
+        data = await bot.http.request(route)
+        return data if isinstance(data, dict) else None
+    except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+        logger.warning("Could not fetch OwO ticket response %s: %s", message_id, exc)
+        return None
 
 
 def parse_ticket_count(text: str) -> int | None:
@@ -416,6 +461,7 @@ class TicketTracker(commands.Cog):
         self.pending_by_channel: dict[int, list[PendingTicketRequest]] = {}
         self.board_locks: dict[int, asyncio.Lock] = {}
         self.reset_task: asyncio.Task[None] | None = None
+        self.processed_responses: dict[tuple[int, int], float] = {}
         self._restored = False
 
     async def cog_load(self) -> None:
@@ -467,24 +513,30 @@ class TicketTracker(commands.Cog):
             message.guild.id,
         )
 
-    def match_pending_request(
-        self, message: discord.Message, text: str
+    def match_pending_request_data(
+        self,
+        *,
+        guild_id: int,
+        channel_id: int,
+        text: str,
+        reference_id: int | None = None,
+        mentioned_ids: set[int] | None = None,
     ) -> PendingTicketRequest | None:
-        pending = self.purge_pending(message.channel.id)
+        pending = [
+            item
+            for item in self.purge_pending(channel_id)
+            if item.guild_id == guild_id
+        ]
         if not pending:
             return None
 
-        reference_id = (
-            message.reference.message_id if message.reference is not None else None
-        )
         if reference_id is not None:
             for item in pending:
                 if item.command_message_id == reference_id:
                     return item
 
-        mentioned_ids = {user.id for user in message.mentions}
         for item in pending:
-            if item.user_id in mentioned_ids:
+            if item.user_id in (mentioned_ids or set()):
                 return item
 
         normalized_text = re.sub(r"[^a-z0-9_]", "", text.lower())
@@ -496,9 +548,36 @@ class TicketTracker(commands.Cog):
         if identified:
             return min(identified, key=lambda item: item.created_at)
 
-        # OwO normally answers ticket checks in channel order. FIFO is a safe final
-        # fallback when the response contains a decorated nickname rather than a mention.
+        # OwO normally answers ticket checks in channel order. FIFO remains a safe
+        # final fallback when the response contains a decorated nickname.
         return min(pending, key=lambda item: item.created_at)
+
+    def match_pending_request(
+        self, message: discord.Message, text: str
+    ) -> PendingTicketRequest | None:
+        reference_id = (
+            message.reference.message_id if message.reference is not None else None
+        )
+        return self.match_pending_request_data(
+            guild_id=message.guild.id if message.guild else 0,
+            channel_id=message.channel.id,
+            text=text,
+            reference_id=reference_id,
+            mentioned_ids={user.id for user in message.mentions},
+        )
+
+    def response_already_processed(self, guild_id: int, message_id: int) -> bool:
+        now = time.monotonic()
+        self.processed_responses = {
+            key: seen_at
+            for key, seen_at in self.processed_responses.items()
+            if now - seen_at <= 120
+        }
+        key = (guild_id, message_id)
+        if key in self.processed_responses:
+            return True
+        self.processed_responses[key] = now
+        return False
 
     def consume_pending(self, request: PendingTicketRequest) -> None:
         pending = self.pending_by_channel.get(request.channel_id, [])
@@ -523,43 +602,148 @@ class TicketTracker(commands.Cog):
         if changed_guilds:
             logger.info("Applied daily boss-ticket reset for %s guild(s)", len(changed_guilds))
 
+    async def record_ticket_response(
+        self,
+        *,
+        guild_id: int,
+        channel_id: int,
+        message_id: int,
+        text: str,
+        reference_id: int | None = None,
+        mentioned_ids: set[int] | None = None,
+    ) -> bool:
+        tickets = parse_ticket_count(text)
+        if tickets is None:
+            return False
+
+        request = self.match_pending_request_data(
+            guild_id=guild_id,
+            channel_id=channel_id,
+            text=text,
+            reference_id=reference_id,
+            mentioned_ids=mentioned_ids,
+        )
+        if request is None:
+            logger.info(
+                "Readable boss-ticket response %s had no pending request in guild %s",
+                message_id,
+                guild_id,
+            )
+            return False
+        if self.response_already_processed(guild_id, message_id):
+            return True
+
+        self.consume_pending(request)
+        await self.store.upsert_status(
+            request.guild_id,
+            request.user_id,
+            request.username,
+            tickets,
+        )
+        logger.info(
+            "Updated boss tickets for user %s in guild %s: %s/3",
+            request.user_id,
+            request.guild_id,
+            tickets,
+        )
+        if await self.store.get_config(request.guild_id) is not None:
+            await self.refresh_board(request.guild_id)
+        return True
+
+    async def read_ticket_response_message(self, message: discord.Message) -> bool:
+        if message.guild is None:
+            return False
+        if not self.purge_pending(message.channel.id):
+            return False
+
+        text = extract_message_text(message)
+        if parse_ticket_count(text) is None:
+            # Some Components V2 responses are incomplete on the high-level Message
+            # object. Fetch only this explicitly awaited ticket response, never general
+            # OwO traffic. A short second attempt covers create-then-edit responses.
+            raw = await fetch_raw_message(self.bot, message.channel.id, message.id)
+            if raw is not None:
+                text = extract_raw_text(raw)
+            if parse_ticket_count(text) is None:
+                await asyncio.sleep(0.35)
+                raw = await fetch_raw_message(self.bot, message.channel.id, message.id)
+                if raw is not None:
+                    text = extract_raw_text(raw)
+
+        if parse_ticket_count(text) is None:
+            logger.warning(
+                "Could not read ticket count from awaited OwO response %s in guild %s",
+                message.id,
+                message.guild.id,
+            )
+            return False
+        return await self.record_ticket_response(
+            guild_id=message.guild.id,
+            channel_id=message.channel.id,
+            message_id=message.id,
+            text=text,
+            reference_id=(
+                message.reference.message_id if message.reference is not None else None
+            ),
+            mentioned_ids={user.id for user in message.mentions},
+        )
+
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         try:
             if message.guild is None:
                 return
             if not message.author.bot:
+                if is_ticket_list_command(message.content or ""):
+                    await self.send_ticket_list(message)
+                    return
                 if is_ticket_command(message.content or ""):
                     self.arm_ticket_request(message)
                 return
 
             if message.author.id != OWO_BOT_ID:
                 return
-            text = extract_message_text(message)
-            tickets = parse_ticket_count(text)
-            if tickets is None:
-                return
-            request = self.match_pending_request(message, text)
-            if request is None or request.guild_id != message.guild.id:
-                return
-
-            self.consume_pending(request)
-            await self.store.upsert_status(
-                request.guild_id,
-                request.user_id,
-                request.username,
-                tickets,
-            )
-            logger.info(
-                "Updated boss tickets for user %s in guild %s: %s/3",
-                request.user_id,
-                request.guild_id,
-                tickets,
-            )
-            if await self.store.get_config(request.guild_id) is not None:
-                await self.refresh_board(request.guild_id)
+            await self.read_ticket_response_message(message)
         except Exception:
             logger.exception("Unhandled boss-ticket tracking error")
+
+    @commands.Cog.listener()
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
+        try:
+            if payload.guild_id is None or not self.purge_pending(payload.channel_id):
+                return
+            data = dict(payload.data)
+            author_id = int((data.get("author") or {}).get("id", 0) or 0)
+            text = extract_raw_text(data)
+
+            if author_id != OWO_BOT_ID or parse_ticket_count(text) is None:
+                raw = await fetch_raw_message(
+                    self.bot, payload.channel_id, payload.message_id
+                )
+                if raw is None:
+                    return
+                if int((raw.get("author") or {}).get("id", 0) or 0) != OWO_BOT_ID:
+                    return
+                data = raw
+                text = extract_raw_text(raw)
+
+            reference = data.get("message_reference") or {}
+            reference_id = int(reference.get("message_id", 0) or 0) or None
+            mentioned_ids = {
+                int(item.get("id", 0))
+                for item in data.get("mentions", [])
+                if int(item.get("id", 0) or 0)
+            }
+            await self.record_ticket_response(
+                guild_id=payload.guild_id,
+                channel_id=payload.channel_id,
+                message_id=payload.message_id,
+                text=text,
+                reference_id=reference_id,
+                mentioned_ids=mentioned_ids,
+            )
+        except Exception:
+            logger.exception("Unhandled edited boss-ticket response")
 
     @app_commands.command(
         name="boss-ticket-channel",
@@ -595,6 +779,57 @@ class TicketTracker(commands.Cog):
             "Configured boss-ticket board channel %s for guild %s",
             channel.id,
             interaction.guild_id,
+        )
+
+    @app_commands.command(
+        name="boss-ticket-list",
+        description="Show and refresh the current server boss-ticket list.",
+    )
+    async def boss_ticket_list(self, interaction: discord.Interaction) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "This command only works inside a server.", ephemeral=True
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        if await self.store.get_config(interaction.guild_id) is not None:
+            await self.refresh_board(interaction.guild_id)
+        statuses = await self.store.list_status(interaction.guild_id)
+        embeds = self.build_board_embeds(statuses)
+        for index, embed in enumerate(embeds):
+            if index == 0:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+            else:
+                await interaction.followup.send(embed=embed, ephemeral=True)
+        logger.info(
+            "Slash ticket list requested in guild %s (%s entries)",
+            interaction.guild_id,
+            len(statuses),
+        )
+
+    async def send_ticket_list(self, message: discord.Message) -> None:
+        if message.guild is None:
+            return
+        config = await self.store.get_config(message.guild.id)
+        if config is not None:
+            await self.refresh_board(message.guild.id)
+        statuses = await self.store.list_status(message.guild.id)
+        embeds = self.build_board_embeds(statuses)
+        for index, embed in enumerate(embeds):
+            if index == 0:
+                await message.reply(embed=embed, mention_author=False)
+            else:
+                await message.channel.send(embed=embed)
+        if config is None:
+            await message.channel.send(
+                "ℹ️ The list is shown here, but no persistent ticket-board channel is "
+                "configured yet. A server manager can use `/boss-ticket-channel`."
+            )
+        logger.info(
+            "Prefix ticket list requested by %s in guild %s (%s entries)",
+            message.author.id,
+            message.guild.id,
+            len(statuses),
         )
 
     async def get_text_channel(self, channel_id: int) -> discord.TextChannel | None:
@@ -715,6 +950,12 @@ class TicketTracker(commands.Cog):
                     continue
 
             await self.store.set_board_message_ids(guild_id, final_ids)
+            logger.info(
+                "Refreshed boss-ticket board for guild %s: %s entries across %s page(s)",
+                guild_id,
+                len(statuses),
+                len(final_ids),
+            )
 
     async def daily_reset_loop(self) -> None:
         try:
