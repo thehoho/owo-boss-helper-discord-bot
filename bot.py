@@ -13,6 +13,10 @@ from dotenv import load_dotenv
 PROJECT_ROOT = Path(__file__).resolve().parent
 LOG_DIR = PROJECT_ROOT / "logs"
 LOG_FILE = LOG_DIR / "bot.log"
+BOT_DESCRIPTION = (
+    "OwO Boss Helper generates ordered Neon boss commands, tracks guild-boss "
+    "cooldowns and tickets, and saves guided team templates with exact weapon IDs."
+)
 
 
 def configure_logging() -> None:
@@ -64,14 +68,30 @@ bot = commands.Bot(
     command_prefix=commands.when_mentioned,
     intents=intents,
     help_command=None,
+    description=BOT_DESCRIPTION,
 )
+
+_commands_synced = False
 
 
 @bot.event
 async def on_ready() -> None:
+    global _commands_synced
+
     logger.info("Logged in as %s (ID: %s)", bot.user, getattr(bot.user, "id", "unknown"))
+    await bot.change_presence(
+        activity=discord.Activity(
+            type=discord.ActivityType.watching,
+            name="OwO guild bosses • H help",
+        )
+    )
+
+    if _commands_synced:
+        return
+
     try:
         synced = await bot.tree.sync()
+        _commands_synced = True
         logger.info("Synced %s slash command(s)", len(synced))
     except Exception:
         logger.exception("Failed to sync slash commands")
@@ -85,6 +105,8 @@ async def main() -> None:
         logger.info("Team template manager loaded")
         await bot.load_extension("cogs.ticket_tracker")
         logger.info("Boss ticket tracker loaded")
+        await bot.load_extension("cogs.bot_info")
+        logger.info("Bot information and developer statistics loaded")
         await bot.start(TOKEN)
 
 

@@ -53,8 +53,13 @@ TICKET_COUNT_RE = re.compile(
     r"(?<!\d)([0-3])\s*/\s*3(?=[^\n]{0,80}\b(?:boss\s+)?tickets?\b)",
     re.IGNORECASE,
 )
+ZERO_TICKET_RE = re.compile(
+    r"\b(?:you\s+)?(?:ran\s+out\s+of|have\s+no|do\s+not\s+have\s+any|don't\s+have\s+any)\s+(?:boss\s+)?tickets?\b",
+    re.IGNORECASE,
+)
 TICKET_CAPTURE_RETRY_DELAYS = (0.20, 0.65, 1.35, 2.40, 3.75)
 ZERO_WIDTH_RE = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060\ufeff]")
+USER_ID_RE = re.compile(r"^(?:<@!?(\d{15,22})>|(\d{15,22}))$")
 
 
 @dataclass(frozen=True)
@@ -201,6 +206,12 @@ def normalize_ticket_response_text(text: str) -> str:
 
 def parse_ticket_count(text: str) -> int | None:
     normalized = normalize_ticket_response_text(text)
+
+    # OwO does not display "0/3" when a member has no tickets. Its live response
+    # is "you ran out of boss tickets", so treat that wording as an explicit zero.
+    if ZERO_TICKET_RE.search(normalized):
+        return 0
+
     match = TICKET_COUNT_RE.search(normalized)
     if match is None:
         # Last-resort bounded pattern for Components V2 payloads that split the
@@ -413,6 +424,8 @@ class TicketStore:
     def _normalize_guild_cycle_sync(
         connection: sqlite3.Connection, guild_id: int, cycle: str
     ) -> bool:
+        # Previously tracked members replenish to 3/3 at Pacific midnight. A later
+        # ticket check from OwO replaces this reset value with the user's real count.
         reset_epoch = pacific_midnight_timestamp(date.fromisoformat(cycle))
         cursor = connection.execute(
             """
@@ -446,6 +459,41 @@ class TicketStore:
                 (reset_epoch, cycle, cycle),
             )
         return guild_ids
+
+    async def remove_status(
+        self, guild_id: int, user_id: int
+    ) -> TicketStatus | None:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._remove_status_sync, guild_id, user_id
+            )
+
+    def _remove_status_sync(
+        self, guild_id: int, user_id: int
+    ) -> TicketStatus | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT guild_id, user_id, username, tickets, updated_at, cycle_date
+                FROM ticket_status
+                WHERE guild_id = ? AND user_id = ?
+                """,
+                (guild_id, user_id),
+            ).fetchone()
+            if row is None:
+                return None
+            connection.execute(
+                "DELETE FROM ticket_status WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id),
+            )
+        return TicketStatus(
+            guild_id=int(row["guild_id"]),
+            user_id=int(row["user_id"]),
+            username=str(row["username"]),
+            tickets=int(row["tickets"]),
+            updated_at=int(row["updated_at"]),
+            cycle_date=str(row["cycle_date"]),
+        )
 
     async def list_status(self, guild_id: int) -> list[TicketStatus]:
         async with self.lock:
@@ -627,7 +675,7 @@ class TicketTracker(commands.Cog):
             except Exception:
                 logger.exception("Could not restore ticket board for guild %s", guild_id)
         if changed_guilds:
-            logger.info("Applied daily boss-ticket reset for %s guild(s)", len(changed_guilds))
+            logger.info("Replenished stale boss-ticket entries for %s guild(s)", len(changed_guilds))
 
     async def record_ticket_response(
         self,
@@ -848,7 +896,7 @@ class TicketTracker(commands.Cog):
 
         await interaction.response.defer(ephemeral=True)
         old_config = await self.store.get_config(interaction.guild_id)
-        if old_config and old_config[0] != channel.id:
+        if old_config:
             await self.delete_old_board(old_config[0], old_config[1])
 
         await self.store.set_channel(interaction.guild_id, channel.id)
@@ -866,8 +914,60 @@ class TicketTracker(commands.Cog):
         )
 
     @app_commands.command(
+        name="boss-ticket-remove",
+        description="Remove a user from this server's boss-ticket board.",
+    )
+    @app_commands.describe(
+        user_id="Discord user ID or mention shown on the ticket board"
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_ticket_remove(
+        self,
+        interaction: discord.Interaction,
+        user_id: str,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "This command only works inside a server.", ephemeral=True
+            )
+            return
+
+        match = USER_ID_RE.fullmatch(user_id.strip())
+        if match is None:
+            await interaction.response.send_message(
+                "Enter the Discord user ID shown on the ticket board, or paste a user mention.",
+                ephemeral=True,
+            )
+            return
+
+        target_id = int(match.group(1) or match.group(2))
+        await interaction.response.defer(ephemeral=True)
+        removed = await self.store.remove_status(interaction.guild_id, target_id)
+        if removed is None:
+            await interaction.followup.send(
+                f"No ticket entry exists for `{target_id}` in this server.",
+                ephemeral=True,
+            )
+            return
+
+        if await self.store.get_config(interaction.guild_id) is not None:
+            await self.refresh_board(interaction.guild_id)
+
+        await interaction.followup.send(
+            f"🗑️ Removed **{discord.utils.escape_markdown(removed.username)}** "
+            f"(`{removed.user_id}`) from the boss-ticket board.",
+            ephemeral=True,
+        )
+        logger.info(
+            "Removed boss-ticket entry for user %s from guild %s by admin %s",
+            removed.user_id,
+            interaction.guild_id,
+            interaction.user.id,
+        )
+
+    @app_commands.command(
         name="boss-ticket-list",
-        description="Show and refresh the current server boss-ticket list.",
+        description="Show the current server boss-ticket list.",
     )
     async def boss_ticket_list(self, interaction: discord.Interaction) -> None:
         if interaction.guild_id is None:
@@ -876,8 +976,6 @@ class TicketTracker(commands.Cog):
             )
             return
         await interaction.response.defer(ephemeral=True)
-        if await self.store.get_config(interaction.guild_id) is not None:
-            await self.refresh_board(interaction.guild_id)
         statuses = await self.store.list_status(interaction.guild_id)
         embeds = self.build_board_embeds(statuses)
         for index, embed in enumerate(embeds):
@@ -895,8 +993,6 @@ class TicketTracker(commands.Cog):
         if message.guild is None:
             return
         config = await self.store.get_config(message.guild.id)
-        if config is not None:
-            await self.refresh_board(message.guild.id)
         statuses = await self.store.list_status(message.guild.id)
         embeds = self.build_board_embeds(statuses)
         for index, embed in enumerate(embeds):
@@ -984,14 +1080,20 @@ class TicketTracker(commands.Cog):
             )
             embed.set_footer(
                 text=(
-                    "Counts update only when each user checks tickets in this server. "
-                    "Daily reset follows America/Los_Angeles midnight."
+                    "Previously tracked members replenish to 3/3 at Pacific midnight. "
+                    "Later OwO checks replace that reset value with the real count."
                 )
             )
             embeds.append(embed)
         return embeds
 
     async def refresh_board(self, guild_id: int) -> None:
+        """Replace the configured board with a fresh message set.
+
+        Discord message editing has been inconsistent for this Components-heavy
+        workflow. Sending the new board first and deleting the previous board keeps
+        the configured channel clean while guaranteeing that the visible list is new.
+        """
         async with self.board_lock(guild_id):
             config = await self.store.get_config(guild_id)
             if config is None:
@@ -1005,40 +1107,42 @@ class TicketTracker(commands.Cog):
             await self.store.normalize_guild_cycle(guild_id)
             statuses = await self.store.list_status(guild_id)
             embeds = self.build_board_embeds(statuses)
-            final_ids: list[int] = []
+            new_messages: list[discord.Message] = []
 
-            for index, embed in enumerate(embeds):
-                existing_id = stored_ids[index] if index < len(stored_ids) else None
-                message: discord.Message | None = None
-                if existing_id:
+            try:
+                for embed in embeds:
+                    new_messages.append(await channel.send(embed=embed))
+            except (discord.Forbidden, discord.HTTPException) as exc:
+                logger.warning(
+                    "Could not send replacement ticket board for guild %s: %s",
+                    guild_id,
+                    exc,
+                )
+                # Do not leave a partial replacement behind when a multi-page send fails.
+                for message in new_messages:
                     try:
-                        message = await channel.fetch_message(existing_id)
-                    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-                        message = None
-                try:
-                    if message is None:
-                        message = await channel.send(embed=embed)
-                    else:
-                        await message.edit(content=None, embed=embed)
-                    final_ids.append(message.id)
-                except (discord.Forbidden, discord.HTTPException) as exc:
-                    logger.warning("Could not update ticket board for guild %s: %s", guild_id, exc)
-                    return
-
-            for extra_id in stored_ids[len(embeds):]:
-                try:
-                    message = await channel.fetch_message(extra_id)
-                    if self.bot.user and message.author.id == self.bot.user.id:
                         await message.delete()
+                    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                        pass
+                return
+
+            new_ids = [message.id for message in new_messages]
+            await self.store.set_board_message_ids(guild_id, new_ids)
+
+            # Delete the previous board only after the replacement is safely visible.
+            for old_id in stored_ids:
+                if old_id in new_ids:
+                    continue
+                try:
+                    await channel.get_partial_message(old_id).delete()
                 except (discord.Forbidden, discord.NotFound, discord.HTTPException):
                     continue
 
-            await self.store.set_board_message_ids(guild_id, final_ids)
             logger.info(
-                "Refreshed boss-ticket board for guild %s: %s entries across %s page(s)",
+                "Replaced boss-ticket board for guild %s: %s entries across %s page(s)",
                 guild_id,
                 len(statuses),
-                len(final_ids),
+                len(new_ids),
             )
 
     async def daily_reset_loop(self) -> None:
@@ -1058,7 +1162,7 @@ class TicketTracker(commands.Cog):
                             guild_id,
                         )
                 logger.info(
-                    "Applied Pacific-midnight boss-ticket reset; %s guild(s) changed",
+                    "Replenished Pacific-midnight boss-ticket entries; %s guild(s) changed",
                     len(changed_guilds),
                 )
         except asyncio.CancelledError:
