@@ -2,7 +2,9 @@
 
 A community Discord bot for OwO guild-boss fights. It generates Neon battle commands, tracks guild-boss timing, saves reusable teams with exact weapon IDs, and maintains a per-server boss-ticket board.
 
-Made by **Hassaan**.
+Developed and maintained by **Hassaan**.
+
+Use `H about` or `/about` inside Discord for the public project profile.
 
 > Independent community project. Not affiliated with Discord, OwO Bot, or NeonUtil.
 
@@ -60,6 +62,26 @@ Made by **Hassaan**.
 - Supports manual list display and board refresh commands.
 - Reads Components V2 ticket responses from both message-create and message-edit events, with a bounded raw-message fallback only after an explicit ticket request.
 
+### Developer information and operational statistics
+
+Public commands:
+
+```text
+H about
+/about
+```
+
+The public profile identifies Hassaan as the developer, shows the current version, summarizes the bot, and links to the source repository.
+
+Owner-only commands configured through `BOT_OWNER_ID`:
+
+```text
+/bot-stats
+/bot-servers
+```
+
+They show current and historical server counts, approximate member reach, per-server usage, saved-template counts, ticket-board counts, uptime, latency, and local storage size. The bot also sends the configured owner a private message when it joins or leaves a server. Persistent operational metadata is stored in `bot_stats.db`.
+
 ### Logging
 
 - Writes runtime activity to `logs/bot.log`.
@@ -72,6 +94,7 @@ Special thanks to **Pencilvester** for:
 
 - Sharing the original exact-command parsing logic and weapon/passive rarity ranges that helped form the foundation of the boss command generator.
 - Suggesting the original saved team-template concept that inspired the team-management system.
+
 
 The project has since been substantially expanded with automatic boss reading, HP detection, rate-limit-friendly guild-boss tracking, exact weapon-ID preservation, numbered team slots, guided restoration, and boss-ticket tracking.
 
@@ -297,6 +320,7 @@ H boss t
 HBL
 ```
 
+The helper intentionally keeps only these focused aliases. Older experimental aliases such as `H buzz t`, `H ticket list`, `T list`, and `HTL` are not supported.
 
 Private slash command:
 
@@ -304,7 +328,7 @@ Private slash command:
 /boss-ticket-list
 ```
 
-These commands display the current list and also refresh the configured persistent board when one exists.
+These commands display the current list wherever they are used. The configured persistent board is replaced automatically whenever a member updates their ticket count.
 
 ### Ticket replenishment
 
@@ -314,7 +338,19 @@ Ticket cycles follow midnight in:
 America/Los_Angeles
 ```
 
+At the daily reset, every **previously tracked member** is replenished to `3/3` and remains on the board. A later `w boss t` or `owo boss t` check replaces that reset value with the real count reported by OwO.
+
 Discord timestamps display the corresponding local time for every viewer.
+
+### Remove an old member
+
+A server manager can remove a stale entry, including somebody who already left the server:
+
+```text
+/boss-ticket-remove
+```
+
+Enter the Discord user ID shown on the ticket board, or paste a user mention. The persistent board is replaced immediately after removal.
 
 ## Storage
 
@@ -329,12 +365,15 @@ team_templates.db-wal
 boss_tickets.db
 boss_tickets.db-shm
 boss_tickets.db-wal
+bot_stats.db
+bot_stats.db-shm
+bot_stats.db-wal
 logs/
 ```
 
 These files are ignored by Git.
 
-When moving the bot to another computer or host, copy both SQLite databases and `boss_cooldown_config.json` to preserve saved teams, ticket data, board configuration, and boss watcher state.
+When moving the bot to another computer or host, copy `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, and `boss_cooldown_config.json` to preserve saved teams, ticket data, developer statistics, board configuration, and boss watcher state.
 
 ## Project structure
 
@@ -346,14 +385,22 @@ owo-boss-helper-discord-bot/
 │   ├── __init__.py
 │   ├── boss_generator.py
 │   ├── team_templates.py
-│   └── ticket_tracker.py
+│   ├── ticket_tracker.py
+│   └── bot_info.py
+├── deploy/
+│   ├── backup.sh
+│   └── owo-boss-helper.service
 ├── logs/                         # created automatically
 ├── .env.example
 ├── .gitignore
 ├── bot.py
 ├── CHANGELOG.md
+├── DEPLOYMENT_DIGITALOCEAN.md
 ├── LICENSE
+├── PRIVACY.md
 ├── README.md
+├── RELEASE_NOTES_v0.8.0-beta.md
+├── TERMS.md
 └── requirements.txt
 ```
 
@@ -363,6 +410,7 @@ Generated locally and ignored by Git:
 boss_cooldown_config.json
 team_templates.db
 boss_tickets.db
+bot_stats.db
 ```
 
 ## Updating
@@ -375,7 +423,16 @@ rmdir /s /q cogs\__pycache__ 2>nul
 py bot.py
 ```
 
-Do not delete `.env`, `boss_cooldown_config.json`, `team_templates.db`, `boss_tickets.db`, or `logs/` during an update.
+Do not delete `.env`, `boss_cooldown_config.json`, `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, or `logs/` during an update.
+
+## Production hosting
+
+For a 24/7 Linux VPS deployment with automatic restarts and protected local storage, follow [DEPLOYMENT_DIGITALOCEAN.md](DEPLOYMENT_DIGITALOCEAN.md). Deployment helpers are included under `deploy/`.
+
+## Privacy and terms
+
+- [Privacy Policy](PRIVACY.md)
+- [Terms of Use](TERMS.md)
 
 ## License
 

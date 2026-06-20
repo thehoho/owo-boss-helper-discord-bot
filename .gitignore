@@ -12,9 +12,13 @@ team_templates.db-wal
 boss_tickets.db
 boss_tickets.db-shm
 boss_tickets.db-wal
+bot_stats.db
+bot_stats.db-shm
+bot_stats.db-wal
 *.json.tmp
 *.log
 logs/
+backups/
 
 # Python
 __pycache__/

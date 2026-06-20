@@ -1,0 +1,24 @@
+[Unit]
+Description=OwO Boss Helper Discord Bot
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=owohelper
+Group=owohelper
+WorkingDirectory=/opt/owo-boss-helper
+Environment=PYTHONUNBUFFERED=1
+ExecStart=/opt/owo-boss-helper/.venv/bin/python /opt/owo-boss-helper/bot.py
+Restart=always
+RestartSec=5
+TimeoutStopSec=30
+KillSignal=SIGINT
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ReadWritePaths=/opt/owo-boss-helper
+
+[Install]
+WantedBy=multi-user.target

@@ -1,14 +1,26 @@
 # Changelog
 
-## 0.7.2-beta
+## 0.8.0-beta
 
-- Fixed ticket responses that rendered correctly in Discord but were not captured from OwO Components V2 payloads.
-- Recursively reads all string values from raw component payloads instead of relying on a small field-name allow-list.
-- Normalizes Discord markdown, zero-width characters, escaped slashes, and Unicode slash variants before parsing `0/3`–`3/3` counts.
-- Added a bounded delayed capture window for OwO responses that are created before their final component text is available.
-- Added clearer diagnostic logs showing the safely extracted response preview and raw top-level keys only when capture still fails.
-- Kept public list commands limited to `H boss list`, `H boss t`, and `HBL`.
-- Stopped the guild-boss watcher from requesting a deleted OwO status message every 15 seconds; it now pauses REST polling until a replacement status arrives or the stored escape time is reached.
+- Added the public `H about` and `/about` project profile identifying Hassaan as the developer.
+- Added a clear bot description and a persistent Discord presence pointing users to `H help`.
+- Added owner-only `/bot-stats` and `/bot-servers` commands.
+- Added persistent `bot_stats.db` storage for active/historical servers and aggregate feature usage.
+- Added private developer notifications when the bot joins or leaves a server.
+- Added server reach, approximate member counts, saved-template counts, ticket-board counts, uptime, latency, database sizes, and usage summaries.
+- Added `PRIVACY.md` and `TERMS.md` for public deployment.
+- Added a production DigitalOcean deployment guide, hardened systemd service, and SQLite-safe backup script.
+- Updated `.env.example` with developer, repository, support, description, and owner settings.
+- Updated `.gitignore` to protect the operational statistics database and local backups.
+- Includes the complete ticket-tracking, renamed-pet, team-update, missing-weapon, zero-ticket, reset, and admin-removal improvements developed after v0.6.2.
+
+## 0.7.4-beta
+
+- Changed the Pacific-midnight reset to keep previously tracked members and replenish each entry to `3/3`.
+- A later OwO ticket check replaces the reset value with the user's real reported count.
+- Added `/boss-ticket-remove` for server managers to remove a stale member by Discord user ID or mention.
+- The persistent ticket board is replaced immediately after an admin removes an entry.
+- Updated ticket-board wording to explain the reset behavior.
 
 ## 0.7.1-beta
 
@@ -17,11 +29,7 @@
 - Added `on_raw_message_edit` handling for OwO ticket responses that finish rendering through an edit.
 - Broadened ticket-count parsing to support both `3/3 boss tickets` and `3/3 tickets` wording.
 - Increased the pending ticket-response window from 25 to 60 seconds.
-- Added manual ticket-list and persistent-board refresh commands:
-  - `H boss list`
-  - `H boss t`
-  - `HTL`
-  - `/boss-ticket-list`
+- Added manual ticket-list commands: `H boss list`, `H boss t`, `HBL`, and `/boss-ticket-list`.
 - Added ticket-board refresh logs showing entry and page counts.
 - Updated `H help` with the new ticket-list commands.
 - Replaced the accumulated README with a single cleaned and current guide.
