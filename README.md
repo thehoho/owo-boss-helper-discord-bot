@@ -4,6 +4,8 @@ A community Discord bot for OwO guild-boss fights. It generates Neon battle comm
 
 Made by **Hassaan**.
 
+> Independent community project. Not affiliated with Discord, OwO Bot, or NeonUtil.
+
 ## Features
 
 ### Boss command generator
@@ -287,15 +289,14 @@ The tracker records only the ticket count OwO actually reports. It does not infe
 
 ### Show and refresh the complete list
 
-Public text aliases:
+Public text commands:
 
 ```text
-H ticket list
-H tickets
 H boss list
 H boss t
-HTL
+HBL
 ```
+
 
 Private slash command:
 

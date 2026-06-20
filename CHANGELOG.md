@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.7.2-beta
+
+- Fixed ticket responses that rendered correctly in Discord but were not captured from OwO Components V2 payloads.
+- Recursively reads all string values from raw component payloads instead of relying on a small field-name allow-list.
+- Normalizes Discord markdown, zero-width characters, escaped slashes, and Unicode slash variants before parsing `0/3`–`3/3` counts.
+- Added a bounded delayed capture window for OwO responses that are created before their final component text is available.
+- Added clearer diagnostic logs showing the safely extracted response preview and raw top-level keys only when capture still fails.
+- Kept public list commands limited to `H boss list`, `H boss t`, and `HBL`.
+- Stopped the guild-boss watcher from requesting a deleted OwO status message every 15 seconds; it now pauses REST polling until a replacement status arrives or the stored escape time is reached.
+
 ## 0.7.1-beta
 
 - Fixed ticket responses being armed but not recorded when OwO's Components V2 text was missing from the high-level message object.

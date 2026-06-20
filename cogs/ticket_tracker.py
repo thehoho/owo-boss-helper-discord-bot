@@ -13,6 +13,7 @@ import logging
 import re
 import sqlite3
 import time
+import unicodedata
 from dataclasses import dataclass
 from datetime import date, datetime, time as datetime_time, timedelta
 from pathlib import Path
@@ -45,19 +46,15 @@ TICKET_COMMANDS = {
 TICKET_LIST_COMMANDS = {
     "hbosslist",
     "hbosst",
-    "hbossticket",
-    "hbosstickets",
-    "hticket",
-    "htickets",
-    "hticketlist",
-    "hticketslist",
-    "htl",
+    "hbl",
 }
 
 TICKET_COUNT_RE = re.compile(
-    r"(?<!\d)([0-3])\s*/\s*3\s+(?:boss\s+)?tickets?\b",
+    r"(?<!\d)([0-3])\s*/\s*3(?=[^\n]{0,80}\b(?:boss\s+)?tickets?\b)",
     re.IGNORECASE,
 )
+TICKET_CAPTURE_RETRY_DELAYS = (0.20, 0.65, 1.35, 2.40, 3.75)
+ZERO_WIDTH_RE = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060\ufeff]")
 
 
 @dataclass(frozen=True)
@@ -109,12 +106,11 @@ def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
     seen.add(object_id)
 
     if isinstance(value, dict):
-        for key, child in value.items():
-            if key in {"content", "title", "description", "label", "value", "name"}:
-                if isinstance(child, str) and child.strip():
-                    chunks.append(child)
-            elif isinstance(child, (dict, list, tuple)):
-                _walk_text(child, chunks, seen)
+        # Components V2 and application responses can place visible text under
+        # fields that differ between message-create and message-edit payloads.
+        # Walk every value instead of depending on a small key allow-list.
+        for child in value.values():
+            _walk_text(child, chunks, seen)
         return
 
     if isinstance(value, (list, tuple, set)):
@@ -140,11 +136,21 @@ def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
         if child is not None:
             _walk_text(child, chunks, seen)
 
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        try:
+            _walk_text(to_dict(), chunks, seen)
+        except Exception:
+            pass
+
 
 def extract_message_text(message: discord.Message) -> str:
     chunks: list[str] = []
     if message.content:
         chunks.append(message.content)
+    system_content = getattr(message, "system_content", "")
+    if system_content and system_content != message.content:
+        chunks.append(system_content)
     for embed in message.embeds:
         if embed.title:
             chunks.append(embed.title)
@@ -181,10 +187,33 @@ async def fetch_raw_message(
         return None
 
 
+def normalize_ticket_response_text(text: str) -> str:
+    normalized = unicodedata.normalize("NFKC", text or "")
+    normalized = ZERO_WIDTH_RE.sub("", normalized)
+    normalized = normalized.replace("\\/", "/")
+    for slash in ("⁄", "∕", "／", "⧸"):
+        normalized = normalized.replace(slash, "/")
+    # Discord markdown can split the visible count as **3**/**3**. Removing
+    # formatting markers makes the parser work on what members actually see.
+    normalized = re.sub(r"[*_`~|]", "", normalized)
+    return re.sub(r"[\t\r\f\v ]+", " ", normalized)
+
+
 def parse_ticket_count(text: str) -> int | None:
-    match = TICKET_COUNT_RE.search(re.sub(r"\s+", " ", text or ""))
+    normalized = normalize_ticket_response_text(text)
+    match = TICKET_COUNT_RE.search(normalized)
     if match is None:
-        return None
+        # Last-resort bounded pattern for Components V2 payloads that split the
+        # count across several text-display nodes. It still requires the word
+        # "ticket" nearby, preventing unrelated 3/3 values from being accepted.
+        fallback = re.search(
+            r"(?<!\d)([0-3])\D{0,18}3(?=[^\n]{0,100}\b(?:boss\s+)?tickets?\b)",
+            normalized,
+            re.IGNORECASE,
+        )
+        if fallback is None:
+            return None
+        match = fallback
     value = int(match.group(1))
     return value if 0 <= value <= MAX_TICKETS else None
 
@@ -456,6 +485,7 @@ class TicketTracker(commands.Cog):
         self.board_locks: dict[int, asyncio.Lock] = {}
         self.reset_task: asyncio.Task[None] | None = None
         self.processed_responses: dict[tuple[int, int], float] = {}
+        self.capture_tasks: dict[tuple[int, int], asyncio.Task[bool]] = {}
         self._restored = False
 
     async def cog_load(self) -> None:
@@ -467,6 +497,9 @@ class TicketTracker(commands.Cog):
         if self.reset_task:
             self.reset_task.cancel()
             self.reset_task = None
+        for task in self.capture_tasks.values():
+            task.cancel()
+        self.capture_tasks.clear()
 
     def board_lock(self, guild_id: int) -> asyncio.Lock:
         return self.board_locks.setdefault(guild_id, asyncio.Lock())
@@ -644,43 +677,96 @@ class TicketTracker(commands.Cog):
             await self.refresh_board(request.guild_id)
         return True
 
-    async def read_ticket_response_message(self, message: discord.Message) -> bool:
+    async def capture_ticket_response_with_retries(
+        self, message: discord.Message
+    ) -> bool:
+        """Read one explicitly awaited OwO ticket response.
+
+        OwO can create the application message before its final Components V2
+        text is available. We therefore inspect the gateway object immediately,
+        then retry only this one response message for a few seconds.
+        """
         if message.guild is None:
             return False
-        if not self.purge_pending(message.channel.id):
-            return False
 
-        text = extract_message_text(message)
-        if parse_ticket_count(text) is None:
-            # Some Components V2 responses are incomplete on the high-level Message
-            # object. Fetch only this explicitly awaited ticket response, never general
-            # OwO traffic. A short second attempt covers create-then-edit responses.
-            raw = await fetch_raw_message(self.bot, message.channel.id, message.id)
-            if raw is not None:
-                text = extract_raw_text(raw)
-            if parse_ticket_count(text) is None:
-                await asyncio.sleep(0.35)
-                raw = await fetch_raw_message(self.bot, message.channel.id, message.id)
-                if raw is not None:
-                    text = extract_raw_text(raw)
-
-        if parse_ticket_count(text) is None:
-            logger.warning(
-                "Could not read ticket count from awaited OwO response %s in guild %s",
-                message.id,
-                message.guild.id,
+        last_text = extract_message_text(message)
+        if parse_ticket_count(last_text) is not None:
+            return await self.record_ticket_response(
+                guild_id=message.guild.id,
+                channel_id=message.channel.id,
+                message_id=message.id,
+                text=last_text,
+                reference_id=(
+                    message.reference.message_id
+                    if message.reference is not None
+                    else None
+                ),
+                mentioned_ids={user.id for user in message.mentions},
             )
-            return False
-        return await self.record_ticket_response(
-            guild_id=message.guild.id,
-            channel_id=message.channel.id,
-            message_id=message.id,
-            text=text,
-            reference_id=(
-                message.reference.message_id if message.reference is not None else None
-            ),
-            mentioned_ids={user.id for user in message.mentions},
+
+        raw: dict[str, Any] | None = None
+        for delay in TICKET_CAPTURE_RETRY_DELAYS:
+            if not self.purge_pending(message.channel.id):
+                return False
+            await asyncio.sleep(delay)
+            raw = await fetch_raw_message(self.bot, message.channel.id, message.id)
+            if raw is None:
+                continue
+            last_text = extract_raw_text(raw)
+            if parse_ticket_count(last_text) is None:
+                continue
+
+            reference = raw.get("message_reference") or {}
+            reference_id = int(reference.get("message_id", 0) or 0) or None
+            mentioned_ids = {
+                int(item.get("id", 0))
+                for item in raw.get("mentions", [])
+                if int(item.get("id", 0) or 0)
+            }
+            return await self.record_ticket_response(
+                guild_id=message.guild.id,
+                channel_id=message.channel.id,
+                message_id=message.id,
+                text=last_text,
+                reference_id=reference_id,
+                mentioned_ids=mentioned_ids,
+            )
+
+        preview = normalize_ticket_response_text(last_text)[:500]
+        raw_keys = sorted(raw.keys()) if isinstance(raw, dict) else []
+        logger.warning(
+            "Could not read ticket count from awaited OwO response %s in guild %s; "
+            "extracted=%r raw_keys=%s",
+            message.id,
+            message.guild.id,
+            preview,
+            raw_keys,
         )
+        return False
+
+    def schedule_ticket_response_capture(self, message: discord.Message) -> None:
+        if message.guild is None:
+            return
+        key = (message.guild.id, message.id)
+        existing = self.capture_tasks.get(key)
+        if existing and not existing.done():
+            return
+
+        task = asyncio.create_task(self.capture_ticket_response_with_retries(message))
+        self.capture_tasks[key] = task
+
+        def cleanup(done: asyncio.Task[bool]) -> None:
+            self.capture_tasks.pop(key, None)
+            try:
+                done.result()
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                logger.exception(
+                    "Unhandled delayed boss-ticket capture for message %s", message.id
+                )
+
+        task.add_done_callback(cleanup)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -697,7 +783,8 @@ class TicketTracker(commands.Cog):
 
             if message.author.id != OWO_BOT_ID:
                 return
-            await self.read_ticket_response_message(message)
+            if self.purge_pending(message.channel.id):
+                self.schedule_ticket_response_capture(message)
         except Exception:
             logger.exception("Unhandled boss-ticket tracking error")
 
@@ -720,6 +807,9 @@ class TicketTracker(commands.Cog):
                     return
                 data = raw
                 text = extract_raw_text(raw)
+
+            if parse_ticket_count(text) is None:
+                return
 
             reference = data.get("message_reference") or {}
             reference_id = int(reference.get("message_id", 0) or 0) or None

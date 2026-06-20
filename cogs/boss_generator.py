@@ -376,7 +376,10 @@ async def fetch_raw_message(bot: commands.Bot, channel_id: int, message_id: int)
             message_id=message_id,
         )
         return await bot.http.request(route)
-    except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+    except discord.NotFound:
+        logger.info("Raw message %s no longer exists", message_id)
+        return None
+    except (discord.Forbidden, discord.HTTPException) as exc:
         logger.warning("Could not read raw message %s: %s", message_id, exc)
         return None
 
@@ -1527,7 +1530,42 @@ class BossGenerator(commands.Cog):
                     return
                 async with self.get_guild_boss_fetch_lock(guild_id):
                     data = await fetch_raw_message(self.bot, channel_id, message_id)
-                if data and int((data.get("author") or {}).get("id", 0)) == OWO_BOT_ID:
+
+                if not data:
+                    # OwO status cards can be deleted or replaced. Do not keep
+                    # requesting a missing message every 15 seconds. Pause REST
+                    # polling while gateway events remain able to replace the
+                    # tracked ID, and fall back to the stored escape timestamp.
+                    logger.info(
+                        "Tracked guild %s boss message %s is unavailable; "
+                        "pausing REST polling until replacement or expiry",
+                        guild_id,
+                        message_id,
+                    )
+                    while True:
+                        await asyncio.sleep(BOSS_WATCH_INTERVAL_SECONDS)
+                        current_config = self.cooldown_config.get(str(guild_id), {})
+                        current_message_id = int(
+                            current_config.get("active_boss_message_id") or 0
+                        )
+                        if not current_message_id:
+                            return
+                        if current_message_id != message_id:
+                            break
+                        expiry = int(
+                            current_config.get("active_boss_expires_at") or 0
+                        )
+                        if expiry and expiry <= int(time.time()):
+                            await self.finish_boss_escape(
+                                guild_id,
+                                message_id,
+                                expiry,
+                                boss_key=expiry,
+                            )
+                            return
+                    continue
+
+                if int((data.get("author") or {}).get("id", 0)) == OWO_BOT_ID:
                     await self.track_latest_guild_boss_message(
                         guild_id,
                         channel_id,
