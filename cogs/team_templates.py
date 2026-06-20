@@ -145,6 +145,7 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
     - H team create name / HT C name / HTC name / HTM C name
     - HT3 / HTM3 / H team 3
     - H team delete 3 / HT D 3 / HTD team-name
+    - H team update 3 / HT U 3 / HTU team-name
     - H team help / HT help
     - HS / H skip / H escape / HT skip
     - HT cancel
@@ -169,7 +170,7 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
         return "open", rest
 
     action_match = re.match(
-        r"^(create|save|c|s|delete|remove|d|r|help|h|skip|escape|cancel|stop|x)(?:\s+(.*))?$",
+        r"^(create|save|c|s|update|u|delete|remove|d|r|help|h|skip|escape|cancel|stop|x)(?:\s+(.*))?$",
         rest,
         re.IGNORECASE,
     )
@@ -180,6 +181,8 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
     argument = (action_match.group(2) or "").strip() or None
     if action in {"create", "save", "c", "s"}:
         return "create", argument
+    if action in {"update", "u"}:
+        return "update", argument
     if action in {"delete", "remove", "d", "r"}:
         return "delete", argument
     if action in {"help", "h"}:
@@ -201,6 +204,14 @@ class TeamMember:
     position: int
     animal: str
     weapon_id: str
+
+
+@dataclass(frozen=True)
+class ParsedTeamMessage:
+    source_title: str
+    members: tuple[TeamMember, ...]
+    missing_positions: tuple[int, ...]
+    missing_weapon_positions: tuple[int, ...]
 
 
 @dataclass(frozen=True)
@@ -367,66 +378,72 @@ def normalize_animal_emoji_alias(alias: str) -> str:
     return original
 
 
-def parse_team_message(text: str) -> tuple[str, tuple[TeamMember, ...]] | None:
-    """Extract positions, emoji-based animal IDs, and six-character weapon IDs."""
+def parse_team_message_detailed(text: str) -> ParsedTeamMessage | None:
+    """Parse a team page without silently dropping incomplete positions.
+
+    Animal identity comes from the OwO emoji alias. Missing animals are reported as
+    missing positions, while animals without an equipped weapon are retained with an
+    empty weapon ID so the user can explicitly choose whether to save them.
+    """
     cleaned = _clean_display_text(text)
     lowered = cleaned.lower()
     if not any(marker in lowered for marker in TEAM_MARKERS):
         return None
 
-    section_re = re.compile(r"(?m)^\s*\[([1-3])\]\s+([^\n]+?)\s*$")
+    # The animal label may be empty for an unused team slot, so the text after [1-3]
+    # is optional. Section boundaries still let us inspect the slot independently.
+    section_re = re.compile(r"(?m)^[ \t]*\[([1-3])\](?:[ \t]+([^\n]*?))?[ \t]*$")
     matches = list(section_re.finditer(cleaned))
     if not matches:
         return None
 
     members: list[TeamMember] = []
-    used_positions: set[int] = set()
+    seen_positions: set[int] = set()
+    missing_positions: set[int] = set()
+    missing_weapon_positions: set[int] = set()
+
     for index, match in enumerate(matches):
         position = int(match.group(1))
-        if position in used_positions:
+        if position in seen_positions:
             continue
+        seen_positions.add(position)
+
         section_end = matches[index + 1].start() if index + 1 < len(matches) else len(cleaned)
         section = cleaned[match.end():section_end]
+        animal_line = re.sub(r"[*~]", "", match.group(2) or "").strip()
 
-        animal_line = re.sub(r"[*~]", "", match.group(2)).strip()
         emoji_alias = extract_first_emoji_alias(animal_line)
         if emoji_alias:
-            # The emoji identifies the real OwO animal even when the visible pet
-            # name is custom text, spaced letters, symbols, dots, or another emoji.
             animal = normalize_animal_emoji_alias(emoji_alias)
         else:
-            # Legacy/fallback path for payloads that expose no custom emoji alias.
             animal_tokens = re.findall(r"[A-Za-z0-9_'-]+", animal_line)
-            if not animal_tokens:
-                continue
-            animal = animal_tokens[-1]
+            # Empty slots and labels containing only decorations have no usable animal.
+            animal = animal_tokens[-1] if animal_tokens else ""
 
-        # Weapon IDs are six uppercase alphanumeric characters on the equipment line.
-        # Restricting the search to this animal's section avoids matching HP values.
+        if not animal:
+            missing_positions.add(position)
+            continue
+
         weapon_match = re.search(
             r"(?m)^\s*([A-Z0-9]{6})\b(?=.*(?:%|$))",
             section,
         )
-        if not weapon_match:
-            # Components can occasionally flatten lines. This fallback still requires
-            # an uppercase six-character token and ignores purely numeric values.
+        if weapon_match:
+            weapon_id = weapon_match.group(1).upper()
+        else:
             candidates = re.findall(r"(?<![A-Z0-9])([A-Z0-9]{6})(?![A-Z0-9])", section)
             candidates = [candidate for candidate in candidates if not candidate.isdigit()]
-            if not candidates:
-                continue
-            weapon_id = candidates[-1]
-        else:
-            weapon_id = weapon_match.group(1)
+            weapon_id = candidates[-1].upper() if candidates else ""
 
-        members.append(
-            TeamMember(position=position, animal=animal, weapon_id=weapon_id.upper())
-        )
-        used_positions.add(position)
+        if not weapon_id:
+            missing_weapon_positions.add(position)
 
-    if not members:
-        return None
+        members.append(TeamMember(position=position, animal=animal, weapon_id=weapon_id))
 
+    # Any position absent from the payload is also incomplete.
+    missing_positions.update({1, 2, 3} - seen_positions)
     members.sort(key=lambda member: member.position)
+
     first_section_start = matches[0].start()
     header_lines = [
         line.strip()
@@ -437,15 +454,29 @@ def parse_team_message(text: str) -> tuple[str, tuple[TeamMember, ...]] | None:
         and not line.lower().startswith("owo setteam")
     ]
     source_title = header_lines[0] if header_lines else "OwO team"
-    return source_title[:100], tuple(members)
 
+    return ParsedTeamMessage(
+        source_title=source_title[:100],
+        members=tuple(members),
+        missing_positions=tuple(sorted(missing_positions)),
+        missing_weapon_positions=tuple(sorted(missing_weapon_positions)),
+    )
+
+
+def parse_team_message(text: str) -> tuple[str, tuple[TeamMember, ...]] | None:
+    """Compatibility wrapper used by team-page detection and reactions."""
+    parsed = parse_team_message_detailed(text)
+    if parsed is None or not parsed.members:
+        return None
+    return parsed.source_title, parsed.members
 
 def interleaved_member_commands(template: TeamTemplate) -> list[str]:
     """Alternate team edits and weapon equips to avoid same-action cooldowns."""
     commands: list[str] = []
     for member in template.members:
         commands.append(f"wtm a {member.animal} {member.position}")
-        commands.append(f"ww {member.weapon_id} {member.position}")
+        if member.weapon_id:
+            commands.append(f"ww {member.weapon_id} {member.position}")
     return commands
 
 
@@ -812,6 +843,58 @@ class TeamTemplateStore:
             ).fetchone()
         return self._row_to_template(row) if row else None
 
+    async def update_existing(
+        self,
+        user_id: int,
+        template_id: int,
+        source_title: str,
+        members: tuple[TeamMember, ...],
+    ) -> TeamTemplate | None:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._update_existing_sync,
+                user_id,
+                template_id,
+                source_title,
+                members,
+            )
+
+    def _update_existing_sync(
+        self,
+        user_id: int,
+        template_id: int,
+        source_title: str,
+        members: tuple[TeamMember, ...],
+    ) -> TeamTemplate | None:
+        now = int(time.time())
+        members_json = json.dumps(
+            [
+                {
+                    "position": member.position,
+                    "animal": member.animal,
+                    "weapon_id": member.weapon_id,
+                }
+                for member in members
+            ],
+            separators=(",", ":"),
+        )
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE team_templates
+                SET source_title = ?, members_json = ?, updated_at = ?
+                WHERE id = ? AND user_id = ?
+                """,
+                (source_title, members_json, now, template_id, user_id),
+            )
+            if cursor.rowcount <= 0:
+                return None
+            row = connection.execute(
+                "SELECT * FROM team_templates WHERE id = ? AND user_id = ?",
+                (template_id, user_id),
+            ).fetchone()
+        return self._row_to_template(row) if row else None
+
     async def delete_by_id(self, user_id: int, template_id: int) -> bool:
         async with self.lock:
             return await asyncio.to_thread(self._delete_by_id_sync, user_id, template_id)
@@ -878,6 +961,14 @@ class TeamTemplateStore:
         )
 
 
+def format_team_members(members: Iterable[TeamMember]) -> str:
+    lines: list[str] = []
+    for member in members:
+        weapon = f"weapon `{member.weapon_id}`" if member.weapon_id else "**no weapon saved**"
+        lines.append(f"**{member.position}.** `{member.animal}` — {weapon}")
+    return "\n".join(lines) or "No team members found."
+
+
 class OwnedView(discord.ui.View):
     def __init__(self, owner_id: int, *, timeout: float = 300) -> None:
         super().__init__(timeout=timeout)
@@ -936,6 +1027,74 @@ class GuidedStepView(discord.ui.View):
     ) -> None:
         await self.cog.cancel_guided_session_from_interaction(
             interaction, self.key, self.step_index
+        )
+
+
+class MissingWeaponConfirmView(OwnedView):
+    """Require an explicit choice before saving a team with missing weapons."""
+
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        owner_id: int,
+        *,
+        action: str,
+        name: str | None,
+        source_title: str,
+        members: tuple[TeamMember, ...],
+        existing: TeamTemplate | None = None,
+    ) -> None:
+        super().__init__(owner_id, timeout=180)
+        self.cog = cog
+        self.action = action
+        self.name = name
+        self.source_title = source_title
+        self.members = members
+        self.existing = existing
+
+    @discord.ui.button(label="Save without weapons", emoji="⚠️", style=discord.ButtonStyle.danger)
+    async def save_anyway(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        if self.action == "update" and self.existing is not None:
+            updated = await self.cog.store.update_existing(
+                interaction.user.id,
+                self.existing.template_id,
+                self.source_title,
+                self.members,
+            )
+            if updated is None:
+                await interaction.response.edit_message(
+                    content="That saved team no longer exists.", embed=None, view=None
+                )
+                return
+            embed = self.cog.build_updated_embed(self.existing, updated)
+        else:
+            template, error = await self.cog.store.save(
+                interaction.user.id,
+                self.name or "Unnamed team",
+                self.source_title,
+                self.members,
+            )
+            if error or template is None:
+                await interaction.response.edit_message(
+                    content=f"⚠️ {error or 'The team could not be saved.'}",
+                    embed=None,
+                    view=None,
+                )
+                return
+            embed = self.cog.build_saved_embed(template)
+
+        await interaction.response.edit_message(content=None, embed=embed, view=None)
+
+    @discord.ui.button(label="Cancel", emoji="✖️", style=discord.ButtonStyle.secondary)
+    async def cancel(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await interaction.response.edit_message(
+            content="Cancelled. Equip the missing weapon(s), then run the save or update command again.",
+            embed=None,
+            view=None,
         )
 
 
@@ -1038,10 +1197,7 @@ class TemplateSelect(discord.ui.Select):
             )
             return
 
-        member_lines = "\n".join(
-            f"**{member.position}.** `{member.animal}` — weapon `{member.weapon_id}`"
-            for member in template.members
-        )
+        member_lines = format_team_members(template.members)
         embed = discord.Embed(
             title=f"🐾 #{template.slot} — {template.name}",
             description=(
@@ -1642,6 +1798,15 @@ class TeamTemplates(commands.Cog):
             inline=False,
         )
         embed.add_field(
+            name="🎟️ Boss tickets",
+            value=(
+                "Run `owo boss t` / `w boss t` anywhere in the server. The helper records "
+                "the reported ticket count and updates the configured ticket board. A server "
+                "manager can select that board channel with `/boss-ticket-channel`."
+            ),
+            inline=False,
+        )
+        embed.add_field(
             name="🛠️ Server setup",
             value=(
                 "A server manager can use `/boss-cooldown-channel` to choose the "
@@ -1685,11 +1850,12 @@ class TeamTemplates(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="Delete, skip, and cancel",
+            name="Update, delete, skip, and cancel",
             value=(
-                "Use `HT D 3` / `HTD 3` to delete by number, or `HT D <name>` to "
-                "delete by name. During guided setup, use `HS` / `H skip` / `H escape` to skip "
-                "the current step, or `HT cancel` to stop."
+                "Reply to a fresh OwO team page with `HT U <number or name>` / `HTU 3` "
+                "to update an existing template. Use `HT D 3` / `HTD 3` to delete by "
+                "number, or `HT D <name>` to delete by name. During guided setup, use "
+                "`HS` / `H skip` / `H escape` to skip the current step, or `HT cancel` to stop."
             ),
             inline=False,
         )
@@ -1707,24 +1873,15 @@ class TeamTemplates(commands.Cog):
         )
         await message.reply(embed=embed, mention_author=False)
 
-    async def save_from_reply(self, message: discord.Message, requested_name: str) -> None:
-        name = re.sub(r"\s+", " ", requested_name).strip()
-        if not name:
-            await message.reply("Use `HT C <name>` or `H team create <name>`.", mention_author=False)
-            return
-        if len(name) > MAX_TEMPLATE_NAME_LENGTH:
-            await message.reply(
-                f"Template names can contain at most {MAX_TEMPLATE_NAME_LENGTH} characters.",
-                mention_author=False,
-            )
-            return
+    async def parse_team_reply(
+        self, message: discord.Message
+    ) -> ParsedTeamMessage | None:
         if message.reference is None or message.reference.message_id is None:
             await message.reply(
-                "Reply directly to the OwO team message you want to save, then send "
-                "`HT C <name>` or `H team create <name>`.",
+                "Reply directly to the OwO team message you want to use.",
                 mention_author=False,
             )
-            return
+            return None
 
         channel_id = message.reference.channel_id or message.channel.id
         raw = await fetch_raw_message(
@@ -1736,46 +1893,88 @@ class TeamTemplates(commands.Cog):
                 "permission and try again.",
                 mention_author=False,
             )
-            return
+            return None
         author_id = int((raw.get("author") or {}).get("id", 0) or 0)
         if author_id != OWO_BOT_ID:
             await message.reply(
                 "That reply is not pointing to an official OwO Bot team message.",
                 mention_author=False,
             )
-            return
+            return None
 
-        parsed = parse_team_message(extract_all_text(raw))
+        parsed = parse_team_message_detailed(extract_all_text(raw))
         if parsed is None:
             await message.reply(
-                "I could not find a team with animal names and weapon IDs in that "
-                "message. Make sure you replied to the visible `wtm` / `owo team` page.",
+                "I could not read that OwO team page. Make sure you replied to the "
+                "visible `wtm` / `owo team` message.",
+                mention_author=False,
+            )
+            return None
+
+        if parsed.missing_positions:
+            positions = ", ".join(str(position) for position in parsed.missing_positions)
+            await message.reply(
+                f"❌ This team is incomplete. Add an animal to position(s) **{positions}** "
+                "before saving or updating the template.",
+                mention_author=False,
+            )
+            return None
+        return parsed
+
+    @staticmethod
+    def build_saved_embed(template: TeamTemplate) -> discord.Embed:
+        return discord.Embed(
+            title=f"✅ Team #{template.slot} saved: {template.name}",
+            description=(
+                f"{format_team_members(template.members)}\n\n"
+                f"Use `HT{template.slot}` to open it directly, or `HT` to open the full list."
+            ),
+            color=0x57F287,
+        )
+
+    @staticmethod
+    def build_updated_embed(before: TeamTemplate, after: TeamTemplate) -> discord.Embed:
+        return discord.Embed(
+            title=f"✅ Team #{after.slot} updated: {after.name}",
+            description=(
+                "**Before**\n"
+                f"{format_team_members(before.members)}\n\n"
+                "**After**\n"
+                f"{format_team_members(after.members)}"
+            ),
+            color=0x57F287,
+        )
+
+    async def confirm_or_save_create(
+        self,
+        message: discord.Message,
+        name: str,
+        parsed: ParsedTeamMessage,
+    ) -> None:
+        if parsed.missing_weapon_positions:
+            positions = ", ".join(str(position) for position in parsed.missing_weapon_positions)
+            await message.reply(
+                f"⚠️ Animal position(s) **{positions}** have no equipped weapon. "
+                "You can save the team without those weapon commands, or cancel and equip them first.",
+                view=MissingWeaponConfirmView(
+                    self,
+                    message.author.id,
+                    action="create",
+                    name=name,
+                    source_title=parsed.source_title,
+                    members=parsed.members,
+                ),
                 mention_author=False,
             )
             return
 
-        source_title, members = parsed
         template, error = await self.store.save(
-            message.author.id, name, source_title, members
+            message.author.id, name, parsed.source_title, parsed.members
         )
-        if error:
-            await message.reply(f"⚠️ {error}", mention_author=False)
+        if error or template is None:
+            await message.reply(f"⚠️ {error or 'The team could not be saved.'}", mention_author=False)
             return
-        assert template is not None
-
-        member_lines = "\n".join(
-            f"**{member.position}.** `{member.animal}` — `{member.weapon_id}`"
-            for member in template.members
-        )
-        embed = discord.Embed(
-            title=f"✅ Team #{template.slot} saved: {template.name}",
-            description=(
-                f"{member_lines}\n\nUse `HT{template.slot}` to open it directly, or "
-                "`HT` to open the full list."
-            ),
-            color=0x57F287,
-        )
-        await message.reply(embed=embed, mention_author=False)
+        await message.reply(embed=self.build_saved_embed(template), mention_author=False)
         logger.info(
             "Saved team template %s for user %s with %s member(s)",
             template.template_id,
@@ -1783,13 +1982,90 @@ class TeamTemplates(commands.Cog):
             len(template.members),
         )
 
+    async def save_from_reply(self, message: discord.Message, requested_name: str) -> None:
+        name = re.sub(r"\s+", " ", requested_name).strip()
+        if not name:
+            await message.reply("Use `HT C <name>` or `H team create <name>`.", mention_author=False)
+            return
+        if len(name) > MAX_TEMPLATE_NAME_LENGTH:
+            await message.reply(
+                f"Template names can contain at most {MAX_TEMPLATE_NAME_LENGTH} characters.",
+                mention_author=False,
+            )
+            return
+        parsed = await self.parse_team_reply(message)
+        if parsed is None:
+            return
+        await self.confirm_or_save_create(message, name, parsed)
+
+    async def update_from_reply(
+        self, message: discord.Message, selector: str | None
+    ) -> None:
+        value = re.sub(r"\s+", " ", selector or "").strip()
+        if not value:
+            await message.reply(
+                "Use `HT U <number or name>`, for example `HTU 3` or `HT U boss team`.",
+                mention_author=False,
+            )
+            return
+
+        existing = (
+            await self.store.get_by_slot(message.author.id, int(value))
+            if value.isdigit()
+            else await self.store.get_by_name(message.author.id, value)
+        )
+        if existing is None:
+            await message.reply(
+                f"I could not find a saved team matching **{value}**.",
+                mention_author=False,
+            )
+            return
+
+        parsed = await self.parse_team_reply(message)
+        if parsed is None:
+            return
+
+        if parsed.missing_weapon_positions:
+            positions = ", ".join(str(position) for position in parsed.missing_weapon_positions)
+            await message.reply(
+                f"⚠️ Animal position(s) **{positions}** have no equipped weapon. "
+                "You can update the saved team without those weapon commands, or cancel and equip them first.",
+                view=MissingWeaponConfirmView(
+                    self,
+                    message.author.id,
+                    action="update",
+                    name=None,
+                    source_title=parsed.source_title,
+                    members=parsed.members,
+                    existing=existing,
+                ),
+                mention_author=False,
+            )
+            return
+
+        updated = await self.store.update_existing(
+            message.author.id,
+            existing.template_id,
+            parsed.source_title,
+            parsed.members,
+        )
+        if updated is None:
+            await message.reply("That saved team no longer exists.", mention_author=False)
+            return
+        await message.reply(
+            embed=self.build_updated_embed(existing, updated), mention_author=False
+        )
+        logger.info(
+            "Updated team template %s (slot %s) for user %s",
+            updated.template_id,
+            updated.slot,
+            message.author.id,
+        )
+
     async def send_template_card(
         self, message: discord.Message, template: TeamTemplate
     ) -> None:
-        member_lines = "\n".join(
-            f"**{member.position}.** `{member.animal}` — weapon `{member.weapon_id}`"
-            for member in template.members
-        )
+        member_lines = format_team_members(template.members)
         embed = discord.Embed(
             title=f"🐾 #{template.slot} — {template.name}",
             description=(
@@ -1913,6 +2189,9 @@ class TeamTemplates(commands.Cog):
 
             if action == "create":
                 await self.save_from_reply(message, argument or "")
+                return
+            if action == "update":
+                await self.update_from_reply(message, argument)
                 return
             if action == "delete":
                 await self.delete_template(message, argument)

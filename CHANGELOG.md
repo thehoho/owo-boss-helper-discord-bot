@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.7.0-beta
+
+- Added persistent per-server guild-boss ticket tracking.
+- Added `/boss-ticket-channel` for choosing the ticket-board channel.
+- Added automatic capture of `owo boss t`, `owo boss ticket`, `w boss t`, and `w boss ticket` results.
+- Added persistent paginated ticket boards containing usernames, Discord IDs, reported ticket counts, and update times.
+- Added automatic daily ticket replenishment at `America/Los_Angeles` midnight with DST-safe Discord timestamps.
+- Added local SQLite storage in `boss_tickets.db`.
+- Added team-template validation for missing positions.
+- Stopped silently dropping animals that do not have an equipped weapon.
+- Added an explicit Save without weapons / Cancel confirmation flow.
+- Added `HT U <number or name>`, `HTU`, and `H team update` for updating an existing stable template slot from a fresh OwO team page.
+- Added before-and-after summaries after template updates.
+- Updated restoration packets so positions without a saved weapon omit only the unavailable `ww` command.
+- Extended `H help` with boss-ticket tracking instructions.
+
 ## 0.6.3-beta
 
 - Fixed team templates for renamed pets by reading the animal's OwO emoji alias instead of the visible custom nickname.

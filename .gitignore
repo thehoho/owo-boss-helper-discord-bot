@@ -9,6 +9,9 @@ prefix_config.json
 team_templates.db
 team_templates.db-shm
 team_templates.db-wal
+boss_tickets.db
+boss_tickets.db-shm
+boss_tickets.db-wal
 *.json.tmp
 *.log
 logs/

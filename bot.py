@@ -83,6 +83,8 @@ async def main() -> None:
         logger.info("Boss generator and cooldown tracker loaded")
         await bot.load_extension("cogs.team_templates")
         logger.info("Team template manager loaded")
+        await bot.load_extension("cogs.ticket_tracker")
+        logger.info("Boss ticket tracker loaded")
         await bot.start(TOKEN)
 
 

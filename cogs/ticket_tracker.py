@@ -1,0 +1,744 @@
+"""Per-guild OwO boss-ticket board with Pacific-midnight resets.
+
+The tracker only records a user's ticket count after that user explicitly runs an
+OwO boss-ticket command in a server where the helper is present. It does not infer
+usage from battles or from activity in other servers.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import json
+import logging
+import re
+import sqlite3
+import time
+from dataclasses import dataclass
+from datetime import date, datetime, time as datetime_time, timedelta
+from pathlib import Path
+from typing import Any
+from zoneinfo import ZoneInfo
+
+import discord
+from discord import app_commands
+from discord.ext import commands
+
+logger = logging.getLogger(__name__)
+
+OWO_BOT_ID = 408785106942164992
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
+PACIFIC = ZoneInfo("America/Los_Angeles")
+PENDING_REQUEST_SECONDS = 25
+BOARD_PAGE_SIZE = 20
+MAX_TICKETS = 3
+
+TICKET_COMMANDS = {
+    "owobosst",
+    "owobossticket",
+    "owobosstickets",
+    "wbosst",
+    "wbossticket",
+    "wbosstickets",
+}
+
+TICKET_COUNT_RE = re.compile(
+    r"(?:currently\s+have|have)\s+([0-3])\s*/\s*3\s+boss\s+tickets?",
+    re.IGNORECASE,
+)
+
+
+@dataclass(frozen=True)
+class PendingTicketRequest:
+    guild_id: int
+    channel_id: int
+    user_id: int
+    command_message_id: int
+    username: str
+    identity_tokens: tuple[str, ...]
+    created_at: float
+
+
+@dataclass(frozen=True)
+class TicketStatus:
+    guild_id: int
+    user_id: int
+    username: str
+    tickets: int
+    updated_at: int
+    cycle_date: str
+
+
+def normalize_ticket_command(content: str) -> str:
+    return re.sub(r"\s+", "", content or "").lower()
+
+
+def is_ticket_command(content: str) -> bool:
+    return normalize_ticket_command(content) in TICKET_COMMANDS
+
+
+def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
+    if value is None:
+        return
+    if isinstance(value, str):
+        if value.strip():
+            chunks.append(value)
+        return
+    if isinstance(value, (int, float, bool, bytes)):
+        return
+
+    object_id = id(value)
+    if object_id in seen:
+        return
+    seen.add(object_id)
+
+    if isinstance(value, dict):
+        for key, child in value.items():
+            if key in {"content", "title", "description", "label", "value", "name"}:
+                if isinstance(child, str) and child.strip():
+                    chunks.append(child)
+            elif isinstance(child, (dict, list, tuple)):
+                _walk_text(child, chunks, seen)
+        return
+
+    if isinstance(value, (list, tuple, set)):
+        for child in value:
+            _walk_text(child, chunks, seen)
+        return
+
+    for attribute in (
+        "content",
+        "title",
+        "description",
+        "label",
+        "value",
+        "name",
+        "components",
+        "children",
+        "accessory",
+    ):
+        try:
+            child = getattr(value, attribute, None)
+        except Exception:
+            continue
+        if child is not None:
+            _walk_text(child, chunks, seen)
+
+
+def extract_message_text(message: discord.Message) -> str:
+    chunks: list[str] = []
+    if message.content:
+        chunks.append(message.content)
+    for embed in message.embeds:
+        if embed.title:
+            chunks.append(embed.title)
+        if embed.description:
+            chunks.append(embed.description)
+        if embed.author and embed.author.name:
+            chunks.append(embed.author.name)
+        for field in embed.fields:
+            chunks.extend((field.name, field.value))
+    _walk_text(message.components, chunks, set())
+    return "\n".join(chunk.strip() for chunk in chunks if chunk and chunk.strip())
+
+
+def parse_ticket_count(text: str) -> int | None:
+    match = TICKET_COUNT_RE.search(re.sub(r"\s+", " ", text or ""))
+    if match is None:
+        return None
+    value = int(match.group(1))
+    return value if 0 <= value <= MAX_TICKETS else None
+
+
+def current_pacific_date(now: datetime | None = None) -> date:
+    current = now or datetime.now(tz=PACIFIC)
+    return current.astimezone(PACIFIC).date()
+
+
+def pacific_midnight_timestamp(day: date) -> int:
+    local_midnight = datetime.combine(day, datetime_time.min, tzinfo=PACIFIC)
+    return int(local_midnight.timestamp())
+
+
+def next_pacific_reset_timestamp(now: datetime | None = None) -> int:
+    current = (now or datetime.now(tz=PACIFIC)).astimezone(PACIFIC)
+    next_day = current.date() + timedelta(days=1)
+    return pacific_midnight_timestamp(next_day)
+
+
+def identity_tokens_for_user(user: discord.abc.User) -> tuple[str, ...]:
+    sources = (
+        getattr(user, "display_name", ""),
+        getattr(user, "global_name", ""),
+        getattr(user, "name", ""),
+    )
+    tokens = {
+        re.sub(r"[^a-z0-9_]", "", source.lower())
+        for source in sources
+        if source
+    }
+    return tuple(sorted((token for token in tokens if len(token) >= 2), key=len, reverse=True))
+
+
+class TicketStore:
+    def __init__(self, path: Path) -> None:
+        self.path = path
+        self.lock = asyncio.Lock()
+
+    def _connect(self) -> sqlite3.Connection:
+        connection = sqlite3.connect(self.path)
+        connection.row_factory = sqlite3.Row
+        connection.execute("PRAGMA journal_mode=WAL")
+        return connection
+
+    async def initialize(self) -> None:
+        async with self.lock:
+            await asyncio.to_thread(self._initialize_sync)
+
+    def _initialize_sync(self) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_guild_config (
+                    guild_id INTEGER PRIMARY KEY,
+                    channel_id INTEGER NOT NULL,
+                    message_ids_json TEXT NOT NULL DEFAULT '[]',
+                    updated_at INTEGER NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_status (
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    username TEXT NOT NULL,
+                    tickets INTEGER NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    cycle_date TEXT NOT NULL,
+                    PRIMARY KEY (guild_id, user_id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ticket_status_guild "
+                "ON ticket_status(guild_id, tickets DESC, username COLLATE NOCASE)"
+            )
+
+    async def set_channel(self, guild_id: int, channel_id: int) -> None:
+        async with self.lock:
+            await asyncio.to_thread(self._set_channel_sync, guild_id, channel_id)
+
+    def _set_channel_sync(self, guild_id: int, channel_id: int) -> None:
+        now = int(time.time())
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO ticket_guild_config
+                    (guild_id, channel_id, message_ids_json, updated_at)
+                VALUES (?, ?, '[]', ?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                    channel_id = excluded.channel_id,
+                    message_ids_json = '[]',
+                    updated_at = excluded.updated_at
+                """,
+                (guild_id, channel_id, now),
+            )
+
+    async def get_config(self, guild_id: int) -> tuple[int, list[int]] | None:
+        async with self.lock:
+            return await asyncio.to_thread(self._get_config_sync, guild_id)
+
+    def _get_config_sync(self, guild_id: int) -> tuple[int, list[int]] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT channel_id, message_ids_json FROM ticket_guild_config WHERE guild_id = ?",
+                (guild_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            message_ids = [int(value) for value in json.loads(row["message_ids_json"])]
+        except (TypeError, ValueError, json.JSONDecodeError):
+            message_ids = []
+        return int(row["channel_id"]), message_ids
+
+    async def list_configured_guilds(self) -> list[int]:
+        async with self.lock:
+            return await asyncio.to_thread(self._list_configured_guilds_sync)
+
+    def _list_configured_guilds_sync(self) -> list[int]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT guild_id FROM ticket_guild_config ORDER BY guild_id"
+            ).fetchall()
+        return [int(row["guild_id"]) for row in rows]
+
+    async def set_board_message_ids(self, guild_id: int, message_ids: list[int]) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._set_board_message_ids_sync, guild_id, message_ids
+            )
+
+    def _set_board_message_ids_sync(self, guild_id: int, message_ids: list[int]) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE ticket_guild_config
+                SET message_ids_json = ?, updated_at = ?
+                WHERE guild_id = ?
+                """,
+                (json.dumps(message_ids), int(time.time()), guild_id),
+            )
+
+    async def upsert_status(
+        self,
+        guild_id: int,
+        user_id: int,
+        username: str,
+        tickets: int,
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._upsert_status_sync,
+                guild_id,
+                user_id,
+                username,
+                tickets,
+            )
+
+    def _upsert_status_sync(
+        self,
+        guild_id: int,
+        user_id: int,
+        username: str,
+        tickets: int,
+    ) -> None:
+        now = int(time.time())
+        cycle = current_pacific_date().isoformat()
+        with self._connect() as connection:
+            self._normalize_guild_cycle_sync(connection, guild_id, cycle)
+            connection.execute(
+                """
+                INSERT INTO ticket_status
+                    (guild_id, user_id, username, tickets, updated_at, cycle_date)
+                VALUES (?, ?, ?, ?, ?, ?)
+                ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                    username = excluded.username,
+                    tickets = excluded.tickets,
+                    updated_at = excluded.updated_at,
+                    cycle_date = excluded.cycle_date
+                """,
+                (guild_id, user_id, username[:100], tickets, now, cycle),
+            )
+
+    async def normalize_guild_cycle(self, guild_id: int) -> bool:
+        async with self.lock:
+            return await asyncio.to_thread(self._normalize_guild_cycle_entry, guild_id)
+
+    def _normalize_guild_cycle_entry(self, guild_id: int) -> bool:
+        cycle = current_pacific_date().isoformat()
+        with self._connect() as connection:
+            return self._normalize_guild_cycle_sync(connection, guild_id, cycle)
+
+    @staticmethod
+    def _normalize_guild_cycle_sync(
+        connection: sqlite3.Connection, guild_id: int, cycle: str
+    ) -> bool:
+        reset_epoch = pacific_midnight_timestamp(date.fromisoformat(cycle))
+        cursor = connection.execute(
+            """
+            UPDATE ticket_status
+            SET tickets = 3, updated_at = ?, cycle_date = ?
+            WHERE guild_id = ? AND cycle_date <> ?
+            """,
+            (reset_epoch, cycle, guild_id, cycle),
+        )
+        return cursor.rowcount > 0
+
+    async def reset_all_for_current_cycle(self) -> list[int]:
+        async with self.lock:
+            return await asyncio.to_thread(self._reset_all_for_current_cycle_sync)
+
+    def _reset_all_for_current_cycle_sync(self) -> list[int]:
+        cycle = current_pacific_date().isoformat()
+        reset_epoch = pacific_midnight_timestamp(date.fromisoformat(cycle))
+        with self._connect() as connection:
+            guild_rows = connection.execute(
+                "SELECT DISTINCT guild_id FROM ticket_status WHERE cycle_date <> ?",
+                (cycle,),
+            ).fetchall()
+            guild_ids = [int(row["guild_id"]) for row in guild_rows]
+            connection.execute(
+                """
+                UPDATE ticket_status
+                SET tickets = 3, updated_at = ?, cycle_date = ?
+                WHERE cycle_date <> ?
+                """,
+                (reset_epoch, cycle, cycle),
+            )
+        return guild_ids
+
+    async def list_status(self, guild_id: int) -> list[TicketStatus]:
+        async with self.lock:
+            return await asyncio.to_thread(self._list_status_sync, guild_id)
+
+    def _list_status_sync(self, guild_id: int) -> list[TicketStatus]:
+        cycle = current_pacific_date().isoformat()
+        with self._connect() as connection:
+            self._normalize_guild_cycle_sync(connection, guild_id, cycle)
+            rows = connection.execute(
+                """
+                SELECT guild_id, user_id, username, tickets, updated_at, cycle_date
+                FROM ticket_status
+                WHERE guild_id = ?
+                ORDER BY tickets DESC, username COLLATE NOCASE ASC, user_id ASC
+                """,
+                (guild_id,),
+            ).fetchall()
+        return [
+            TicketStatus(
+                guild_id=int(row["guild_id"]),
+                user_id=int(row["user_id"]),
+                username=str(row["username"]),
+                tickets=int(row["tickets"]),
+                updated_at=int(row["updated_at"]),
+                cycle_date=str(row["cycle_date"]),
+            )
+            for row in rows
+        ]
+
+
+class TicketTracker(commands.Cog):
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
+        self.store = TicketStore(DATABASE_FILE)
+        self.pending_by_channel: dict[int, list[PendingTicketRequest]] = {}
+        self.board_locks: dict[int, asyncio.Lock] = {}
+        self.reset_task: asyncio.Task[None] | None = None
+        self._restored = False
+
+    async def cog_load(self) -> None:
+        await self.store.initialize()
+        self.reset_task = asyncio.create_task(self.daily_reset_loop())
+        logger.info("Boss ticket storage ready at %s", DATABASE_FILE)
+
+    async def cog_unload(self) -> None:
+        if self.reset_task:
+            self.reset_task.cancel()
+            self.reset_task = None
+
+    def board_lock(self, guild_id: int) -> asyncio.Lock:
+        return self.board_locks.setdefault(guild_id, asyncio.Lock())
+
+    def purge_pending(self, channel_id: int) -> list[PendingTicketRequest]:
+        now = time.monotonic()
+        pending = [
+            item
+            for item in self.pending_by_channel.get(channel_id, [])
+            if now - item.created_at <= PENDING_REQUEST_SECONDS
+        ]
+        if pending:
+            self.pending_by_channel[channel_id] = pending
+        else:
+            self.pending_by_channel.pop(channel_id, None)
+        return pending
+
+    def arm_ticket_request(self, message: discord.Message) -> None:
+        if message.guild is None:
+            return
+        pending = self.purge_pending(message.channel.id)
+        pending = [item for item in pending if item.user_id != message.author.id]
+        pending.append(
+            PendingTicketRequest(
+                guild_id=message.guild.id,
+                channel_id=message.channel.id,
+                user_id=message.author.id,
+                command_message_id=message.id,
+                username=getattr(message.author, "display_name", message.author.name),
+                identity_tokens=identity_tokens_for_user(message.author),
+                created_at=time.monotonic(),
+            )
+        )
+        self.pending_by_channel[message.channel.id] = pending
+        logger.info(
+            "Armed boss-ticket capture for user %s in guild %s",
+            message.author.id,
+            message.guild.id,
+        )
+
+    def match_pending_request(
+        self, message: discord.Message, text: str
+    ) -> PendingTicketRequest | None:
+        pending = self.purge_pending(message.channel.id)
+        if not pending:
+            return None
+
+        reference_id = (
+            message.reference.message_id if message.reference is not None else None
+        )
+        if reference_id is not None:
+            for item in pending:
+                if item.command_message_id == reference_id:
+                    return item
+
+        mentioned_ids = {user.id for user in message.mentions}
+        for item in pending:
+            if item.user_id in mentioned_ids:
+                return item
+
+        normalized_text = re.sub(r"[^a-z0-9_]", "", text.lower())
+        identified = [
+            item
+            for item in pending
+            if any(token in normalized_text for token in item.identity_tokens)
+        ]
+        if identified:
+            return min(identified, key=lambda item: item.created_at)
+
+        # OwO normally answers ticket checks in channel order. FIFO is a safe final
+        # fallback when the response contains a decorated nickname rather than a mention.
+        return min(pending, key=lambda item: item.created_at)
+
+    def consume_pending(self, request: PendingTicketRequest) -> None:
+        pending = self.pending_by_channel.get(request.channel_id, [])
+        remaining = [item for item in pending if item != request]
+        if remaining:
+            self.pending_by_channel[request.channel_id] = remaining
+        else:
+            self.pending_by_channel.pop(request.channel_id, None)
+
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        if self._restored:
+            return
+        self._restored = True
+        changed_guilds = await self.store.reset_all_for_current_cycle()
+        configured = await self.store.list_configured_guilds()
+        for guild_id in configured:
+            try:
+                await self.refresh_board(guild_id)
+            except Exception:
+                logger.exception("Could not restore ticket board for guild %s", guild_id)
+        if changed_guilds:
+            logger.info("Applied daily boss-ticket reset for %s guild(s)", len(changed_guilds))
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message) -> None:
+        try:
+            if message.guild is None:
+                return
+            if not message.author.bot:
+                if is_ticket_command(message.content or ""):
+                    self.arm_ticket_request(message)
+                return
+
+            if message.author.id != OWO_BOT_ID:
+                return
+            text = extract_message_text(message)
+            tickets = parse_ticket_count(text)
+            if tickets is None:
+                return
+            request = self.match_pending_request(message, text)
+            if request is None or request.guild_id != message.guild.id:
+                return
+
+            self.consume_pending(request)
+            await self.store.upsert_status(
+                request.guild_id,
+                request.user_id,
+                request.username,
+                tickets,
+            )
+            logger.info(
+                "Updated boss tickets for user %s in guild %s: %s/3",
+                request.user_id,
+                request.guild_id,
+                tickets,
+            )
+            if await self.store.get_config(request.guild_id) is not None:
+                await self.refresh_board(request.guild_id)
+        except Exception:
+            logger.exception("Unhandled boss-ticket tracking error")
+
+    @app_commands.command(
+        name="boss-ticket-channel",
+        description="Choose the channel for the server boss-ticket board.",
+    )
+    @app_commands.describe(channel="Channel where the ticket list should be maintained")
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_ticket_channel(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "This command only works inside a server.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        old_config = await self.store.get_config(interaction.guild_id)
+        if old_config and old_config[0] != channel.id:
+            await self.delete_old_board(old_config[0], old_config[1])
+
+        await self.store.set_channel(interaction.guild_id, channel.id)
+        await self.refresh_board(interaction.guild_id)
+        await interaction.followup.send(
+            f"✅ Boss-ticket updates will be maintained in {channel.mention}. Users can "
+            "refresh their entry with `owo boss t`, `owo boss ticket`, `w boss t`, or "
+            "`w boss ticket` anywhere I can read messages.",
+            ephemeral=True,
+        )
+        logger.info(
+            "Configured boss-ticket board channel %s for guild %s",
+            channel.id,
+            interaction.guild_id,
+        )
+
+    async def get_text_channel(self, channel_id: int) -> discord.TextChannel | None:
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(channel_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                return None
+        return channel if isinstance(channel, discord.TextChannel) else None
+
+    async def delete_old_board(self, channel_id: int, message_ids: list[int]) -> None:
+        channel = await self.get_text_channel(channel_id)
+        if channel is None:
+            return
+        for message_id in message_ids:
+            try:
+                message = await channel.fetch_message(message_id)
+                if self.bot.user and message.author.id == self.bot.user.id:
+                    await message.delete()
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                continue
+
+    def build_board_embeds(self, statuses: list[TicketStatus]) -> list[discord.Embed]:
+        next_reset = next_pacific_reset_timestamp()
+        if not statuses:
+            pages: list[list[TicketStatus]] = [[]]
+        else:
+            pages = [
+                statuses[index:index + BOARD_PAGE_SIZE]
+                for index in range(0, len(statuses), BOARD_PAGE_SIZE)
+            ]
+
+        counts = {number: 0 for number in range(4)}
+        for status in statuses:
+            counts[status.tickets] = counts.get(status.tickets, 0) + 1
+        summary = " • ".join(f"**{number}/3:** {counts[number]}" for number in (3, 2, 1, 0))
+
+        embeds: list[discord.Embed] = []
+        for page_index, page in enumerate(pages, start=1):
+            if page:
+                lines = []
+                for status in page:
+                    safe_name = discord.utils.escape_markdown(status.username)
+                    icon = "🎟️" if status.tickets else "▫️"
+                    lines.append(
+                        f"{icon} **{status.tickets}/3** — **{safe_name}** — "
+                        f"`{status.user_id}` — <t:{status.updated_at}:R>"
+                    )
+                body = "\n".join(lines)
+            else:
+                body = (
+                    "No ticket checks have been recorded yet. Run `owo boss t` or "
+                    "`w boss t` anywhere in this server to add your current count."
+                )
+
+            title = "🎟️ Guild Boss Tickets"
+            if len(pages) > 1:
+                title += f" — Page {page_index}/{len(pages)}"
+            embed = discord.Embed(
+                title=title,
+                description=(
+                    f"{summary}\n\n{body}\n\n"
+                    f"**All tickets replenish:** <t:{next_reset}:R> "
+                    f"(<t:{next_reset}:F>)"
+                ),
+                color=0x5865F2,
+            )
+            embed.set_footer(
+                text=(
+                    "Counts update only when each user checks tickets in this server. "
+                    "Daily reset follows America/Los_Angeles midnight."
+                )
+            )
+            embeds.append(embed)
+        return embeds
+
+    async def refresh_board(self, guild_id: int) -> None:
+        async with self.board_lock(guild_id):
+            config = await self.store.get_config(guild_id)
+            if config is None:
+                return
+            channel_id, stored_ids = config
+            channel = await self.get_text_channel(channel_id)
+            if channel is None:
+                logger.warning("Ticket board channel for guild %s is unavailable", guild_id)
+                return
+
+            await self.store.normalize_guild_cycle(guild_id)
+            statuses = await self.store.list_status(guild_id)
+            embeds = self.build_board_embeds(statuses)
+            final_ids: list[int] = []
+
+            for index, embed in enumerate(embeds):
+                existing_id = stored_ids[index] if index < len(stored_ids) else None
+                message: discord.Message | None = None
+                if existing_id:
+                    try:
+                        message = await channel.fetch_message(existing_id)
+                    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                        message = None
+                try:
+                    if message is None:
+                        message = await channel.send(embed=embed)
+                    else:
+                        await message.edit(content=None, embed=embed)
+                    final_ids.append(message.id)
+                except (discord.Forbidden, discord.HTTPException) as exc:
+                    logger.warning("Could not update ticket board for guild %s: %s", guild_id, exc)
+                    return
+
+            for extra_id in stored_ids[len(embeds):]:
+                try:
+                    message = await channel.fetch_message(extra_id)
+                    if self.bot.user and message.author.id == self.bot.user.id:
+                        await message.delete()
+                except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                    continue
+
+            await self.store.set_board_message_ids(guild_id, final_ids)
+
+    async def daily_reset_loop(self) -> None:
+        try:
+            await self.bot.wait_until_ready()
+            while not self.bot.is_closed():
+                reset_at = next_pacific_reset_timestamp()
+                await asyncio.sleep(max(1, reset_at - time.time() + 1))
+                changed_guilds = await self.store.reset_all_for_current_cycle()
+                configured = await self.store.list_configured_guilds()
+                for guild_id in configured:
+                    try:
+                        await self.refresh_board(guild_id)
+                    except Exception:
+                        logger.exception(
+                            "Could not refresh ticket board after daily reset for guild %s",
+                            guild_id,
+                        )
+                logger.info(
+                    "Applied Pacific-midnight boss-ticket reset; %s guild(s) changed",
+                    len(changed_guilds),
+                )
+        except asyncio.CancelledError:
+            return
+
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(TicketTracker(bot))

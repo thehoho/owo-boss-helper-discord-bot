@@ -229,6 +229,65 @@ The helper also removes its previous step prompt after the user sends the expect
 
 **Quick replace** alternates animal and weapon commands immediately. **Exact reset** must still clear positions 1–3 before rebuilding the team so animals can safely move between slots. If OwO applies a temporary delete cooldown, the helper keeps the same step active for retrying.
 
+## Team completeness and updates
+
+Team templates now validate all three positions before saving or updating.
+
+- Empty positions are rejected with a clear warning.
+- Animals without a weapon are kept instead of being silently dropped.
+- When one or more weapons are missing, the user must choose **Save without weapons** or **Cancel**.
+- Templates saved without a weapon still restore the animal, but no `ww` command is generated for that position.
+
+Reply to a fresh OwO team page to update an existing template by number or name:
+
+```text
+HT U 3
+HTU 3
+HT U boss team
+H team update boss team
+```
+
+The existing stable team number and template name are preserved. The bot shows the previous and updated animals and weapon IDs after a successful update.
+
+## Guild boss ticket tracking
+
+A server manager can choose a ticket-board channel with:
+
+```text
+/boss-ticket-channel
+```
+
+Users can refresh their current count anywhere the bot can read messages by running:
+
+```text
+owo boss t
+owo boss ticket
+w boss t
+w boss ticket
+```
+
+The helper associates the OwO response with the requesting Discord user, stores the reported `0/3`–`3/3` count, and edits the persistent ticket board in the configured channel.
+
+The board includes:
+
+- Discord username
+- Discord user ID
+- Current reported boss tickets
+- How recently the user checked
+- The next daily replenishment time using Discord timestamps
+
+Large servers are split into multiple board pages automatically. Counts are stored separately for each Discord server.
+
+Boss tickets reset to three at midnight in `America/Los_Angeles`. This timezone automatically follows PST/PDT daylight-saving changes, so the displayed Discord timestamp remains correct for every viewer throughout the year.
+
+Ticket data is stored locally in:
+
+```text
+boss_tickets.db
+```
+
+Keep this database when moving the bot to another computer or host. It is ignored by Git together with its SQLite sidecar files.
+
 ## Rate-limit-friendly tracking
 
 The bot does not REST-fetch every OwO message in busy grinding channels.
