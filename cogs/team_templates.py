@@ -1,6 +1,7 @@
 """OwO team-template storage, shortcuts, and guided team restoration.
 
 Templates are stored per Discord user in SQLite with stable slots 1-25.
+Animal identity comes from the OwO emoji alias rather than the renameable pet label.
 Guided mode alternates animal/weapon commands, waits for OwO confirmations,
 supports skip controls, and safely handles concurrent users.
 """
@@ -32,6 +33,108 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 
 TEAM_COMMAND_PREFIXES = ("h teams", "h team", "hteam", "htm", "ht")
+
+# Standard OwO animal names that may appear in emoji aliases with a one-letter
+# rarity prefix, such as :gfish:, :llion:, :deagle:, or :hlizard:.
+# Custom pets are intentionally not guessed: unknown emoji aliases are preserved
+# exactly so users can reference those pets by their real OwO identifier.
+STANDARD_ANIMAL_NAMES = frozenset(
+    {
+        "bee",
+        "bug",
+        "snail",
+        "beetle",
+        "butterfly",
+        "chick",
+        "mouse",
+        "chicken",
+        "rabbit",
+        "chipmunk",
+        "sheep",
+        "pig",
+        "cow",
+        "dog",
+        "cat",
+        "crocodile",
+        "tiger",
+        "penguin",
+        "elephant",
+        "whale",
+        "dragon",
+        "unicorn",
+        "snowman",
+        "ghost",
+        "dove",
+        "pbird",
+        "pdolphin",
+        "pogre",
+        "pscorpion",
+        "ptiger",
+        "camel",
+        "fish",
+        "panda",
+        "shrimp",
+        "spider",
+        "deer",
+        "fox",
+        "lion",
+        "owl",
+        "squid",
+        "boar",
+        "eagle",
+        "frog",
+        "gorilla",
+        "wolf",
+        "dinobot",
+        "giraffbot",
+        "slothbot",
+        "hedgebot",
+        "lobbot",
+        "koala",
+        "lizard",
+        "monkey",
+        "snake",
+        "octopus",
+        "glitchparrot",
+        "glitchotter",
+        "glitchraccoon",
+        "glitchflamingo",
+        "glitchzebra",
+    }
+)
+
+# OwO's emoji aliases commonly prefix standard animals with their tier/rank.
+# Both short and readable forms are accepted because aliases have changed over
+# time and community payloads are not always formatted identically.
+ANIMAL_RANK_EMOJI_PREFIXES = frozenset(
+    {
+        "c",
+        "u",
+        "r",
+        "e",
+        "m",
+        "p",
+        "g",
+        "l",
+        "d",
+        "f",
+        "b",
+        "h",
+        "common",
+        "uncommon",
+        "rare",
+        "epic",
+        "mythic",
+        "mythical",
+        "patreon",
+        "gem",
+        "legendary",
+        "fabled",
+        "bot",
+        "hidden",
+        "distorted",
+    }
+)
 
 
 def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
@@ -214,17 +317,58 @@ def extract_message_text(message: discord.Message) -> str:
 
 def _clean_display_text(text: str) -> str:
     text = text.replace("\r\n", "\n").replace("\r", "\n")
-    # Custom Discord emoji forms such as <:gfish:123> and plain pasted :gfish:.
-    text = re.sub(r"<a?:[A-Za-z0-9_]+:\d+>", " ", text)
-    text = re.sub(r":[A-Za-z0-9_]+:", " ", text)
+    # Keep the emoji alias because it is the authoritative animal identifier.
+    # Discord may provide either <:gfish:123456> or the pasted :gfish: form.
+    text = re.sub(
+        r"<a?:([A-Za-z0-9_]+):\d+>",
+        lambda match: f":{match.group(1)}:",
+        text,
+    )
     text = text.replace("`", "")
     text = re.sub(r"[\t ]+", " ", text)
     text = re.sub(r"\n{3,}", "\n\n", text)
     return text.strip()
 
 
+def extract_first_emoji_alias(text: str) -> str | None:
+    """Return the first Discord custom-emoji alias from a team member line."""
+    match = re.search(r":([A-Za-z0-9_]+):", text or "")
+    return match.group(1) if match else None
+
+
+def normalize_animal_emoji_alias(alias: str) -> str:
+    """Turn ranked standard aliases into normal names and preserve custom pets.
+
+    Examples:
+    - gspider -> spider
+    - gfish -> fish
+    - hlizard -> lizard
+    - deagle -> eagle
+    - custompet231 -> custompet231
+    """
+    original = (alias or "").strip()
+    lowered = original.lower()
+    if not lowered:
+        return original
+
+    # Some animals already include a leading tier-like letter in their official
+    # name (for example pbird), so exact matches must win before prefix stripping.
+    if lowered in STANDARD_ANIMAL_NAMES:
+        return lowered
+
+    for animal in sorted(STANDARD_ANIMAL_NAMES, key=len, reverse=True):
+        if not lowered.endswith(animal):
+            continue
+        prefix = lowered[: -len(animal)]
+        if prefix in ANIMAL_RANK_EMOJI_PREFIXES:
+            return animal
+
+    # Unknown aliases are custom/event pets. Do not damage or guess their names.
+    return original
+
+
 def parse_team_message(text: str) -> tuple[str, tuple[TeamMember, ...]] | None:
-    """Extract the displayed OwO team page, including each six-character weapon ID."""
+    """Extract positions, emoji-based animal IDs, and six-character weapon IDs."""
     cleaned = _clean_display_text(text)
     lowered = cleaned.lower()
     if not any(marker in lowered for marker in TEAM_MARKERS):
@@ -245,10 +389,17 @@ def parse_team_message(text: str) -> tuple[str, tuple[TeamMember, ...]] | None:
         section = cleaned[match.end():section_end]
 
         animal_line = re.sub(r"[*~]", "", match.group(2)).strip()
-        animal_tokens = re.findall(r"[A-Za-z0-9_'-]+", animal_line)
-        if not animal_tokens:
-            continue
-        animal = animal_tokens[-1]
+        emoji_alias = extract_first_emoji_alias(animal_line)
+        if emoji_alias:
+            # The emoji identifies the real OwO animal even when the visible pet
+            # name is custom text, spaced letters, symbols, dots, or another emoji.
+            animal = normalize_animal_emoji_alias(emoji_alias)
+        else:
+            # Legacy/fallback path for payloads that expose no custom emoji alias.
+            animal_tokens = re.findall(r"[A-Za-z0-9_'-]+", animal_line)
+            if not animal_tokens:
+                continue
+            animal = animal_tokens[-1]
 
         # Weapon IDs are six uppercase alphanumeric characters on the equipment line.
         # Restricting the search to this animal's section avoids matching HP values.
@@ -1520,7 +1671,8 @@ class TeamTemplates(commands.Cog):
             name="Save a team",
             value=(
                 "Run `wtm` or `owo team`, open the correct page, and reply to it with "
-                "`HT C <name>`. Full form: `H team create <name>`."
+                "`HT C <name>`. Full form: `H team create <name>`. The helper reads "
+                "the animal emoji alias, so custom pet nicknames do not break restores."
             ),
             inline=False,
         )

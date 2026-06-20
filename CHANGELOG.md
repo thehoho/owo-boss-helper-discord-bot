@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.3-beta
+
+- Fixed team templates for renamed pets by reading the animal's OwO emoji alias instead of the visible custom nickname.
+- Normalized rank-prefixed standard aliases such as `gfish`, `gspider`, `llion`, `deagle`, and `hlizard` to normal OwO command names.
+- Preserved unknown custom and event pet emoji aliases exactly rather than incorrectly replacing them with the displayed nickname.
+- Added support for both Discord emoji payload forms: `<:name:id>` and pasted `:name:` text.
+- Updated `HT help` to explain that emoji identity is used when saving teams.
+
 ## 0.6.2-beta
 
 - Removed the artificial delay between confirmed guided setup steps.

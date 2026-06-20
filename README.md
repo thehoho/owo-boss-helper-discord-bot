@@ -193,6 +193,32 @@ wtm d <animal>
 
 Then resend the displayed add command. If the animal is already in the correct position, press **Skip step** or use `HS`, `H skip`, or `H escape`.
 
+## Renamed and custom pet support
+
+Team templates now identify each animal from the first OwO animal emoji alias on the team card instead of trusting the visible pet nickname.
+
+This means renamed pets such as:
+
+```text
+:gspider: just
+:gfish: f i s h
+:hlizard: l i z a r d
+```
+
+are saved as:
+
+```text
+spider
+fish
+lizard
+```
+
+Known standard animals automatically drop their rank prefix when OwO accepts the normal animal name. Examples include `gfish → fish`, `gspider → spider`, `llion → lion`, `deagle → eagle`, and `hlizard → lizard`.
+
+Unknown custom or event pet aliases are preserved exactly instead of being guessed. For example, `:custompet231:` is stored as `custompet231` and used in the guided `wtm a` command.
+
+Templates saved before this update with renamed pets must be saved again from their OwO team page because the old database record contains only the incorrect visible nickname and cannot recover the original emoji alias.
+
 ### Cleaner guided channels
 
 After OwO responds, the helper attempts to delete the user's completed command message. This cleanup is optional and requires **Manage Messages**. Without that permission, guided setup still works normally and the command remains visible.
