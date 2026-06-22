@@ -320,7 +320,7 @@ H boss t
 HBL
 ```
 
-The helper intentionally keeps only these focused aliases. Older experimental aliases such as `H buzz t`, `H ticket list`, `T list`, and `HTL` are not supported.
+The helper intentionally keeps only these focused aliases. Older experimental aliases such as `H ticket list`, `T list`, and `HTL` are not supported.
 
 Private slash command:
 
