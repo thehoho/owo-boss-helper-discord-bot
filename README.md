@@ -25,6 +25,7 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Tracks only the latest active guild-boss message.
 - Polls that one message every 15 seconds instead of fetching every OwO response.
 - Shows the active boss's escape time using Discord timestamps.
+- Reconciles stale active-boss state before responding to status checks, ignoring late OwO cards and marking unavailable tracked messages as unconfirmed.
 - Starts a five-minute cooldown only after a defeat.
 - Marks the guild ready immediately after an escape.
 - Sends cooldown-complete alerts.
@@ -33,8 +34,9 @@ Use `H about` or `/about` inside Discord for the public project profile.
 
 ### Team templates
 
-- Saves up to 25 personal templates per Discord user.
-- Stores stable slot numbers from 1–25.
+- Saves up to 100 personal templates per Discord user.
+- Paginates the `HT` template selector in groups of 25 while direct shortcuts such as `HT73` continue to open a known slot immediately.
+- Stores stable slot numbers from 1–100.
 - Preserves animal positions and exact six-character weapon IDs.
 - Reads animal identity from the OwO emoji alias rather than a renameable nickname.
 - Normalizes standard aliases such as `gfish → fish`, `gspider → spider`, and `hlizard → lizard`.
@@ -57,7 +59,9 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Stores reported `0/3`–`3/3` counts per server.
 - Maintains one persistent board in a configured channel.
 - Shows username, Discord user ID, ticket count, update time, and next replenishment.
-- Splits large lists into multiple pages.
+- Keeps the persistent board and manual ticket-list responses in a single Discord message, with Previous and Next buttons for large lists.
+- Provides a visual ticket management panel for server managers, including remove, block tracking, and unblock actions.
+- Supports paginated managed user selection for servers with more than 25 tracked or blocked users.
 - Uses `America/Los_Angeles` so Pacific daylight-saving changes are handled automatically.
 - Supports manual list display and board refresh commands.
 - Reads Components V2 ticket responses from both message-create and message-edit events, with a bounded raw-message fallback only after an explicit ticket request.
@@ -187,6 +191,8 @@ This selects the channel for new-boss, defeat, escape, cooldown, and ready alert
 H help
 ```
 
+`H help` now lists only commands currently supported by the bot, including the ticket-management panel and the 100-template workflow.
+
 ## Team templates
 
 ### Save a team
@@ -296,6 +302,25 @@ A server manager runs:
 ```
 
 Choose the channel where the board should be created and maintained.
+
+### Visual ticket management
+
+A server manager can open the visual ticket-user panel with:
+
+```text
+H boss settings
+HBS
+/boss-ticket-manage
+```
+
+The panel supports:
+
+- **Remove from list** — deletes the current board entry, but the user can reappear after their next OwO ticket check.
+- **Block tracking** — removes the user and ignores their future ticket checks in that server.
+- **Unblock** — allows future ticket checks to be recorded again.
+- Paginated user selection for servers with more than 25 tracked or blocked users.
+
+The existing `/boss-ticket-remove` command remains available for direct removal by Discord user ID or mention.
 
 ### Update a user's count
 

@@ -1233,48 +1233,58 @@ class BossGenerator(commands.Cog):
         )
 
     async def send_prefix_help(self, message: discord.Message) -> None:
-        """Reply to `H help` with the bot's focused command guide."""
+        """Reply to `H help` with the current command guide."""
         if message.guild is None:
             return
 
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
             description=(
-                "`H` stands for **Helper** — and it also happens to be the first "
-                "letter of Hassaan's name.\n\n"
-                "This bot helps your server generate correctly ordered Neon boss "
-                "commands and track the current guild-boss status."
+                "`H` stands for **Helper** — and it is also the first letter of "
+                "Hassaan's name. This guide lists the commands currently supported."
             ),
             color=0x5865F2,
         )
         embed.add_field(
-            name="⚔️ Generate a Neon command",
+            name="⚔️ Boss command generator",
             value=(
-                "Send `owo boss i` or `w boss i`, then open all three boss pages. "
-                "The helper reads pages `1/3`, `2/3`, and `3/3`, detects their HP, "
-                "and sends the finished command."
+                "Send `owo boss i` or `w boss i`, then open pages `1/3`, `2/3`, "
+                "and `3/3`."
             ),
             inline=False,
         )
         embed.add_field(
-            name="⏱️ Check the guild boss",
+            name="⏱️ Guild-boss status",
             value=(
-                "Use `H boss cd` or `H boss cooldown`. While a boss is active, "
-                "you will see its escape time. A defeated boss has a five-minute "
-                "cooldown; an escaped boss can be replaced immediately."
+                "Use `H boss cd`, `H boss cooldown`, or `/boss-cooldown`. Managers "
+                "configure alerts with `/boss-cooldown-channel`."
             ),
             inline=False,
         )
         embed.add_field(
-            name="🛠️ Server setup",
+            name="🎟️ Boss tickets",
             value=(
-                "A server manager can use `/boss-cooldown-channel` to choose where "
-                "new-boss, defeat-cooldown, escape, and ready alerts are sent. "
-                "`/boss-cooldown` checks the same status privately."
+                "Update with `owo boss t` / `w boss t`; view with `H boss t`, "
+                "`H boss list`, `HBL`, or `/boss-ticket-list`. Managers use "
+                "`/boss-ticket-channel` and `/boss-ticket-manage`."
             ),
             inline=False,
         )
-        embed.set_footer(text="Use H help anytime to show this guide.")
+        embed.add_field(
+            name="💾 Team templates",
+            value=(
+                "Use `HT C <name>` to save, `HT` or `HT<number>` to open, "
+                "`HT U <slot/name>` to update, `HT D <slot/name>` to delete, and "
+                "`HT help` for the full guide."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="ℹ️ Project",
+            value="Use `H about` or `/about` for developer and project information.",
+            inline=False,
+        )
+        embed.set_footer(text="Use H help anytime to show this current command guide.")
 
         await message.reply(embed=embed, mention_author=False)
         logger.info(
@@ -1413,21 +1423,75 @@ class BossGenerator(commands.Cog):
         """Serialize defeat/escape handling so one boss emits one alert."""
         return self.guild_boss_outcome_locks.setdefault(guild_id, asyncio.Lock())
 
+    def clear_active_boss_tracking(self, guild_id: int, reason: str) -> None:
+        """Clear stale active-message fields without changing the known outcome."""
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        changed = False
+        for key in (
+            "active_boss_channel_id",
+            "active_boss_message_id",
+            "active_boss_expires_at",
+            "active_boss_unverified",
+        ):
+            if key in config:
+                config.pop(key, None)
+                changed = True
+        watcher = self.guild_boss_watch_tasks.get(guild_id)
+        if watcher and watcher is not asyncio.current_task():
+            watcher.cancel()
+        if changed:
+            save_cooldown_config(self.cooldown_config)
+            logger.info("Cleared guild %s stale active boss state: %s", guild_id, reason)
+
     async def refresh_tracked_guild_boss_status(self, guild_id: int) -> None:
-        """Fetch the one tracked boss message and process its latest state."""
+        """Reconcile the tracked boss before displaying a manual status check."""
         config = self.cooldown_config.get(str(guild_id), {})
         channel_id = int(config.get("active_boss_channel_id") or 0)
         message_id = int(config.get("active_boss_message_id") or 0)
         if not channel_id or not message_id:
             return
 
+        now = int(time.time())
+        expiry = int(config.get("active_boss_expires_at") or 0)
+        last_boss_key = int(config.get("last_boss_key") or 0)
+        last_result = str(config.get("last_result") or "")
+
+        # A late copy of the completed boss card must never reactivate the boss.
+        if (
+            expiry
+            and expiry == last_boss_key
+            and last_result in {"defeated", "escaped", "ready"}
+        ):
+            self.clear_active_boss_tracking(
+                guild_id,
+                f"completed boss {expiry} was still marked active",
+            )
+            return
+
         # The watcher, H command, and slash command can fire close together. One
         # per-guild lock prevents duplicate GETs for the same tracked message.
         async with self.get_guild_boss_fetch_lock(guild_id):
             data = await fetch_raw_message(self.bot, channel_id, message_id)
+
         if not data:
+            if expiry and expiry <= now:
+                await self.finish_boss_escape(
+                    guild_id,
+                    message_id,
+                    expiry,
+                    boss_key=expiry,
+                )
+                return
+            config = self.cooldown_config.setdefault(str(guild_id), {})
+            if not config.get("active_boss_unverified"):
+                config["active_boss_unverified"] = True
+                save_cooldown_config(self.cooldown_config)
             return
+
         if int((data.get("author") or {}).get("id", 0)) != OWO_BOT_ID:
+            config = self.cooldown_config.setdefault(str(guild_id), {})
+            config["active_boss_unverified"] = True
+            save_cooldown_config(self.cooldown_config)
             return
 
         await self.track_latest_guild_boss_message(
@@ -1468,6 +1532,33 @@ class BossGenerator(commands.Cog):
         now = int(time.time())
         expiry = extract_future_boss_expiry(data, now)
         previous_expiry = int(config.get("active_boss_expires_at") or 0)
+        last_boss_key = int(config.get("last_boss_key") or 0)
+        last_result = str(config.get("last_result") or "")
+
+        # Ignore late active cards belonging to a boss whose defeat/escape was
+        # already processed. Without this guard, an old status edit can make
+        # `H boss cd` incorrectly report an active boss again.
+        if (
+            expiry
+            and expiry == last_boss_key
+            and last_result in {"defeated", "escaped", "ready"}
+        ):
+            logger.info(
+                "Ignored late active card %s for completed guild %s boss %s",
+                message_id,
+                guild_id,
+                expiry,
+            )
+            return
+
+        if expiry and expiry <= now:
+            await self.finish_boss_escape(
+                guild_id,
+                message_id,
+                expiry,
+                boss_key=expiry,
+            )
+            return
         is_new_boss = bool(expiry and expiry != previous_expiry)
         tracking_changed = (
             old_id != message_id
@@ -1477,6 +1568,7 @@ class BossGenerator(commands.Cog):
 
         config["active_boss_channel_id"] = channel_id
         config["active_boss_message_id"] = message_id
+        config.pop("active_boss_unverified", None)
         if expiry:
             config["active_boss_expires_at"] = expiry
 
@@ -1899,6 +1991,7 @@ class BossGenerator(commands.Cog):
         config.pop("active_boss_channel_id", None)
         config.pop("active_boss_message_id", None)
         config.pop("active_boss_expires_at", None)
+        config.pop("active_boss_unverified", None)
 
         watcher = self.guild_boss_watch_tasks.get(guild_id)
         if watcher and watcher is not asyncio.current_task():
@@ -2028,6 +2121,7 @@ class BossGenerator(commands.Cog):
         cooldown_end = int(config.get("cooldown_end") or 0)
         active_expiry = int(config.get("active_boss_expires_at") or 0)
         result = str(config.get("last_result") or "ready")
+        unverified = bool(config.get("active_boss_unverified"))
 
         if cooldown_end > now:
             embed = discord.Embed(
@@ -2044,6 +2138,25 @@ class BossGenerator(commands.Cog):
             )
             return embed
 
+        if config.get("active_boss_message_id") and unverified:
+            if active_expiry > now:
+                timing = (
+                    f"\n\n**Last known escape time:** <t:{active_expiry}:R>\n"
+                    f"**Exact time:** <t:{active_expiry}:F>"
+                )
+            else:
+                timing = ""
+            return discord.Embed(
+                title="❔ Guild Boss Status Unconfirmed",
+                description=(
+                    "The last tracked OwO boss message is no longer available, so the "
+                    "helper will not claim that the boss is still active. Run an OwO "
+                    "boss-status command or continue grinding; the next status card will "
+                    f"refresh this automatically.{timing}"
+                ),
+                color=0xFEE75C,
+            )
+
         if config.get("active_boss_message_id"):
             if active_expiry > now:
                 description = (
@@ -2055,9 +2168,9 @@ class BossGenerator(commands.Cog):
                 )
             else:
                 description = (
-                    "A guild boss is currently being tracked, but its exact escape "
-                    "time is not available yet. The bot checks the latest OwO boss "
-                    "message every 15 seconds."
+                    "A guild boss status is being tracked, but its exact escape time "
+                    "is not available yet. The helper will update when OwO publishes "
+                    "a complete status card."
                 )
             return discord.Embed(
                 title="⚔️ Guild Boss Active",
@@ -2067,17 +2180,31 @@ class BossGenerator(commands.Cog):
 
         if result == "escaped":
             return discord.Embed(
+                title="✅ No Active Guild Boss",
+                description=(
+                    "The previous guild boss **escaped**. There is no cooldown after an "
+                    "escape, and no new boss has been detected yet. Keep grinding to "
+                    "spawn the next guild boss."
+                ),
+                color=0x57F287,
+            )
+
+        if result in {"defeated", "ready"}:
+            return discord.Embed(
                 title="✅ Guild Boss Ready",
                 description=(
-                    "The previous guild boss **escaped**. Escapes do not start a "
-                    "cooldown, so a new guild boss can appear immediately."
+                    "There is currently no confirmed guild boss or cooldown. The previous "
+                    "defeat cooldown has ended, so keep grinding to spawn a new boss."
                 ),
                 color=0x57F287,
             )
 
         return discord.Embed(
-            title="✅ Guild Boss Ready",
-            description="No guild boss or cooldown is active. A new guild boss can appear.",
+            title="✅ No Active Guild Boss",
+            description=(
+                "There is currently no confirmed guild boss or cooldown. Keep grinding "
+                "to spawn a new guild boss."
+            ),
             color=0x57F287,
         )
 

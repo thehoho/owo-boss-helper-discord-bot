@@ -30,7 +30,7 @@ TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.8.0-beta"
+BOT_VERSION = "0.9.0-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -79,6 +79,8 @@ def classify_message_usage(content: str) -> str | None:
         return "cooldown_checks"
     if compact in {"hbosst", "hbosslist", "hbl"}:
         return "ticket_list_views"
+    if compact in {"hbosssettings", "hbs"}:
+        return "ticket_management"
     if compact == "hhelp":
         return "help_views"
     if compact == "habout":
@@ -561,6 +563,7 @@ class BotInfo(commands.Cog):
             "team_helper_commands": "Team helper",
             "cooldown_checks": "Cooldown checks",
             "ticket_list_views": "Ticket-list views",
+            "ticket_management": "Ticket management",
             "help_views": "Help views",
             "about_views": "About views",
         }

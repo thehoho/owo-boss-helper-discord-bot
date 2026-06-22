@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.9.0-beta
+
+- Replaced multi-message ticket boards with one paginated message using Previous and Next buttons.
+- Added persistent ticket-page navigation that continues working after bot restarts.
+- Added `H boss settings`, `HBS`, and `/boss-ticket-manage` for visual ticket-user administration.
+- Added Remove from list, Block tracking, and Unblock actions.
+- Added per-server blocked-ticket-user storage and prevented blocked users from being recorded.
+- Kept `/boss-ticket-remove` for direct removal by Discord user ID or mention.
+- Increased the personal team-template limit from 25 to 100.
+- Added 25-item pagination to the `HT` template selector so all 100 slots remain accessible.
+- Improved `H boss cd`, `H boss cooldown`, and `/boss-cooldown` reconciliation to prevent completed bosses from appearing active again.
+- Added an unconfirmed status when the tracked OwO boss message is unavailable instead of reporting a possibly stale active boss.
+- Updated `H help` to remove obsolete aliases and document only current commands.
+- Updated the public bot version to `0.9.0-beta` and added ticket-management usage statistics.
+
 ## 0.8.0-beta
 
 - Added the public `H about` and `/about` project profile identifying Hassaan as the developer.

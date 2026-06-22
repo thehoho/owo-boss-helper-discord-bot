@@ -1,6 +1,6 @@
 """OwO team-template storage, shortcuts, and guided team restoration.
 
-Templates are stored per Discord user in SQLite with stable slots 1-25.
+Templates are stored per Discord user in SQLite with stable slots 1-100.
 Animal identity comes from the OwO emoji alias rather than the renameable pet label.
 Guided mode alternates animal/weapon commands, waits for OwO confirmations,
 supports skip controls, and safely handles concurrent users.
@@ -25,7 +25,8 @@ logger = logging.getLogger(__name__)
 
 OWO_BOT_ID = 408785106942164992
 TEAM_SAVE_EMOJI = "💾"
-MAX_TEMPLATES_PER_USER = 25
+MAX_TEMPLATES_PER_USER = 100
+TEMPLATE_PAGE_SIZE = 25
 MAX_TEMPLATE_NAME_LENGTH = 40
 DELETE_CONFIRMED_USER_COMMANDS = True
 GUIDED_SESSION_TIMEOUT_SECONDS = 15 * 60
@@ -1167,10 +1168,17 @@ class TemplateActionView(OwnedView):
 
 
 class TemplateSelect(discord.ui.Select):
-    def __init__(self, cog: "TeamTemplates", templates: list[TeamTemplate]) -> None:
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        templates: list[TeamTemplate],
+        page: int,
+    ) -> None:
         self.cog = cog
+        start = page * TEMPLATE_PAGE_SIZE
+        current = templates[start:start + TEMPLATE_PAGE_SIZE]
         options: list[discord.SelectOption] = []
-        for template in templates[:MAX_TEMPLATES_PER_USER]:
+        for template in current:
             animals = " / ".join(member.animal for member in template.members)
             options.append(
                 discord.SelectOption(
@@ -1222,9 +1230,61 @@ class TemplateListView(OwnedView):
         cog: "TeamTemplates",
         owner_id: int,
         templates: list[TeamTemplate],
+        *,
+        page: int = 0,
     ) -> None:
         super().__init__(owner_id)
-        self.add_item(TemplateSelect(cog, templates))
+        self.cog = cog
+        self.templates = templates
+        self.page_count = max(
+            1,
+            (len(templates) + TEMPLATE_PAGE_SIZE - 1) // TEMPLATE_PAGE_SIZE,
+        )
+        self.page = max(0, min(page, self.page_count - 1))
+        self.add_item(TemplateSelect(cog, templates, self.page))
+
+        previous = discord.ui.Button(
+            label="Previous",
+            emoji="◀️",
+            style=discord.ButtonStyle.secondary,
+            disabled=self.page <= 0,
+            row=1,
+        )
+        next_button = discord.ui.Button(
+            label="Next",
+            emoji="▶️",
+            style=discord.ButtonStyle.secondary,
+            disabled=self.page >= self.page_count - 1,
+            row=1,
+        )
+        previous.callback = self.previous_page
+        next_button.callback = self.next_page
+        self.add_item(previous)
+        self.add_item(next_button)
+
+    async def previous_page(self, interaction: discord.Interaction) -> None:
+        target = max(0, self.page - 1)
+        await interaction.response.edit_message(
+            embed=self.cog.build_template_list_embed(self.templates, target),
+            view=TemplateListView(
+                self.cog,
+                interaction.user.id,
+                self.templates,
+                page=target,
+            ),
+        )
+
+    async def next_page(self, interaction: discord.Interaction) -> None:
+        target = min(self.page_count - 1, self.page + 1)
+        await interaction.response.edit_message(
+            embed=self.cog.build_template_list_embed(self.templates, target),
+            view=TemplateListView(
+                self.cog,
+                interaction.user.id,
+                self.templates,
+                page=target,
+            ),
+        )
 
 
 class TeamTemplates(commands.Cog):
@@ -1764,58 +1824,57 @@ class TeamTemplates(commands.Cog):
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
             description=(
-                "`H` stands for **Helper** — and it also happens to be the first "
-                "letter of Hassaan's name.\n\n"
-                "Generate boss commands, track guild-boss timing, and save reusable "
-                "OwO teams with their exact weapon IDs."
+                "`H` stands for **Helper** — and it is also the first letter of "
+                "Hassaan's name. This guide lists only the commands currently supported."
             ),
             color=0x5865F2,
         )
         embed.add_field(
-            name="⚔️ Generate a Neon boss command",
+            name="⚔️ Boss command generator",
             value=(
-                "Send `owo boss i` or `w boss i`, then open all three pages. The "
-                "helper reads pages `1/3`–`3/3`, detects HP, and sends the command."
+                "Send `owo boss i` or `w boss i`, then open pages `1/3`, `2/3`, "
+                "and `3/3`. The helper reads their HP and sends the ordered Neon command."
             ),
             inline=False,
         )
         embed.add_field(
-            name="⏱️ Check the guild boss",
+            name="⏱️ Guild-boss status",
             value=(
-                "Use `H boss cd` or `H boss cooldown`. A defeated boss starts a "
-                "five-minute cooldown; an escaped boss can be replaced immediately."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="💾 Save and restore teams",
-            value=(
-                "Reply to an OwO team page with `HT C <name>` (or the full "
-                "`H team create <name>`) to save animals, positions, and exact weapon "
-                "IDs. Use `HT`, `HT3`, or `HTM3` to open templates quickly. During "
-                "guided setup, use `HS` / `H skip` / `H escape` when a step is already correct."
+                "Use `H boss cd` or `H boss cooldown`. Server managers configure "
+                "automatic alerts with `/boss-cooldown-channel`; `/boss-cooldown` "
+                "shows the same status privately."
             ),
             inline=False,
         )
         embed.add_field(
             name="🎟️ Boss tickets",
             value=(
-                "Run `owo boss t` / `w boss t` anywhere in the server. The helper records "
-                "the reported count and updates the configured board. Use `H ticket list`, "
-                "`H boss t`, `T list`, or `/boss-ticket-list` to show and refresh the list. "
-                "A server manager selects the board channel with `/boss-ticket-channel`."
+                "Update your count with `owo boss t` or `w boss t`. View the list "
+                "with `H boss t`, `H boss list`, `HBL`, or `/boss-ticket-list`. "
+                "Managers use `/boss-ticket-channel` and can open the visual user "
+                "panel with `H boss settings`, `HBS`, or `/boss-ticket-manage`."
             ),
             inline=False,
         )
         embed.add_field(
-            name="🛠️ Server setup",
+            name="💾 Team templates",
             value=(
-                "A server manager can use `/boss-cooldown-channel` to choose the "
-                "guild-boss alert channel. `/boss-cooldown` checks status privately."
+                f"Save up to **{MAX_TEMPLATES_PER_USER}** teams. Reply to an OwO team "
+                "page with `HT C <name>`. Use `HT`, `HT<number>`, `HT U <slot/name>`, "
+                "or `HT D <slot/name>`. During guided setup use `HS` to skip and "
+                "`HT cancel` to stop. Use `HT help` for the complete team guide."
             ),
             inline=False,
         )
-        embed.set_footer(text="Use H help anytime to show this guide.")
+        embed.add_field(
+            name="ℹ️ Project information",
+            value=(
+                "Use `H about` or `/about`. The developer-only operational commands "
+                "are `/bot-stats` and `/bot-servers`."
+            ),
+            inline=False,
+        )
+        embed.set_footer(text="Use H help anytime to show this current command guide.")
         await message.reply(embed=embed, mention_author=False)
         logger.info(
             "Combined helper help requested by %s in guild %s",
@@ -2083,6 +2142,35 @@ class TeamTemplates(commands.Cog):
             mention_author=False,
         )
 
+    def build_template_list_embed(
+        self,
+        templates: list[TeamTemplate],
+        page: int,
+    ) -> discord.Embed:
+        page_count = max(
+            1,
+            (len(templates) + TEMPLATE_PAGE_SIZE - 1) // TEMPLATE_PAGE_SIZE,
+        )
+        page = max(0, min(page, page_count - 1))
+        start = page * TEMPLATE_PAGE_SIZE
+        current = templates[start:start + TEMPLATE_PAGE_SIZE]
+        numbered = "\n".join(
+            f"`#{template.slot}` **{template.name}**"
+            for template in current
+        )
+        title = "🐾 Your saved OwO teams"
+        if page_count > 1:
+            title += f" — Page {page + 1}/{page_count}"
+        return discord.Embed(
+            title=title,
+            description=(
+                f"You have **{len(templates)}/{MAX_TEMPLATES_PER_USER}** templates.\n\n"
+                f"{numbered}\n\nChoose one below, use the arrows to change pages, "
+                "or open a known slot directly with `HT<number>` such as `HT73`."
+            ),
+            color=0x5865F2,
+        )
+
     async def show_templates(self, message: discord.Message) -> None:
         templates = await self.store.list_for_user(message.author.id)
         if not templates:
@@ -2093,21 +2181,9 @@ class TeamTemplates(commands.Cog):
             )
             return
 
-        numbered = "\n".join(
-            f"`#{template.slot}` **{template.name}**"
-            for template in templates
-        )
-        embed = discord.Embed(
-            title="🐾 Your saved OwO teams",
-            description=(
-                f"You have **{len(templates)}/{MAX_TEMPLATES_PER_USER}** templates.\n\n"
-                f"{numbered}\n\nChoose one below, or use `HT<number>` such as `HT3`."
-            ),
-            color=0x5865F2,
-        )
         await message.reply(
-            embed=embed,
-            view=TemplateListView(self, message.author.id, templates),
+            embed=self.build_template_list_embed(templates, 0),
+            view=TemplateListView(self, message.author.id, templates, page=0),
             mention_author=False,
             delete_after=300,
         )

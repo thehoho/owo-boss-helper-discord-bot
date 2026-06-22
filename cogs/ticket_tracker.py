@@ -10,6 +10,7 @@ from __future__ import annotations
 import asyncio
 import json
 import logging
+import os
 import re
 import sqlite3
 import time
@@ -32,6 +33,7 @@ DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 PACIFIC = ZoneInfo("America/Los_Angeles")
 PENDING_REQUEST_SECONDS = 60
 BOARD_PAGE_SIZE = 20
+MANAGEMENT_PAGE_SIZE = 25
 MAX_TICKETS = 3
 
 TICKET_COMMANDS = {
@@ -47,6 +49,11 @@ TICKET_LIST_COMMANDS = {
     "hbosslist",
     "hbosst",
     "hbl",
+}
+
+TICKET_SETTINGS_COMMANDS = {
+    "hbosssettings",
+    "hbs",
 }
 
 TICKET_COUNT_RE = re.compile(
@@ -83,6 +90,24 @@ class TicketStatus:
     cycle_date: str
 
 
+@dataclass(frozen=True)
+class BlockedTicketUser:
+    guild_id: int
+    user_id: int
+    username: str
+    blocked_at: int
+    blocked_by: int
+
+
+@dataclass(frozen=True)
+class TicketManagementEntry:
+    user_id: int
+    username: str
+    tickets: int | None
+    updated_at: int | None
+    blocked: bool
+
+
 def normalize_ticket_command(content: str) -> str:
     return re.sub(r"\s+", "", content or "").lower()
 
@@ -93,6 +118,10 @@ def is_ticket_command(content: str) -> bool:
 
 def is_ticket_list_command(content: str) -> bool:
     return normalize_ticket_command(content) in TICKET_LIST_COMMANDS
+
+
+def is_ticket_settings_command(content: str) -> bool:
+    return normalize_ticket_command(content) in TICKET_SETTINGS_COMMANDS
 
 
 def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
@@ -303,6 +332,22 @@ class TicketStore:
                 "CREATE INDEX IF NOT EXISTS idx_ticket_status_guild "
                 "ON ticket_status(guild_id, tickets DESC, username COLLATE NOCASE)"
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_blocked_users (
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    username TEXT NOT NULL,
+                    blocked_at INTEGER NOT NULL,
+                    blocked_by INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, user_id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ticket_blocked_guild "
+                "ON ticket_blocked_users(guild_id, username COLLATE NOCASE)"
+            )
 
     async def set_channel(self, guild_id: int, channel_id: int) -> None:
         async with self.lock:
@@ -495,6 +540,102 @@ class TicketStore:
             cycle_date=str(row["cycle_date"]),
         )
 
+    async def block_user(
+        self,
+        guild_id: int,
+        user_id: int,
+        username: str,
+        blocked_by: int,
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._block_user_sync,
+                guild_id,
+                user_id,
+                username,
+                blocked_by,
+            )
+
+    def _block_user_sync(
+        self,
+        guild_id: int,
+        user_id: int,
+        username: str,
+        blocked_by: int,
+    ) -> None:
+        now = int(time.time())
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO ticket_blocked_users
+                    (guild_id, user_id, username, blocked_at, blocked_by)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                    username = excluded.username,
+                    blocked_at = excluded.blocked_at,
+                    blocked_by = excluded.blocked_by
+                """,
+                (guild_id, user_id, username[:100], now, blocked_by),
+            )
+            connection.execute(
+                "DELETE FROM ticket_status WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id),
+            )
+
+    async def unblock_user(self, guild_id: int, user_id: int) -> bool:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._unblock_user_sync, guild_id, user_id
+            )
+
+    def _unblock_user_sync(self, guild_id: int, user_id: int) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM ticket_blocked_users WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id),
+            )
+        return cursor.rowcount > 0
+
+    async def list_blocked(self, guild_id: int) -> list[BlockedTicketUser]:
+        async with self.lock:
+            return await asyncio.to_thread(self._list_blocked_sync, guild_id)
+
+    def _list_blocked_sync(self, guild_id: int) -> list[BlockedTicketUser]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT guild_id, user_id, username, blocked_at, blocked_by
+                FROM ticket_blocked_users
+                WHERE guild_id = ?
+                ORDER BY username COLLATE NOCASE ASC, user_id ASC
+                """,
+                (guild_id,),
+            ).fetchall()
+        return [
+            BlockedTicketUser(
+                guild_id=int(row["guild_id"]),
+                user_id=int(row["user_id"]),
+                username=str(row["username"]),
+                blocked_at=int(row["blocked_at"]),
+                blocked_by=int(row["blocked_by"]),
+            )
+            for row in rows
+        ]
+
+    async def load_all_blocked_ids(self) -> dict[int, set[int]]:
+        async with self.lock:
+            return await asyncio.to_thread(self._load_all_blocked_ids_sync)
+
+    def _load_all_blocked_ids_sync(self) -> dict[int, set[int]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT guild_id, user_id FROM ticket_blocked_users"
+            ).fetchall()
+        result: dict[int, set[int]] = {}
+        for row in rows:
+            result.setdefault(int(row["guild_id"]), set()).add(int(row["user_id"]))
+        return result
+
     async def list_status(self, guild_id: int) -> list[TicketStatus]:
         async with self.lock:
             return await asyncio.to_thread(self._list_status_sync, guild_id)
@@ -525,6 +666,326 @@ class TicketStore:
         ]
 
 
+class TicketBoardView(discord.ui.View):
+    """Persistent left/right navigation for public and ephemeral ticket boards."""
+
+    def __init__(
+        self,
+        tracker: "TicketTracker",
+        *,
+        page: int = 0,
+        page_count: int = 2,
+    ) -> None:
+        super().__init__(timeout=None)
+        self.tracker = tracker
+        self.page = max(0, page)
+        self.page_count = max(1, page_count)
+
+        previous = discord.ui.Button(
+            label="Previous",
+            emoji="◀️",
+            style=discord.ButtonStyle.secondary,
+            custom_id="owo-helper:ticket-board:previous",
+            disabled=self.page <= 0,
+        )
+        next_button = discord.ui.Button(
+            label="Next",
+            emoji="▶️",
+            style=discord.ButtonStyle.secondary,
+            custom_id="owo-helper:ticket-board:next",
+            disabled=self.page >= self.page_count - 1,
+        )
+        previous.callback = self.previous_page
+        next_button.callback = self.next_page
+        self.add_item(previous)
+        self.add_item(next_button)
+
+    async def _move(self, interaction: discord.Interaction, offset: int) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "This ticket board is no longer attached to a server.", ephemeral=True
+            )
+            return
+        statuses = await self.tracker.store.list_status(interaction.guild_id)
+        page_count = self.tracker.board_page_count(statuses)
+        current = self.tracker.page_from_message(interaction.message)
+        target = max(0, min(current + offset, page_count - 1))
+        await interaction.response.edit_message(
+            embed=self.tracker.build_board_embed(statuses, target),
+            view=TicketBoardView(
+                self.tracker,
+                page=target,
+                page_count=page_count,
+            ) if page_count > 1 else None,
+        )
+
+    async def previous_page(self, interaction: discord.Interaction) -> None:
+        await self._move(interaction, -1)
+
+    async def next_page(self, interaction: discord.Interaction) -> None:
+        await self._move(interaction, 1)
+
+
+class TicketManagementSelect(discord.ui.Select):
+    def __init__(self, view: "TicketManagementView") -> None:
+        self.management_view = view
+        start = view.page * MANAGEMENT_PAGE_SIZE
+        entries = view.entries[start:start + MANAGEMENT_PAGE_SIZE]
+        options: list[discord.SelectOption] = []
+        for entry in entries:
+            if entry.blocked:
+                state = "Blocked from ticket tracking"
+                emoji = "🚫"
+            else:
+                state = f"Currently {entry.tickets}/3 tickets"
+                emoji = "🎟️"
+            options.append(
+                discord.SelectOption(
+                    label=entry.username[:100],
+                    value=str(entry.user_id),
+                    description=f"{state} • {entry.user_id}"[:100],
+                    emoji=emoji,
+                    default=entry.user_id == view.selected_user_id,
+                )
+            )
+        super().__init__(
+            placeholder="Choose a tracked or blocked user…",
+            min_values=1,
+            max_values=1,
+            options=options,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        self.management_view.selected_user_id = int(self.values[0])
+        self.management_view.notice = None
+        await self.management_view.edit(interaction)
+
+
+class TicketManagementView(discord.ui.View):
+    def __init__(
+        self,
+        tracker: "TicketTracker",
+        guild_id: int,
+        entries: list[TicketManagementEntry],
+        *,
+        page: int = 0,
+        selected_user_id: int | None = None,
+        notice: str | None = None,
+    ) -> None:
+        super().__init__(timeout=600)
+        self.tracker = tracker
+        self.guild_id = guild_id
+        self.entries = entries
+        self.page_count = max(1, (len(entries) + MANAGEMENT_PAGE_SIZE - 1) // MANAGEMENT_PAGE_SIZE)
+        self.page = max(0, min(page, self.page_count - 1))
+        self.selected_user_id = selected_user_id
+        self.notice = notice
+
+        if entries:
+            self.add_item(TicketManagementSelect(self))
+
+        previous = discord.ui.Button(
+            label="Previous",
+            emoji="◀️",
+            style=discord.ButtonStyle.secondary,
+            disabled=self.page <= 0,
+            row=1,
+        )
+        next_button = discord.ui.Button(
+            label="Next",
+            emoji="▶️",
+            style=discord.ButtonStyle.secondary,
+            disabled=self.page >= self.page_count - 1,
+            row=1,
+        )
+        refresh = discord.ui.Button(
+            label="Refresh",
+            emoji="🔄",
+            style=discord.ButtonStyle.secondary,
+            row=1,
+        )
+        remove = discord.ui.Button(
+            label="Remove from list",
+            emoji="🗑️",
+            style=discord.ButtonStyle.danger,
+            disabled=selected_user_id is None or self.selected_entry_is_blocked(),
+            row=2,
+        )
+        block = discord.ui.Button(
+            label="Block tracking",
+            emoji="🚫",
+            style=discord.ButtonStyle.danger,
+            disabled=selected_user_id is None or self.selected_entry_is_blocked(),
+            row=2,
+        )
+        unblock = discord.ui.Button(
+            label="Unblock",
+            emoji="✅",
+            style=discord.ButtonStyle.success,
+            disabled=selected_user_id is None or not self.selected_entry_is_blocked(),
+            row=2,
+        )
+
+        previous.callback = self.previous_page
+        next_button.callback = self.next_page
+        refresh.callback = self.refresh
+        remove.callback = self.remove_selected
+        block.callback = self.block_selected
+        unblock.callback = self.unblock_selected
+        for item in (previous, next_button, refresh, remove, block, unblock):
+            self.add_item(item)
+
+    def selected_entry(self) -> TicketManagementEntry | None:
+        if self.selected_user_id is None:
+            return None
+        return next(
+            (entry for entry in self.entries if entry.user_id == self.selected_user_id),
+            None,
+        )
+
+    def selected_entry_is_blocked(self) -> bool:
+        entry = self.selected_entry()
+        return bool(entry and entry.blocked)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild_id != self.guild_id:
+            await interaction.response.send_message(
+                "This management panel belongs to another server.", ephemeral=True
+            )
+            return False
+        if self.tracker.has_management_permission(interaction.user):
+            return True
+        await interaction.response.send_message(
+            "You need **Manage Server** permission to use this panel.", ephemeral=True
+        )
+        return False
+
+    async def edit(self, interaction: discord.Interaction) -> None:
+        refreshed = await self.tracker.management_entries(self.guild_id)
+        selected = self.selected_user_id
+        if selected is not None and not any(item.user_id == selected for item in refreshed):
+            selected = None
+        view = TicketManagementView(
+            self.tracker,
+            self.guild_id,
+            refreshed,
+            page=self.page,
+            selected_user_id=selected,
+            notice=self.notice,
+        )
+        if interaction.response.is_done():
+            await interaction.edit_original_response(
+                embed=self.tracker.build_management_embed(view),
+                view=view,
+            )
+        else:
+            await interaction.response.edit_message(
+                embed=self.tracker.build_management_embed(view),
+                view=view,
+            )
+
+    async def previous_page(self, interaction: discord.Interaction) -> None:
+        self.page = max(0, self.page - 1)
+        self.selected_user_id = None
+        self.notice = None
+        await self.edit(interaction)
+
+    async def next_page(self, interaction: discord.Interaction) -> None:
+        self.page = min(self.page_count - 1, self.page + 1)
+        self.selected_user_id = None
+        self.notice = None
+        await self.edit(interaction)
+
+    async def refresh(self, interaction: discord.Interaction) -> None:
+        self.notice = "List refreshed."
+        await self.edit(interaction)
+
+    async def remove_selected(self, interaction: discord.Interaction) -> None:
+        entry = self.selected_entry()
+        if entry is None:
+            await interaction.response.send_message(
+                "Choose a user first.", ephemeral=True
+            )
+            return
+        if entry.blocked:
+            await interaction.response.send_message(
+                "That user is blocked. Use **Unblock** instead.", ephemeral=True
+            )
+            return
+        await interaction.response.defer()
+        removed = await self.tracker.store.remove_status(self.guild_id, entry.user_id)
+        self.tracker.drop_pending_for_user(self.guild_id, entry.user_id)
+        if await self.tracker.store.get_config(self.guild_id) is not None:
+            await self.tracker.refresh_board(self.guild_id)
+        self.selected_user_id = None
+        self.notice = (
+            f"Removed {entry.username} from the current board. They can reappear "
+            "after their next ticket check."
+            if removed else "That user was already absent from the board."
+        )
+        logger.info(
+            "Ticket manager removed user %s from guild %s by %s",
+            entry.user_id,
+            self.guild_id,
+            interaction.user.id,
+        )
+        await self.edit(interaction)
+
+    async def block_selected(self, interaction: discord.Interaction) -> None:
+        entry = self.selected_entry()
+        if entry is None:
+            await interaction.response.send_message(
+                "Choose a user first.", ephemeral=True
+            )
+            return
+        await interaction.response.defer()
+        await self.tracker.store.block_user(
+            self.guild_id,
+            entry.user_id,
+            entry.username,
+            interaction.user.id,
+        )
+        self.tracker.blocked_users.setdefault(self.guild_id, set()).add(entry.user_id)
+        self.tracker.drop_pending_for_user(self.guild_id, entry.user_id)
+        if await self.tracker.store.get_config(self.guild_id) is not None:
+            await self.tracker.refresh_board(self.guild_id)
+        self.selected_user_id = None
+        self.notice = (
+            f"Blocked {entry.username}. Future ticket checks from this user will "
+            "not be recorded until an admin unblocks them."
+        )
+        logger.info(
+            "Ticket manager blocked user %s in guild %s by %s",
+            entry.user_id,
+            self.guild_id,
+            interaction.user.id,
+        )
+        await self.edit(interaction)
+
+    async def unblock_selected(self, interaction: discord.Interaction) -> None:
+        entry = self.selected_entry()
+        if entry is None:
+            await interaction.response.send_message(
+                "Choose a user first.", ephemeral=True
+            )
+            return
+        await interaction.response.defer()
+        changed = await self.tracker.store.unblock_user(self.guild_id, entry.user_id)
+        self.tracker.blocked_users.setdefault(self.guild_id, set()).discard(entry.user_id)
+        self.selected_user_id = None
+        self.notice = (
+            f"Unblocked {entry.username}. They will return after their next ticket check."
+            if changed else "That user was already unblocked."
+        )
+        logger.info(
+            "Ticket manager unblocked user %s in guild %s by %s",
+            entry.user_id,
+            self.guild_id,
+            interaction.user.id,
+        )
+        await self.edit(interaction)
+
+
 class TicketTracker(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -534,10 +995,13 @@ class TicketTracker(commands.Cog):
         self.reset_task: asyncio.Task[None] | None = None
         self.processed_responses: dict[tuple[int, int], float] = {}
         self.capture_tasks: dict[tuple[int, int], asyncio.Task[bool]] = {}
+        self.blocked_users: dict[int, set[int]] = {}
         self._restored = False
 
     async def cog_load(self) -> None:
         await self.store.initialize()
+        self.blocked_users = await self.store.load_all_blocked_ids()
+        self.bot.add_view(TicketBoardView(self))
         self.reset_task = asyncio.create_task(self.daily_reset_loop())
         logger.info("Boss ticket storage ready at %s", DATABASE_FILE)
 
@@ -552,6 +1016,94 @@ class TicketTracker(commands.Cog):
     def board_lock(self, guild_id: int) -> asyncio.Lock:
         return self.board_locks.setdefault(guild_id, asyncio.Lock())
 
+    def has_management_permission(self, user: discord.abc.User) -> bool:
+        owner_id = int((os.getenv("BOT_OWNER_ID") or "0").strip() or 0)
+        if owner_id and user.id == owner_id:
+            return True
+        return isinstance(user, discord.Member) and user.guild_permissions.manage_guild
+
+    def drop_pending_for_user(self, guild_id: int, user_id: int) -> None:
+        for channel_id, pending in list(self.pending_by_channel.items()):
+            remaining = [
+                item for item in pending
+                if not (item.guild_id == guild_id and item.user_id == user_id)
+            ]
+            if remaining:
+                self.pending_by_channel[channel_id] = remaining
+            else:
+                self.pending_by_channel.pop(channel_id, None)
+
+    async def management_entries(self, guild_id: int) -> list[TicketManagementEntry]:
+        statuses = await self.store.list_status(guild_id)
+        blocked = await self.store.list_blocked(guild_id)
+        blocked_ids = {item.user_id for item in blocked}
+        entries = [
+            TicketManagementEntry(
+                user_id=status.user_id,
+                username=status.username,
+                tickets=status.tickets,
+                updated_at=status.updated_at,
+                blocked=False,
+            )
+            for status in statuses
+            if status.user_id not in blocked_ids
+        ]
+        entries.extend(
+            TicketManagementEntry(
+                user_id=item.user_id,
+                username=item.username,
+                tickets=None,
+                updated_at=item.blocked_at,
+                blocked=True,
+            )
+            for item in blocked
+        )
+        return entries
+
+    def build_management_embed(self, view: TicketManagementView) -> discord.Embed:
+        tracked_count = sum(not item.blocked for item in view.entries)
+        blocked_count = sum(item.blocked for item in view.entries)
+        selected = view.selected_entry()
+        description = (
+            f"**Tracked:** {tracked_count} • **Blocked:** {blocked_count}\n\n"
+            "Choose a user, then select an action. **Remove from list** deletes only "
+            "their current entry; their next ticket check can add them again. "
+            "**Block tracking** removes them and ignores future ticket checks until "
+            "an admin unblocks them."
+        )
+        if selected is not None:
+            state = "Blocked" if selected.blocked else f"{selected.tickets}/3 tickets"
+            description += (
+                f"\n\n**Selected:** {discord.utils.escape_markdown(selected.username)} "
+                f"(`{selected.user_id}`) — {state}"
+            )
+        if view.notice:
+            description += f"\n\n✅ {view.notice}"
+        embed = discord.Embed(
+            title=f"⚙️ Boss Ticket Management — Page {view.page + 1}/{view.page_count}",
+            description=description,
+            color=0x5865F2,
+        )
+        embed.set_footer(text="Requires Manage Server permission.")
+        return embed
+
+    async def send_management_panel(
+        self,
+        *,
+        guild_id: int,
+        send: Any,
+        ephemeral: bool = False,
+    ) -> None:
+        entries = await self.management_entries(guild_id)
+        view = TicketManagementView(self, guild_id, entries)
+        kwargs: dict[str, Any] = {
+            "embed": self.build_management_embed(view),
+            "view": view,
+        }
+        if ephemeral:
+            kwargs["ephemeral"] = True
+        await send(**kwargs)
+
     def purge_pending(self, channel_id: int) -> list[PendingTicketRequest]:
         now = time.monotonic()
         pending = [
@@ -565,9 +1117,16 @@ class TicketTracker(commands.Cog):
             self.pending_by_channel.pop(channel_id, None)
         return pending
 
-    def arm_ticket_request(self, message: discord.Message) -> None:
+    def arm_ticket_request(self, message: discord.Message) -> bool:
         if message.guild is None:
-            return
+            return False
+        if message.author.id in self.blocked_users.get(message.guild.id, set()):
+            logger.info(
+                "Ignored ticket check from blocked user %s in guild %s",
+                message.author.id,
+                message.guild.id,
+            )
+            return False
         pending = self.purge_pending(message.channel.id)
         pending = [item for item in pending if item.user_id != message.author.id]
         pending.append(
@@ -587,6 +1146,7 @@ class TicketTracker(commands.Cog):
             message.author.id,
             message.guild.id,
         )
+        return True
 
     def match_pending_request_data(
         self,
@@ -705,6 +1265,14 @@ class TicketTracker(commands.Cog):
                 guild_id,
             )
             return False
+        if request.user_id in self.blocked_users.get(request.guild_id, set()):
+            self.consume_pending(request)
+            logger.info(
+                "Ignored completed ticket response from blocked user %s in guild %s",
+                request.user_id,
+                request.guild_id,
+            )
+            return True
         if self.response_already_processed(guild_id, message_id):
             return True
 
@@ -822,6 +1390,9 @@ class TicketTracker(commands.Cog):
             if message.guild is None:
                 return
             if not message.author.bot:
+                if is_ticket_settings_command(message.content or ""):
+                    await self.send_ticket_settings(message)
+                    return
                 if is_ticket_list_command(message.content or ""):
                     await self.send_ticket_list(message)
                     return
@@ -914,6 +1485,34 @@ class TicketTracker(commands.Cog):
         )
 
     @app_commands.command(
+        name="boss-ticket-manage",
+        description="Open the visual boss-ticket user management panel.",
+    )
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_ticket_manage(self, interaction: discord.Interaction) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "This command only works inside a server.", ephemeral=True
+            )
+            return
+        if not self.has_management_permission(interaction.user):
+            await interaction.response.send_message(
+                "You need **Manage Server** permission to use this panel.",
+                ephemeral=True,
+            )
+            return
+        await self.send_management_panel(
+            guild_id=interaction.guild_id,
+            send=interaction.response.send_message,
+            ephemeral=True,
+        )
+        logger.info(
+            "Ticket management panel opened in guild %s by %s",
+            interaction.guild_id,
+            interaction.user.id,
+        )
+
+    @app_commands.command(
         name="boss-ticket-remove",
         description="Remove a user from this server's boss-ticket board.",
     )
@@ -943,6 +1542,7 @@ class TicketTracker(commands.Cog):
         target_id = int(match.group(1) or match.group(2))
         await interaction.response.defer(ephemeral=True)
         removed = await self.store.remove_status(interaction.guild_id, target_id)
+        self.drop_pending_for_user(interaction.guild_id, target_id)
         if removed is None:
             await interaction.followup.send(
                 f"No ticket entry exists for `{target_id}` in this server.",
@@ -977,12 +1577,13 @@ class TicketTracker(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True)
         statuses = await self.store.list_status(interaction.guild_id)
-        embeds = self.build_board_embeds(statuses)
-        for index, embed in enumerate(embeds):
-            if index == 0:
-                await interaction.followup.send(embed=embed, ephemeral=True)
-            else:
-                await interaction.followup.send(embed=embed, ephemeral=True)
+        page_count = self.board_page_count(statuses)
+        await interaction.followup.send(
+            embed=self.build_board_embed(statuses, 0),
+            view=TicketBoardView(self, page=0, page_count=page_count)
+            if page_count > 1 else None,
+            ephemeral=True,
+        )
         logger.info(
             "Slash ticket list requested in guild %s (%s entries)",
             interaction.guild_id,
@@ -994,12 +1595,13 @@ class TicketTracker(commands.Cog):
             return
         config = await self.store.get_config(message.guild.id)
         statuses = await self.store.list_status(message.guild.id)
-        embeds = self.build_board_embeds(statuses)
-        for index, embed in enumerate(embeds):
-            if index == 0:
-                await message.reply(embed=embed, mention_author=False)
-            else:
-                await message.channel.send(embed=embed)
+        page_count = self.board_page_count(statuses)
+        await message.reply(
+            embed=self.build_board_embed(statuses, 0),
+            view=TicketBoardView(self, page=0, page_count=page_count)
+            if page_count > 1 else None,
+            mention_author=False,
+        )
         if config is None:
             await message.channel.send(
                 "ℹ️ The list is shown here, but no persistent ticket-board channel is "
@@ -1010,6 +1612,29 @@ class TicketTracker(commands.Cog):
             message.author.id,
             message.guild.id,
             len(statuses),
+        )
+
+    async def send_ticket_settings(self, message: discord.Message) -> None:
+        if message.guild is None:
+            return
+        if not self.has_management_permission(message.author):
+            await message.reply(
+                "You need **Manage Server** permission to manage ticket users.",
+                mention_author=False,
+            )
+            return
+        await self.send_management_panel(
+            guild_id=message.guild.id,
+            send=lambda **kwargs: message.reply(
+                mention_author=False,
+                delete_after=600,
+                **kwargs,
+            ),
+        )
+        logger.info(
+            "Prefix ticket management panel opened by %s in guild %s",
+            message.author.id,
+            message.guild.id,
         )
 
     async def get_text_channel(self, channel_id: int) -> discord.TextChannel | None:
@@ -1033,59 +1658,69 @@ class TicketTracker(commands.Cog):
             except (discord.Forbidden, discord.NotFound, discord.HTTPException):
                 continue
 
-    def build_board_embeds(self, statuses: list[TicketStatus]) -> list[discord.Embed]:
+    def board_page_count(self, statuses: list[TicketStatus]) -> int:
+        return max(1, (len(statuses) + BOARD_PAGE_SIZE - 1) // BOARD_PAGE_SIZE)
+
+    def page_from_message(self, message: discord.Message | None) -> int:
+        if message is None or not message.embeds:
+            return 0
+        title = message.embeds[0].title or ""
+        match = re.search(r"Page\s+(\d+)\s*/\s*(\d+)", title, re.IGNORECASE)
+        return max(0, int(match.group(1)) - 1) if match else 0
+
+    def build_board_embed(
+        self,
+        statuses: list[TicketStatus],
+        page: int = 0,
+    ) -> discord.Embed:
         next_reset = next_pacific_reset_timestamp()
-        if not statuses:
-            pages: list[list[TicketStatus]] = [[]]
-        else:
-            pages = [
-                statuses[index:index + BOARD_PAGE_SIZE]
-                for index in range(0, len(statuses), BOARD_PAGE_SIZE)
-            ]
+        page_count = self.board_page_count(statuses)
+        page = max(0, min(page, page_count - 1))
+        start = page * BOARD_PAGE_SIZE
+        current = statuses[start:start + BOARD_PAGE_SIZE]
 
         counts = {number: 0 for number in range(4)}
         for status in statuses:
             counts[status.tickets] = counts.get(status.tickets, 0) + 1
-        summary = " • ".join(f"**{number}/3:** {counts[number]}" for number in (3, 2, 1, 0))
+        summary = " • ".join(
+            f"**{number}/3:** {counts[number]}" for number in (3, 2, 1, 0)
+        )
 
-        embeds: list[discord.Embed] = []
-        for page_index, page in enumerate(pages, start=1):
-            if page:
-                lines = []
-                for status in page:
-                    safe_name = discord.utils.escape_markdown(status.username)
-                    icon = "🎟️" if status.tickets else "▫️"
-                    lines.append(
-                        f"{icon} **{status.tickets}/3** — **{safe_name}** — "
-                        f"`{status.user_id}` — <t:{status.updated_at}:R>"
-                    )
-                body = "\n".join(lines)
-            else:
-                body = (
-                    "No ticket checks have been recorded yet. Run `owo boss t` or "
-                    "`w boss t` anywhere in this server to add your current count."
+        if current:
+            lines = []
+            for status in current:
+                safe_name = discord.utils.escape_markdown(status.username)
+                icon = "🎟️" if status.tickets else "▫️"
+                lines.append(
+                    f"{icon} **{status.tickets}/3** — **{safe_name}** — "
+                    f"`{status.user_id}` — <t:{status.updated_at}:R>"
                 )
+            body = "\n".join(lines)
+        else:
+            body = (
+                "No ticket checks have been recorded yet. Run `owo boss t` or "
+                "`w boss t` anywhere in this server to add your current count."
+            )
 
-            title = "🎟️ Guild Boss Tickets"
-            if len(pages) > 1:
-                title += f" — Page {page_index}/{len(pages)}"
-            embed = discord.Embed(
-                title=title,
-                description=(
-                    f"{summary}\n\n{body}\n\n"
-                    f"**All tickets replenish:** <t:{next_reset}:R> "
-                    f"(<t:{next_reset}:F>)"
-                ),
-                color=0x5865F2,
+        title = "🎟️ Guild Boss Tickets"
+        if page_count > 1:
+            title += f" — Page {page + 1}/{page_count}"
+        embed = discord.Embed(
+            title=title,
+            description=(
+                f"{summary}\n\n{body}\n\n"
+                f"**All tickets replenish:** <t:{next_reset}:R> "
+                f"(<t:{next_reset}:F>)"
+            ),
+            color=0x5865F2,
+        )
+        embed.set_footer(
+            text=(
+                "Previously tracked members replenish to 3/3 at Pacific midnight. "
+                "Later OwO checks replace that reset value with the real count."
             )
-            embed.set_footer(
-                text=(
-                    "Previously tracked members replenish to 3/3 at Pacific midnight. "
-                    "Later OwO checks replace that reset value with the real count."
-                )
-            )
-            embeds.append(embed)
-        return embeds
+        )
+        return embed
 
     async def refresh_board(self, guild_id: int) -> None:
         """Replace the configured board with a fresh message set.
@@ -1106,32 +1741,28 @@ class TicketTracker(commands.Cog):
 
             await self.store.normalize_guild_cycle(guild_id)
             statuses = await self.store.list_status(guild_id)
-            embeds = self.build_board_embeds(statuses)
-            new_messages: list[discord.Message] = []
+            page_count = self.board_page_count(statuses)
 
             try:
-                for embed in embeds:
-                    new_messages.append(await channel.send(embed=embed))
+                new_message = await channel.send(
+                    embed=self.build_board_embed(statuses, 0),
+                    view=TicketBoardView(self, page=0, page_count=page_count)
+                    if page_count > 1 else None,
+                )
             except (discord.Forbidden, discord.HTTPException) as exc:
                 logger.warning(
                     "Could not send replacement ticket board for guild %s: %s",
                     guild_id,
                     exc,
                 )
-                # Do not leave a partial replacement behind when a multi-page send fails.
-                for message in new_messages:
-                    try:
-                        await message.delete()
-                    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
-                        pass
                 return
 
-            new_ids = [message.id for message in new_messages]
+            new_ids = [new_message.id]
             await self.store.set_board_message_ids(guild_id, new_ids)
 
-            # Delete the previous board only after the replacement is safely visible.
+            # Delete every previous page only after the replacement is safely visible.
             for old_id in stored_ids:
-                if old_id in new_ids:
+                if old_id == new_message.id:
                     continue
                 try:
                     await channel.get_partial_message(old_id).delete()
@@ -1139,10 +1770,10 @@ class TicketTracker(commands.Cog):
                     continue
 
             logger.info(
-                "Replaced boss-ticket board for guild %s: %s entries across %s page(s)",
+                "Replaced boss-ticket board for guild %s: %s entries in one paginated message (%s page(s))",
                 guild_id,
                 len(statuses),
-                len(new_ids),
+                page_count,
             )
 
     async def daily_reset_loop(self) -> None:
