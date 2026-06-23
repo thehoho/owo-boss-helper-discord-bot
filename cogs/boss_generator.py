@@ -880,7 +880,7 @@ def _extract_exact_animal(block: str) -> str:
 
 def _exact_rarity_from_raw(value:float,low:float,high:float,wear:str)->int:
     raw = 100.0*((value-low)/(high-low)-EXACT_WEAR_MULTIPLIER[wear]+1)
-    return max(1,min(100,round(raw)))
+    return max(0,min(100,round(raw)))
 
 
 def _exact_convert_values(wear,weapon_type,passive_types,w_values,p_values):
@@ -979,7 +979,7 @@ def build_command(boss_results: list, hp_values: list) -> tuple:
     command=("neon b myself vs "+", ".join(b["part"] for b in boss_results)
              +" -hp "+" ".join(hp_values)+" -m")
     if not all_exact:
-        qe=round(sum(b["quality"] for b in boss_results)/len(boss_results))
+        qe=max(0,min(100,round(sum(b["quality"] for b in boss_results)/len(boss_results))))
         command+=f" -qe{qe}"
     return command, [w for b in boss_results for w in b.get("warnings",[])]
 
