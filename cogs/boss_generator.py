@@ -236,7 +236,7 @@ EXACT_WEAPONS = {
     "Briar-Heart Staff":    {"values":[[25,50],[20,30],[20,30],[240,140]],             "alias":"bhstaff"},
     "Arbiter's Edge":       {"values":[[10,20],[20,30],[225,125]],                     "alias":"aedge"},
     "Wounding Crossbow":    {"values":[[220,300],[10,25],[480,280]],                   "alias":"xbow"},
-    "Bleeding Gaze":        {"values":[[20,10],[30,50],[20,40],[150,200]],             "alias":"bgaz"},
+    "Bleeding Gaze":        {"values":[[30,50],[20,40],[150,200],[20,10]],             "alias":"bgaz"},
     "Conduit Claw":         {"values":[[20,50],[120,170],[200,100]],                   "alias":"cclaw"},
 }
 EXACT_PASSIVES = {
