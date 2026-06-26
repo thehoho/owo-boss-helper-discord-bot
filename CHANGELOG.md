@@ -1,5 +1,23 @@
 # Changelog
 
+## 0.10.0-beta
+
+- Added optional per-server ticket nickname markers, disabled by default.
+- Added Enable, Disable, and Sync nickname-marker controls to `H boss settings`, `HBS`, and `/boss-ticket-manage`.
+- Added a persistent **My nickname** ticket-board button plus `/boss-ticket-nickname`, `H boss nickname`, and `HBN` for private member controls.
+- Added per-server, per-member opt-out preferences so members can hide their own suffix without leaving the ticket board.
+- Added `🏷️`, `🔕`, and `⚠️` reactions to successful ticket commands to indicate applied, personally hidden, or blocked-by-permissions nickname states.
+- Added four Unicode ticket states: `🎟🎟🎟`, `🎟🎟▫`, `🎟▫▫`, and `▫▫▫`.
+- Added Manage Nicknames permission checks and role-hierarchy checks before enabling or syncing markers.
+- Explicitly skips the server owner and members whose highest role is equal to or above the bot role.
+- Preserves existing server nicknames and compatible prefixes, including AFK-style prefixes from other bots.
+- Restores managed nicknames when the feature is disabled or when a tracked user is removed or blocked.
+- Reapplies `3/3` nickname markers during the existing Pacific-midnight ticket reset.
+- Added persistent nickname configuration, personal preferences, and restoration state to `boss_tickets.db` with automatic schema creation.
+- Updated `H help`, the README, and the privacy policy for the optional nickname feature.
+- Added enabled nickname-marker server counts and personal opt-out counts to `/bot-stats`.
+- Updated the public bot version to `0.10.0-beta`.
+
 ## 0.9.0-beta
 
 - Replaced multi-message ticket boards with one paginated message using Previous and Next buttons.

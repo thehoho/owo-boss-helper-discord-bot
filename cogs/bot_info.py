@@ -30,7 +30,7 @@ TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.9.0-beta"
+BOT_VERSION = "0.10.0-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -556,6 +556,14 @@ class BotInfo(commands.Cog):
             TICKET_DATABASE_FILE,
             "SELECT COUNT(*) FROM ticket_guild_config",
         )
+        nickname_marker_guilds = query_database(
+            TICKET_DATABASE_FILE,
+            "SELECT COUNT(*) FROM ticket_nickname_config WHERE enabled = 1",
+        )
+        nickname_opt_outs = query_database(
+            TICKET_DATABASE_FILE,
+            "SELECT COUNT(*) FROM ticket_nickname_preferences WHERE enabled = 0",
+        )
 
         metric_labels = {
             "boss_generator_requests": "Boss generator",
@@ -605,6 +613,8 @@ class BotInfo(commands.Cog):
                 f"**Template users:** {template_users:,}\n"
                 f"**Ticket entries:** {ticket_entries:,}\n"
                 f"**Ticket boards:** {ticket_guilds:,}\n"
+                f"**Nickname markers:** {nickname_marker_guilds:,} server(s)\n"
+                f"**Personal marker opt-outs:** {nickname_opt_outs:,}\n"
                 f"**Local tracked size:** {human_bytes(storage_size)}"
             ),
             inline=True,

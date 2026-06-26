@@ -35,6 +35,17 @@ PENDING_REQUEST_SECONDS = 60
 BOARD_PAGE_SIZE = 20
 MANAGEMENT_PAGE_SIZE = 25
 MAX_TICKETS = 3
+NICKNAME_MAX_LENGTH = 32
+NICKNAME_SYNC_DELAY_SECONDS = 0.20
+TICKET_NICKNAME_MARKERS = {
+    3: "🎟🎟🎟",
+    2: "🎟🎟▫",
+    1: "🎟▫▫",
+    0: "▫▫▫",
+}
+TICKET_NICKNAME_RE = re.compile(
+    r"\s*·\s*(?:(?:🎟|▫)\ufe0f?){3}\s*$"
+)
 
 TICKET_COMMANDS = {
     "owobosst",
@@ -54,6 +65,12 @@ TICKET_LIST_COMMANDS = {
 TICKET_SETTINGS_COMMANDS = {
     "hbosssettings",
     "hbs",
+}
+
+TICKET_NICKNAME_COMMANDS = {
+    "hbossnickname",
+    "hbn",
+    "hticketnickname",
 }
 
 TICKET_COUNT_RE = re.compile(
@@ -108,6 +125,58 @@ class TicketManagementEntry:
     blocked: bool
 
 
+@dataclass(frozen=True)
+class TicketNicknameState:
+    guild_id: int
+    user_id: int
+    base_nickname: str | None
+    last_applied_nickname: str
+    updated_at: int
+
+
+@dataclass
+class NicknameSyncResult:
+    updated: int = 0
+    unchanged: int = 0
+    restored: int = 0
+    missing: int = 0
+    skipped_owner: int = 0
+    skipped_hierarchy: int = 0
+    missing_permission: int = 0
+    opted_out: int = 0
+    failed: int = 0
+
+    @property
+    def total_processed(self) -> int:
+        return (
+            self.updated
+            + self.unchanged
+            + self.restored
+            + self.missing
+            + self.skipped_owner
+            + self.skipped_hierarchy
+            + self.missing_permission
+            + self.opted_out
+            + self.failed
+        )
+
+
+def strip_ticket_nickname_marker(value: str | None) -> str | None:
+    if not value:
+        return None
+    stripped = TICKET_NICKNAME_RE.sub("", value).rstrip()
+    return stripped or None
+
+
+def build_ticket_nickname(base_name: str, tickets: int) -> str:
+    marker = TICKET_NICKNAME_MARKERS[max(0, min(MAX_TICKETS, tickets))]
+    suffix = f" · {marker}"
+    allowed = max(1, NICKNAME_MAX_LENGTH - len(suffix))
+    clean_base = (base_name or "Member").strip() or "Member"
+    truncated = clean_base[:allowed].rstrip() or clean_base[:allowed]
+    return f"{truncated}{suffix}"
+
+
 def normalize_ticket_command(content: str) -> str:
     return re.sub(r"\s+", "", content or "").lower()
 
@@ -122,6 +191,10 @@ def is_ticket_list_command(content: str) -> bool:
 
 def is_ticket_settings_command(content: str) -> bool:
     return normalize_ticket_command(content) in TICKET_SETTINGS_COMMANDS
+
+
+def is_ticket_nickname_command(content: str) -> bool:
+    return normalize_ticket_command(content) in TICKET_NICKNAME_COMMANDS
 
 
 def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
@@ -347,6 +420,47 @@ class TicketStore:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_ticket_blocked_guild "
                 "ON ticket_blocked_users(guild_id, username COLLATE NOCASE)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_nickname_config (
+                    guild_id INTEGER PRIMARY KEY,
+                    enabled INTEGER NOT NULL DEFAULT 0,
+                    updated_at INTEGER NOT NULL,
+                    updated_by INTEGER NOT NULL
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_nickname_state (
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    base_nickname TEXT,
+                    last_applied_nickname TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, user_id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ticket_nickname_state_guild "
+                "ON ticket_nickname_state(guild_id)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_nickname_preferences (
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    updated_at INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, user_id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ticket_nickname_preferences_guild "
+                "ON ticket_nickname_preferences(guild_id, enabled)"
             )
 
     async def set_channel(self, guild_id: int, channel_id: int) -> None:
@@ -636,6 +750,265 @@ class TicketStore:
             result.setdefault(int(row["guild_id"]), set()).add(int(row["user_id"]))
         return result
 
+    async def nickname_markers_enabled(self, guild_id: int) -> bool:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._nickname_markers_enabled_sync, guild_id
+            )
+
+    def _nickname_markers_enabled_sync(self, guild_id: int) -> bool:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT enabled FROM ticket_nickname_config WHERE guild_id = ?",
+                (guild_id,),
+            ).fetchone()
+        return bool(row and int(row["enabled"]))
+
+    async def set_nickname_markers_enabled(
+        self,
+        guild_id: int,
+        enabled: bool,
+        updated_by: int,
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._set_nickname_markers_enabled_sync,
+                guild_id,
+                enabled,
+                updated_by,
+            )
+
+    def _set_nickname_markers_enabled_sync(
+        self,
+        guild_id: int,
+        enabled: bool,
+        updated_by: int,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO ticket_nickname_config
+                    (guild_id, enabled, updated_at, updated_by)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                    enabled = excluded.enabled,
+                    updated_at = excluded.updated_at,
+                    updated_by = excluded.updated_by
+                """,
+                (guild_id, int(enabled), int(time.time()), updated_by),
+            )
+
+    async def save_nickname_state(
+        self,
+        guild_id: int,
+        user_id: int,
+        base_nickname: str | None,
+        last_applied_nickname: str,
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._save_nickname_state_sync,
+                guild_id,
+                user_id,
+                base_nickname,
+                last_applied_nickname,
+            )
+
+    def _save_nickname_state_sync(
+        self,
+        guild_id: int,
+        user_id: int,
+        base_nickname: str | None,
+        last_applied_nickname: str,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO ticket_nickname_state
+                    (guild_id, user_id, base_nickname, last_applied_nickname, updated_at)
+                VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                    base_nickname = excluded.base_nickname,
+                    last_applied_nickname = excluded.last_applied_nickname,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    guild_id,
+                    user_id,
+                    base_nickname,
+                    last_applied_nickname,
+                    int(time.time()),
+                ),
+            )
+
+    async def get_nickname_state(
+        self, guild_id: int, user_id: int
+    ) -> TicketNicknameState | None:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._get_nickname_state_sync, guild_id, user_id
+            )
+
+    def _get_nickname_state_sync(
+        self, guild_id: int, user_id: int
+    ) -> TicketNicknameState | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT guild_id, user_id, base_nickname, last_applied_nickname, updated_at
+                FROM ticket_nickname_state
+                WHERE guild_id = ? AND user_id = ?
+                """,
+                (guild_id, user_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return TicketNicknameState(
+            guild_id=int(row["guild_id"]),
+            user_id=int(row["user_id"]),
+            base_nickname=(
+                str(row["base_nickname"])
+                if row["base_nickname"] is not None
+                else None
+            ),
+            last_applied_nickname=str(row["last_applied_nickname"]),
+            updated_at=int(row["updated_at"]),
+        )
+
+    async def delete_nickname_state(self, guild_id: int, user_id: int) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._delete_nickname_state_sync, guild_id, user_id
+            )
+
+    def _delete_nickname_state_sync(self, guild_id: int, user_id: int) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                "DELETE FROM ticket_nickname_state WHERE guild_id = ? AND user_id = ?",
+                (guild_id, user_id),
+            )
+
+    async def list_nickname_states(
+        self, guild_id: int
+    ) -> list[TicketNicknameState]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._list_nickname_states_sync, guild_id
+            )
+
+    def _list_nickname_states_sync(
+        self, guild_id: int
+    ) -> list[TicketNicknameState]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT guild_id, user_id, base_nickname, last_applied_nickname, updated_at
+                FROM ticket_nickname_state
+                WHERE guild_id = ?
+                ORDER BY user_id
+                """,
+                (guild_id,),
+            ).fetchall()
+        return [
+            TicketNicknameState(
+                guild_id=int(row["guild_id"]),
+                user_id=int(row["user_id"]),
+                base_nickname=(
+                    str(row["base_nickname"])
+                    if row["base_nickname"] is not None
+                    else None
+                ),
+                last_applied_nickname=str(row["last_applied_nickname"]),
+                updated_at=int(row["updated_at"]),
+            )
+            for row in rows
+        ]
+
+    async def get_status(
+        self, guild_id: int, user_id: int
+    ) -> TicketStatus | None:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._get_status_sync, guild_id, user_id
+            )
+
+    def _get_status_sync(
+        self, guild_id: int, user_id: int
+    ) -> TicketStatus | None:
+        cycle = current_pacific_date().isoformat()
+        with self._connect() as connection:
+            self._normalize_guild_cycle_sync(connection, guild_id, cycle)
+            row = connection.execute(
+                """
+                SELECT guild_id, user_id, username, tickets, updated_at, cycle_date
+                FROM ticket_status
+                WHERE guild_id = ? AND user_id = ?
+                """,
+                (guild_id, user_id),
+            ).fetchone()
+        if row is None:
+            return None
+        return TicketStatus(
+            guild_id=int(row["guild_id"]),
+            user_id=int(row["user_id"]),
+            username=str(row["username"]),
+            tickets=int(row["tickets"]),
+            updated_at=int(row["updated_at"]),
+            cycle_date=str(row["cycle_date"]),
+        )
+
+    async def nickname_marker_allowed(self, guild_id: int, user_id: int) -> bool:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._nickname_marker_allowed_sync, guild_id, user_id
+            )
+
+    def _nickname_marker_allowed_sync(self, guild_id: int, user_id: int) -> bool:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT enabled
+                FROM ticket_nickname_preferences
+                WHERE guild_id = ? AND user_id = ?
+                """,
+                (guild_id, user_id),
+            ).fetchone()
+        # No row means the server default applies: participate when the feature is on.
+        return row is None or bool(int(row["enabled"]))
+
+    async def set_nickname_marker_allowed(
+        self,
+        guild_id: int,
+        user_id: int,
+        enabled: bool,
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._set_nickname_marker_allowed_sync,
+                guild_id,
+                user_id,
+                enabled,
+            )
+
+    def _set_nickname_marker_allowed_sync(
+        self,
+        guild_id: int,
+        user_id: int,
+        enabled: bool,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO ticket_nickname_preferences
+                    (guild_id, user_id, enabled, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                    enabled = excluded.enabled,
+                    updated_at = excluded.updated_at
+                """,
+                (guild_id, user_id, int(enabled), int(time.time())),
+            )
+
     async def list_status(self, guild_id: int) -> list[TicketStatus]:
         async with self.lock:
             return await asyncio.to_thread(self._list_status_sync, guild_id)
@@ -667,7 +1040,7 @@ class TicketStore:
 
 
 class TicketBoardView(discord.ui.View):
-    """Persistent left/right navigation for public and ephemeral ticket boards."""
+    """Persistent ticket-board navigation plus personal nickname controls."""
 
     def __init__(
         self,
@@ -681,24 +1054,34 @@ class TicketBoardView(discord.ui.View):
         self.page = max(0, page)
         self.page_count = max(1, page_count)
 
-        previous = discord.ui.Button(
-            label="Previous",
-            emoji="◀️",
-            style=discord.ButtonStyle.secondary,
-            custom_id="owo-helper:ticket-board:previous",
-            disabled=self.page <= 0,
+        if self.page_count > 1:
+            previous = discord.ui.Button(
+                label="Previous",
+                emoji="◀️",
+                style=discord.ButtonStyle.secondary,
+                custom_id="owo-helper:ticket-board:previous",
+                disabled=self.page <= 0,
+            )
+            next_button = discord.ui.Button(
+                label="Next",
+                emoji="▶️",
+                style=discord.ButtonStyle.secondary,
+                custom_id="owo-helper:ticket-board:next",
+                disabled=self.page >= self.page_count - 1,
+            )
+            previous.callback = self.previous_page
+            next_button.callback = self.next_page
+            self.add_item(previous)
+            self.add_item(next_button)
+
+        nickname = discord.ui.Button(
+            label="My nickname",
+            emoji="🏷️",
+            style=discord.ButtonStyle.primary,
+            custom_id="owo-helper:ticket-board:my-nickname",
         )
-        next_button = discord.ui.Button(
-            label="Next",
-            emoji="▶️",
-            style=discord.ButtonStyle.secondary,
-            custom_id="owo-helper:ticket-board:next",
-            disabled=self.page >= self.page_count - 1,
-        )
-        previous.callback = self.previous_page
-        next_button.callback = self.next_page
-        self.add_item(previous)
-        self.add_item(next_button)
+        nickname.callback = self.my_nickname
+        self.add_item(nickname)
 
     async def _move(self, interaction: discord.Interaction, offset: int) -> None:
         if interaction.guild_id is None:
@@ -716,7 +1099,7 @@ class TicketBoardView(discord.ui.View):
                 self.tracker,
                 page=target,
                 page_count=page_count,
-            ) if page_count > 1 else None,
+            ),
         )
 
     async def previous_page(self, interaction: discord.Interaction) -> None:
@@ -724,6 +1107,110 @@ class TicketBoardView(discord.ui.View):
 
     async def next_page(self, interaction: discord.Interaction) -> None:
         await self._move(interaction, 1)
+
+    async def my_nickname(self, interaction: discord.Interaction) -> None:
+        await self.tracker.send_personal_nickname_panel(interaction)
+
+
+class TicketNicknamePreferenceView(discord.ui.View):
+    """Private user controls for showing or hiding only their nickname marker."""
+
+    def __init__(
+        self,
+        tracker: "TicketTracker",
+        guild_id: int,
+        user_id: int,
+        *,
+        server_enabled: bool,
+        user_enabled: bool,
+        notice: str | None = None,
+    ) -> None:
+        super().__init__(timeout=300)
+        self.tracker = tracker
+        self.guild_id = guild_id
+        self.user_id = user_id
+        self.server_enabled = server_enabled
+        self.user_enabled = user_enabled
+        self.notice = notice
+
+        show = discord.ui.Button(
+            label="Show my marker",
+            emoji="🏷️",
+            style=discord.ButtonStyle.success,
+            disabled=not server_enabled or user_enabled,
+        )
+        hide = discord.ui.Button(
+            label="Hide my marker",
+            emoji="🔕",
+            style=discord.ButtonStyle.danger,
+            disabled=not server_enabled or not user_enabled,
+        )
+        refresh = discord.ui.Button(
+            label="Refresh",
+            emoji="🔄",
+            style=discord.ButtonStyle.secondary,
+        )
+        show.callback = self.show_marker
+        hide.callback = self.hide_marker
+        refresh.callback = self.refresh
+        self.add_item(show)
+        self.add_item(hide)
+        self.add_item(refresh)
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.user_id and interaction.guild_id == self.guild_id:
+            return True
+        await interaction.response.send_message(
+            "These nickname controls belong to another member.", ephemeral=True
+        )
+        return False
+
+    async def edit(self, interaction: discord.Interaction) -> None:
+        server_enabled = await self.tracker.store.nickname_markers_enabled(self.guild_id)
+        user_enabled = await self.tracker.store.nickname_marker_allowed(
+            self.guild_id, self.user_id
+        )
+        view = TicketNicknamePreferenceView(
+            self.tracker,
+            self.guild_id,
+            self.user_id,
+            server_enabled=server_enabled,
+            user_enabled=user_enabled,
+            notice=self.notice,
+        )
+        embed = await self.tracker.build_personal_nickname_embed(
+            self.guild_id,
+            self.user_id,
+            server_enabled=server_enabled,
+            user_enabled=user_enabled,
+            notice=self.notice,
+        )
+        if interaction.response.is_done():
+            await interaction.edit_original_response(embed=embed, view=view)
+        else:
+            await interaction.response.edit_message(embed=embed, view=view)
+
+    async def show_marker(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+        self.notice = await self.tracker.set_personal_nickname_preference(
+            self.guild_id,
+            self.user_id,
+            True,
+        )
+        await self.edit(interaction)
+
+    async def hide_marker(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+        self.notice = await self.tracker.set_personal_nickname_preference(
+            self.guild_id,
+            self.user_id,
+            False,
+        )
+        await self.edit(interaction)
+
+    async def refresh(self, interaction: discord.Interaction) -> None:
+        self.notice = "Nickname status refreshed."
+        await self.edit(interaction)
 
 
 class TicketManagementSelect(discord.ui.Select):
@@ -771,6 +1258,7 @@ class TicketManagementView(discord.ui.View):
         page: int = 0,
         selected_user_id: int | None = None,
         notice: str | None = None,
+        nickname_enabled: bool = False,
     ) -> None:
         super().__init__(timeout=600)
         self.tracker = tracker
@@ -780,6 +1268,7 @@ class TicketManagementView(discord.ui.View):
         self.page = max(0, min(page, self.page_count - 1))
         self.selected_user_id = selected_user_id
         self.notice = notice
+        self.nickname_enabled = nickname_enabled
 
         if entries:
             self.add_item(TicketManagementSelect(self))
@@ -825,6 +1314,27 @@ class TicketManagementView(discord.ui.View):
             disabled=selected_user_id is None or not self.selected_entry_is_blocked(),
             row=2,
         )
+        toggle_nicknames = discord.ui.Button(
+            label=(
+                "Disable nickname markers"
+                if self.nickname_enabled
+                else "Enable nickname markers"
+            ),
+            emoji="🏷️",
+            style=(
+                discord.ButtonStyle.danger
+                if self.nickname_enabled
+                else discord.ButtonStyle.success
+            ),
+            row=3,
+        )
+        sync_nicknames = discord.ui.Button(
+            label="Sync nickname markers",
+            emoji="🔄",
+            style=discord.ButtonStyle.secondary,
+            disabled=not self.nickname_enabled,
+            row=3,
+        )
 
         previous.callback = self.previous_page
         next_button.callback = self.next_page
@@ -832,7 +1342,18 @@ class TicketManagementView(discord.ui.View):
         remove.callback = self.remove_selected
         block.callback = self.block_selected
         unblock.callback = self.unblock_selected
-        for item in (previous, next_button, refresh, remove, block, unblock):
+        toggle_nicknames.callback = self.toggle_nickname_markers
+        sync_nicknames.callback = self.sync_nickname_markers
+        for item in (
+            previous,
+            next_button,
+            refresh,
+            remove,
+            block,
+            unblock,
+            toggle_nicknames,
+            sync_nicknames,
+        ):
             self.add_item(item)
 
     def selected_entry(self) -> TicketManagementEntry | None:
@@ -865,6 +1386,9 @@ class TicketManagementView(discord.ui.View):
         selected = self.selected_user_id
         if selected is not None and not any(item.user_id == selected for item in refreshed):
             selected = None
+        nickname_enabled = await self.tracker.store.nickname_markers_enabled(
+            self.guild_id
+        )
         view = TicketManagementView(
             self.tracker,
             self.guild_id,
@@ -872,6 +1396,7 @@ class TicketManagementView(discord.ui.View):
             page=self.page,
             selected_user_id=selected,
             notice=self.notice,
+            nickname_enabled=nickname_enabled,
         )
         if interaction.response.is_done():
             await interaction.edit_original_response(
@@ -915,6 +1440,11 @@ class TicketManagementView(discord.ui.View):
         await interaction.response.defer()
         removed = await self.tracker.store.remove_status(self.guild_id, entry.user_id)
         self.tracker.drop_pending_for_user(self.guild_id, entry.user_id)
+        await self.tracker.clear_ticket_nickname(
+            self.guild_id,
+            entry.user_id,
+            reason="Boss-ticket entry removed",
+        )
         if await self.tracker.store.get_config(self.guild_id) is not None:
             await self.tracker.refresh_board(self.guild_id)
         self.selected_user_id = None
@@ -947,6 +1477,11 @@ class TicketManagementView(discord.ui.View):
         )
         self.tracker.blocked_users.setdefault(self.guild_id, set()).add(entry.user_id)
         self.tracker.drop_pending_for_user(self.guild_id, entry.user_id)
+        await self.tracker.clear_ticket_nickname(
+            self.guild_id,
+            entry.user_id,
+            reason="Boss-ticket tracking blocked",
+        )
         if await self.tracker.store.get_config(self.guild_id) is not None:
             await self.tracker.refresh_board(self.guild_id)
         self.selected_user_id = None
@@ -985,6 +1520,75 @@ class TicketManagementView(discord.ui.View):
         )
         await self.edit(interaction)
 
+    async def toggle_nickname_markers(
+        self, interaction: discord.Interaction
+    ) -> None:
+        await interaction.response.defer()
+        if self.nickname_enabled:
+            await self.tracker.store.set_nickname_markers_enabled(
+                self.guild_id,
+                False,
+                interaction.user.id,
+            )
+            result = await self.tracker.restore_guild_nicknames(self.guild_id)
+            self.nickname_enabled = False
+            self.notice = self.tracker.nickname_result_text(
+                "Nickname markers disabled and managed names restored",
+                result,
+            )
+        else:
+            allowed, message = await self.tracker.nickname_feature_ready(
+                self.guild_id
+            )
+            if not allowed:
+                self.notice = message
+                await self.edit(interaction)
+                return
+            await self.tracker.store.set_nickname_markers_enabled(
+                self.guild_id,
+                True,
+                interaction.user.id,
+            )
+            self.nickname_enabled = True
+            result = await self.tracker.sync_guild_nicknames(self.guild_id)
+            self.notice = self.tracker.nickname_result_text(
+                "Nickname markers enabled and synced",
+                result,
+            )
+        logger.info(
+            "Ticket nickname markers set to %s in guild %s by %s",
+            self.nickname_enabled,
+            self.guild_id,
+            interaction.user.id,
+        )
+        await self.edit(interaction)
+
+    async def sync_nickname_markers(
+        self, interaction: discord.Interaction
+    ) -> None:
+        if not self.nickname_enabled:
+            await interaction.response.send_message(
+                "Enable nickname markers first.", ephemeral=True
+            )
+            return
+        await interaction.response.defer()
+        allowed, message = await self.tracker.nickname_feature_ready(self.guild_id)
+        if not allowed:
+            self.notice = message
+            await self.edit(interaction)
+            return
+        result = await self.tracker.sync_guild_nicknames(self.guild_id)
+        self.notice = self.tracker.nickname_result_text(
+            "Nickname markers synced",
+            result,
+        )
+        logger.info(
+            "Ticket nickname marker sync requested in guild %s by %s",
+            self.guild_id,
+            interaction.user.id,
+        )
+        await self.edit(interaction)
+
 
 class TicketTracker(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
@@ -992,6 +1596,8 @@ class TicketTracker(commands.Cog):
         self.store = TicketStore(DATABASE_FILE)
         self.pending_by_channel: dict[int, list[PendingTicketRequest]] = {}
         self.board_locks: dict[int, asyncio.Lock] = {}
+        self.nickname_locks: dict[int, asyncio.Lock] = {}
+        self.nickname_user_locks: dict[tuple[int, int], asyncio.Lock] = {}
         self.reset_task: asyncio.Task[None] | None = None
         self.processed_responses: dict[tuple[int, int], float] = {}
         self.capture_tasks: dict[tuple[int, int], asyncio.Task[bool]] = {}
@@ -1016,11 +1622,511 @@ class TicketTracker(commands.Cog):
     def board_lock(self, guild_id: int) -> asyncio.Lock:
         return self.board_locks.setdefault(guild_id, asyncio.Lock())
 
+    def nickname_lock(self, guild_id: int) -> asyncio.Lock:
+        return self.nickname_locks.setdefault(guild_id, asyncio.Lock())
+
+    def nickname_user_lock(self, guild_id: int, user_id: int) -> asyncio.Lock:
+        return self.nickname_user_locks.setdefault((guild_id, user_id), asyncio.Lock())
+
     def has_management_permission(self, user: discord.abc.User) -> bool:
         owner_id = int((os.getenv("BOT_OWNER_ID") or "0").strip() or 0)
         if owner_id and user.id == owner_id:
             return True
         return isinstance(user, discord.Member) and user.guild_permissions.manage_guild
+
+    async def nickname_feature_ready(self, guild_id: int) -> tuple[bool, str]:
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            return False, "I cannot access this server right now."
+        bot_member = guild.me
+        if bot_member is None and self.bot.user is not None:
+            try:
+                bot_member = await guild.fetch_member(self.bot.user.id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                bot_member = None
+        if bot_member is None:
+            return False, "I could not check my server permissions."
+        if not bot_member.guild_permissions.manage_nicknames:
+            return (
+                False,
+                "Grant my bot role **Manage Nicknames**, then reopen `HBS`. "
+                "The role must also be above members whose names should be updated.",
+            )
+        return True, "Nickname markers are ready."
+
+    async def fetch_known_member(
+        self, guild: discord.Guild, user_id: int
+    ) -> discord.Member | None:
+        member = guild.get_member(user_id)
+        if member is not None:
+            return member
+        try:
+            return await guild.fetch_member(user_id)
+        except discord.NotFound:
+            return None
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning(
+                "Could not fetch member %s in guild %s for ticket nickname: %s",
+                user_id,
+                guild.id,
+                exc,
+            )
+            return None
+
+    def nickname_edit_status(
+        self,
+        guild: discord.Guild,
+        member: discord.Member,
+    ) -> str | None:
+        if member.id == guild.owner_id:
+            return "owner"
+        bot_member = guild.me
+        if bot_member is None:
+            return "permission"
+        if not bot_member.guild_permissions.manage_nicknames:
+            return "permission"
+        if self.bot.user is not None and member.id == self.bot.user.id:
+            return "hierarchy"
+        if bot_member.top_role <= member.top_role:
+            return "hierarchy"
+        return None
+
+    @staticmethod
+    def add_nickname_result(result: NicknameSyncResult, status: str) -> None:
+        field = {
+            "updated": "updated",
+            "unchanged": "unchanged",
+            "restored": "restored",
+            "missing": "missing",
+            "owner": "skipped_owner",
+            "hierarchy": "skipped_hierarchy",
+            "permission": "missing_permission",
+            "failed": "failed",
+            "already-cleared": "unchanged",
+            "not-managed": "unchanged",
+            "disabled": "unchanged",
+            "opted-out": "opted_out",
+        }.get(status, "failed")
+        setattr(result, field, getattr(result, field) + 1)
+
+    @staticmethod
+    def nickname_result_text(prefix: str, result: NicknameSyncResult) -> str:
+        parts: list[str] = []
+        if result.updated:
+            parts.append(f"{result.updated} updated")
+        if result.restored:
+            parts.append(f"{result.restored} restored")
+        if result.unchanged:
+            parts.append(f"{result.unchanged} unchanged")
+        if result.skipped_owner:
+            parts.append(f"{result.skipped_owner} server owner skipped")
+        if result.skipped_hierarchy:
+            parts.append(f"{result.skipped_hierarchy} above/equal role skipped")
+        if result.missing_permission:
+            parts.append(f"{result.missing_permission} missing permission")
+        if result.opted_out:
+            parts.append(f"{result.opted_out} personally hidden")
+        if result.missing:
+            parts.append(f"{result.missing} no longer in server")
+        if result.failed:
+            parts.append(f"{result.failed} failed")
+        return f"{prefix}: " + (", ".join(parts) if parts else "nothing to change") + "."
+
+    async def apply_ticket_nickname(
+        self,
+        guild_id: int,
+        user_id: int,
+        tickets: int,
+    ) -> str:
+        async with self.nickname_user_lock(guild_id, user_id):
+            return await self._apply_ticket_nickname_unlocked(
+                guild_id,
+                user_id,
+                tickets,
+            )
+
+    async def _apply_ticket_nickname_unlocked(
+        self,
+        guild_id: int,
+        user_id: int,
+        tickets: int,
+    ) -> str:
+        if not await self.store.nickname_markers_enabled(guild_id):
+            return "disabled"
+        if not await self.store.nickname_marker_allowed(guild_id, user_id):
+            if await self.store.get_nickname_state(guild_id, user_id) is not None:
+                await self._clear_ticket_nickname_unlocked(
+                    guild_id,
+                    user_id,
+                    reason="Member disabled their OwO boss-ticket nickname marker",
+                )
+            return "opted-out"
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            return "missing"
+        member = await self.fetch_known_member(guild, user_id)
+        if member is None:
+            return "missing"
+        edit_status = self.nickname_edit_status(guild, member)
+        if edit_status is not None:
+            logger.info(
+                "Skipped ticket nickname for user %s in guild %s: %s",
+                user_id,
+                guild_id,
+                edit_status,
+            )
+            return edit_status
+
+        state = await self.store.get_nickname_state(guild_id, user_id)
+        current_nickname = member.nick
+        if state is None:
+            # On the first application, preserve the complete existing nickname even
+            # if it coincidentally resembles our marker format.
+            base_nickname = current_nickname
+        elif current_nickname == state.last_applied_nickname:
+            base_nickname = state.base_nickname
+        else:
+            # Another bot or an administrator changed the name after our last edit.
+            # Preserve that change while removing only our known suffix.
+            base_nickname = strip_ticket_nickname_marker(current_nickname)
+
+        display_base = (
+            base_nickname
+            or getattr(member, "global_name", None)
+            or member.name
+        )
+        new_nickname = build_ticket_nickname(display_base, tickets)
+        if current_nickname == new_nickname:
+            await self.store.save_nickname_state(
+                guild_id,
+                user_id,
+                base_nickname,
+                new_nickname,
+            )
+            return "unchanged"
+
+        try:
+            await member.edit(
+                nick=new_nickname,
+                reason=f"OwO boss tickets updated to {tickets}/3",
+            )
+        except discord.Forbidden:
+            logger.warning(
+                "Missing permission or role hierarchy for ticket nickname user %s in guild %s",
+                user_id,
+                guild_id,
+            )
+            return "hierarchy"
+        except discord.HTTPException as exc:
+            logger.warning(
+                "Could not update ticket nickname for user %s in guild %s: %s",
+                user_id,
+                guild_id,
+                exc,
+            )
+            return "failed"
+
+        await self.store.save_nickname_state(
+            guild_id,
+            user_id,
+            base_nickname,
+            new_nickname,
+        )
+        logger.info(
+            "Updated ticket nickname for user %s in guild %s to %s/3",
+            user_id,
+            guild_id,
+            tickets,
+        )
+        return "updated"
+
+    async def clear_ticket_nickname(
+        self,
+        guild_id: int,
+        user_id: int,
+        *,
+        reason: str,
+    ) -> str:
+        async with self.nickname_user_lock(guild_id, user_id):
+            return await self._clear_ticket_nickname_unlocked(
+                guild_id,
+                user_id,
+                reason=reason,
+            )
+
+    async def _clear_ticket_nickname_unlocked(
+        self,
+        guild_id: int,
+        user_id: int,
+        *,
+        reason: str,
+    ) -> str:
+        state = await self.store.get_nickname_state(guild_id, user_id)
+        if state is None:
+            return "not-managed"
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            return "missing"
+        member = await self.fetch_known_member(guild, user_id)
+        if member is None:
+            await self.store.delete_nickname_state(guild_id, user_id)
+            return "missing"
+        edit_status = self.nickname_edit_status(guild, member)
+        if edit_status is not None:
+            return edit_status
+
+        current_nickname = member.nick
+        if current_nickname == state.last_applied_nickname:
+            target_nickname = state.base_nickname
+        else:
+            stripped = strip_ticket_nickname_marker(current_nickname)
+            if stripped == current_nickname:
+                await self.store.delete_nickname_state(guild_id, user_id)
+                return "already-cleared"
+            target_nickname = stripped
+
+        try:
+            await member.edit(nick=target_nickname, reason=reason)
+        except discord.Forbidden:
+            return "hierarchy"
+        except discord.HTTPException as exc:
+            logger.warning(
+                "Could not restore ticket nickname for user %s in guild %s: %s",
+                user_id,
+                guild_id,
+                exc,
+            )
+            return "failed"
+
+        await self.store.delete_nickname_state(guild_id, user_id)
+        logger.info(
+            "Restored ticket nickname for user %s in guild %s",
+            user_id,
+            guild_id,
+        )
+        return "restored"
+
+    async def sync_guild_nicknames(self, guild_id: int) -> NicknameSyncResult:
+        result = NicknameSyncResult()
+        async with self.nickname_lock(guild_id):
+            statuses = await self.store.list_status(guild_id)
+            for index, status in enumerate(statuses):
+                async with self.nickname_user_lock(guild_id, status.user_id):
+                    latest = await self.store.get_status(guild_id, status.user_id)
+                    if latest is None:
+                        outcome = "missing"
+                    else:
+                        outcome = await self._apply_ticket_nickname_unlocked(
+                            guild_id,
+                            latest.user_id,
+                            latest.tickets,
+                        )
+                self.add_nickname_result(result, outcome)
+                if index + 1 < len(statuses):
+                    await asyncio.sleep(NICKNAME_SYNC_DELAY_SECONDS)
+        return result
+
+    async def restore_guild_nicknames(self, guild_id: int) -> NicknameSyncResult:
+        result = NicknameSyncResult()
+        async with self.nickname_lock(guild_id):
+            states = await self.store.list_nickname_states(guild_id)
+            for index, state in enumerate(states):
+                async with self.nickname_user_lock(guild_id, state.user_id):
+                    outcome = await self._clear_ticket_nickname_unlocked(
+                        guild_id,
+                        state.user_id,
+                        reason="OwO boss-ticket nickname markers disabled",
+                    )
+                self.add_nickname_result(result, outcome)
+                if index + 1 < len(states):
+                    await asyncio.sleep(NICKNAME_SYNC_DELAY_SECONDS)
+        return result
+
+    async def build_personal_nickname_embed(
+        self,
+        guild_id: int,
+        user_id: int,
+        *,
+        server_enabled: bool,
+        user_enabled: bool,
+        notice: str | None = None,
+    ) -> discord.Embed:
+        status = await self.store.get_status(guild_id, user_id)
+        state = await self.store.get_nickname_state(guild_id, user_id)
+        guild = self.bot.get_guild(guild_id)
+        owner_note = bool(guild and guild.owner_id == user_id)
+
+        if not server_enabled:
+            description = (
+                "Ticket nickname markers are currently **disabled for this server**. "
+                "A server manager can enable them through `HBS`. Your ticket entry and "
+                "ticket-board tracking are unaffected."
+            )
+        else:
+            preference = "Shown" if user_enabled else "Hidden by you"
+            count_text = f"{status.tickets}/3" if status else "No ticket check recorded yet"
+            managed_text = "Currently managed" if state else "Not currently applied"
+            description = (
+                f"**Your preference:** {preference}\n"
+                f"**Recorded tickets:** {count_text}\n"
+                f"**Nickname status:** {managed_text}\n\n"
+                "Hiding the marker removes only the `· 🎟🎟▫` suffix. Your ticket count "
+                "stays on the server ticket board. You can show it again at any time."
+            )
+            if owner_note:
+                description += (
+                    "\n\n⚠️ Discord does not allow bots to edit the server owner's "
+                    "nickname, so your preference can be saved but no marker can be applied."
+                )
+        if notice:
+            description += f"\n\n✅ {notice}"
+        embed = discord.Embed(
+            title="🏷️ My Boss-Ticket Nickname",
+            description=description,
+            color=0x5865F2,
+        )
+        embed.set_footer(
+            text=(
+                "Open this panel with the ticket board button, "
+                "/boss-ticket-nickname, H boss nickname, or HBN."
+            )
+        )
+        return embed
+
+    async def send_personal_nickname_panel(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "This control only works inside a server.", ephemeral=True
+            )
+            return
+        server_enabled = await self.store.nickname_markers_enabled(interaction.guild_id)
+        user_enabled = await self.store.nickname_marker_allowed(
+            interaction.guild_id, interaction.user.id
+        )
+        view = TicketNicknamePreferenceView(
+            self,
+            interaction.guild_id,
+            interaction.user.id,
+            server_enabled=server_enabled,
+            user_enabled=user_enabled,
+        )
+        embed = await self.build_personal_nickname_embed(
+            interaction.guild_id,
+            interaction.user.id,
+            server_enabled=server_enabled,
+            user_enabled=user_enabled,
+        )
+        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+
+    async def send_personal_nickname_panel_message(
+        self,
+        message: discord.Message,
+    ) -> None:
+        if message.guild is None:
+            return
+        server_enabled = await self.store.nickname_markers_enabled(message.guild.id)
+        user_enabled = await self.store.nickname_marker_allowed(
+            message.guild.id, message.author.id
+        )
+        view = TicketNicknamePreferenceView(
+            self,
+            message.guild.id,
+            message.author.id,
+            server_enabled=server_enabled,
+            user_enabled=user_enabled,
+        )
+        embed = await self.build_personal_nickname_embed(
+            message.guild.id,
+            message.author.id,
+            server_enabled=server_enabled,
+            user_enabled=user_enabled,
+        )
+        await message.reply(
+            embed=embed,
+            view=view,
+            mention_author=False,
+            delete_after=300,
+        )
+
+    async def set_personal_nickname_preference(
+        self,
+        guild_id: int,
+        user_id: int,
+        enabled: bool,
+    ) -> str:
+        await self.store.set_nickname_marker_allowed(guild_id, user_id, enabled)
+        if not enabled:
+            outcome = await self.clear_ticket_nickname(
+                guild_id,
+                user_id,
+                reason="Member disabled their OwO boss-ticket nickname marker",
+            )
+            logger.info(
+                "User %s disabled ticket nickname marker in guild %s (%s)",
+                user_id,
+                guild_id,
+                outcome,
+            )
+            if outcome in {"restored", "already-cleared", "not-managed", "missing"}:
+                return "Your nickname marker is hidden. Your ticket-board entry remains tracked."
+            if outcome == "owner":
+                return "Your preference is saved. Discord does not allow bots to edit the server owner."
+            if outcome == "hierarchy":
+                return "Your preference is saved, but I could not restore the name because of role hierarchy."
+            return "Your preference is saved, but I could not fully restore the nickname."
+
+        if not await self.store.nickname_markers_enabled(guild_id):
+            return "Your preference is saved. A server manager must enable nickname markers first."
+        status = await self.store.get_status(guild_id, user_id)
+        if status is None:
+            return "Your marker is enabled. Run `w boss t` to record a count and apply it."
+        outcome = await self.apply_ticket_nickname(guild_id, user_id, status.tickets)
+        logger.info(
+            "User %s enabled ticket nickname marker in guild %s (%s)",
+            user_id,
+            guild_id,
+            outcome,
+        )
+        if outcome in {"updated", "unchanged"}:
+            return "Your nickname marker is enabled and synced to your current ticket count."
+        if outcome == "owner":
+            return "Your preference is saved, but Discord does not allow bots to edit the server owner."
+        if outcome == "hierarchy":
+            return "Your preference is saved, but my role is not high enough to edit your nickname."
+        if outcome == "permission":
+            return "Your preference is saved, but the bot needs Manage Nicknames permission."
+        return "Your preference is saved, but the nickname could not be updated right now."
+
+    async def add_ticket_command_marker_reaction(
+        self,
+        request: PendingTicketRequest,
+        nickname_result: str,
+    ) -> None:
+        emoji = None
+        if nickname_result in {"updated", "unchanged"}:
+            emoji = "🏷️"
+        elif nickname_result == "opted-out":
+            emoji = "🔕"
+        elif nickname_result in {"owner", "hierarchy", "permission", "failed"}:
+            emoji = "⚠️"
+        if emoji is None:
+            return
+        channel = self.bot.get_channel(request.channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(request.channel_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                return
+        get_partial = getattr(channel, "get_partial_message", None)
+        if not callable(get_partial):
+            return
+        try:
+            await get_partial(request.command_message_id).add_reaction(emoji)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            return
 
     def drop_pending_for_user(self, guild_id: int, user_id: int) -> None:
         for channel_id, pending in list(self.pending_by_channel.items()):
@@ -1064,12 +2170,17 @@ class TicketTracker(commands.Cog):
         tracked_count = sum(not item.blocked for item in view.entries)
         blocked_count = sum(item.blocked for item in view.entries)
         selected = view.selected_entry()
+        nickname_state = "Enabled" if view.nickname_enabled else "Disabled (default)"
         description = (
-            f"**Tracked:** {tracked_count} • **Blocked:** {blocked_count}\n\n"
+            f"**Tracked:** {tracked_count} • **Blocked:** {blocked_count}\n"
+            f"**Ticket nickname markers:** {nickname_state}\n\n"
             "Choose a user, then select an action. **Remove from list** deletes only "
             "their current entry; their next ticket check can add them again. "
             "**Block tracking** removes them and ignores future ticket checks until "
-            "an admin unblocks them."
+            "an admin unblocks them.\n\n"
+            "Nickname markers use `Name · 🎟🎟▫`, require **Manage Nicknames**, and "
+            "cannot edit the server owner or members whose highest role is equal to "
+            "or above the bot role."
         )
         if selected is not None:
             state = "Blocked" if selected.blocked else f"{selected.tickets}/3 tickets"
@@ -1084,7 +2195,9 @@ class TicketTracker(commands.Cog):
             description=description,
             color=0x5865F2,
         )
-        embed.set_footer(text="Requires Manage Server permission.")
+        embed.set_footer(
+            text="Panel requires Manage Server. Nickname markers require Manage Nicknames."
+        )
         return embed
 
     async def send_management_panel(
@@ -1095,7 +2208,13 @@ class TicketTracker(commands.Cog):
         ephemeral: bool = False,
     ) -> None:
         entries = await self.management_entries(guild_id)
-        view = TicketManagementView(self, guild_id, entries)
+        nickname_enabled = await self.store.nickname_markers_enabled(guild_id)
+        view = TicketManagementView(
+            self,
+            guild_id,
+            entries,
+            nickname_enabled=nickname_enabled,
+        )
         kwargs: dict[str, Any] = {
             "embed": self.build_management_embed(view),
             "view": view,
@@ -1234,6 +2353,21 @@ class TicketTracker(commands.Cog):
                 await self.refresh_board(guild_id)
             except Exception:
                 logger.exception("Could not restore ticket board for guild %s", guild_id)
+        for guild_id in changed_guilds:
+            if not await self.store.nickname_markers_enabled(guild_id):
+                continue
+            try:
+                result = await self.sync_guild_nicknames(guild_id)
+                logger.info(
+                    "Synced ticket nickname reset for guild %s: %s processed",
+                    guild_id,
+                    result.total_processed,
+                )
+            except Exception:
+                logger.exception(
+                    "Could not sync ticket nicknames after startup reset for guild %s",
+                    guild_id,
+                )
         if changed_guilds:
             logger.info("Replenished stale boss-ticket entries for %s guild(s)", len(changed_guilds))
 
@@ -1289,6 +2423,19 @@ class TicketTracker(commands.Cog):
             request.guild_id,
             tickets,
         )
+        nickname_result = await self.apply_ticket_nickname(
+            request.guild_id,
+            request.user_id,
+            tickets,
+        )
+        if nickname_result not in {"disabled", "unchanged"}:
+            logger.info(
+                "Ticket nickname result for user %s in guild %s: %s",
+                request.user_id,
+                request.guild_id,
+                nickname_result,
+            )
+        await self.add_ticket_command_marker_reaction(request, nickname_result)
         if await self.store.get_config(request.guild_id) is not None:
             await self.refresh_board(request.guild_id)
         return True
@@ -1390,6 +2537,9 @@ class TicketTracker(commands.Cog):
             if message.guild is None:
                 return
             if not message.author.bot:
+                if is_ticket_nickname_command(message.content or ""):
+                    await self.send_personal_nickname_panel_message(message)
+                    return
                 if is_ticket_settings_command(message.content or ""):
                     await self.send_ticket_settings(message)
                     return
@@ -1485,6 +2635,18 @@ class TicketTracker(commands.Cog):
         )
 
     @app_commands.command(
+        name="boss-ticket-nickname",
+        description="Choose whether your ticket count appears in your server nickname.",
+    )
+    async def boss_ticket_nickname(self, interaction: discord.Interaction) -> None:
+        await self.send_personal_nickname_panel(interaction)
+        logger.info(
+            "Personal ticket nickname panel opened in guild %s by %s",
+            interaction.guild_id,
+            interaction.user.id,
+        )
+
+    @app_commands.command(
         name="boss-ticket-manage",
         description="Open the visual boss-ticket user management panel.",
     )
@@ -1543,6 +2705,11 @@ class TicketTracker(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         removed = await self.store.remove_status(interaction.guild_id, target_id)
         self.drop_pending_for_user(interaction.guild_id, target_id)
+        await self.clear_ticket_nickname(
+            interaction.guild_id,
+            target_id,
+            reason="Boss-ticket entry removed",
+        )
         if removed is None:
             await interaction.followup.send(
                 f"No ticket entry exists for `{target_id}` in this server.",
@@ -1580,8 +2747,7 @@ class TicketTracker(commands.Cog):
         page_count = self.board_page_count(statuses)
         await interaction.followup.send(
             embed=self.build_board_embed(statuses, 0),
-            view=TicketBoardView(self, page=0, page_count=page_count)
-            if page_count > 1 else None,
+            view=TicketBoardView(self, page=0, page_count=page_count),
             ephemeral=True,
         )
         logger.info(
@@ -1598,8 +2764,7 @@ class TicketTracker(commands.Cog):
         page_count = self.board_page_count(statuses)
         await message.reply(
             embed=self.build_board_embed(statuses, 0),
-            view=TicketBoardView(self, page=0, page_count=page_count)
-            if page_count > 1 else None,
+            view=TicketBoardView(self, page=0, page_count=page_count),
             mention_author=False,
         )
         if config is None:
@@ -1746,8 +2911,7 @@ class TicketTracker(commands.Cog):
             try:
                 new_message = await channel.send(
                     embed=self.build_board_embed(statuses, 0),
-                    view=TicketBoardView(self, page=0, page_count=page_count)
-                    if page_count > 1 else None,
+                    view=TicketBoardView(self, page=0, page_count=page_count),
                 )
             except (discord.Forbidden, discord.HTTPException) as exc:
                 logger.warning(
@@ -1790,6 +2954,21 @@ class TicketTracker(commands.Cog):
                     except Exception:
                         logger.exception(
                             "Could not refresh ticket board after daily reset for guild %s",
+                            guild_id,
+                        )
+                for guild_id in changed_guilds:
+                    if not await self.store.nickname_markers_enabled(guild_id):
+                        continue
+                    try:
+                        result = await self.sync_guild_nicknames(guild_id)
+                        logger.info(
+                            "Synced Pacific-midnight ticket nicknames for guild %s: %s processed",
+                            guild_id,
+                            result.total_processed,
+                        )
+                    except Exception:
+                        logger.exception(
+                            "Could not sync ticket nicknames after daily reset for guild %s",
                             guild_id,
                         )
                 logger.info(

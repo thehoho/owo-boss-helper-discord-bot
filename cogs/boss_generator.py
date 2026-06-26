@@ -1266,7 +1266,12 @@ class BossGenerator(commands.Cog):
             value=(
                 "Update with `owo boss t` / `w boss t`; view with `H boss t`, "
                 "`H boss list`, `HBL`, or `/boss-ticket-list`. Managers use "
-                "`/boss-ticket-channel` and `/boss-ticket-manage`."
+                "`HBS` / `H boss settings` / `/boss-ticket-manage` to remove or "
+                "block users and optionally enable nickname markers. Members control "
+                "their own marker with the board's **My nickname** button, "
+                "`/boss-ticket-nickname`, `H boss nickname`, or `HBN`. A `🏷️` reaction "
+                "means the marker was applied; `🔕` means that member chose to hide it. "
+                "Nickname markers require **Manage Nicknames** and proper role order."
             ),
             inline=False,
         )

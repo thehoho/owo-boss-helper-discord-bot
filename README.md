@@ -61,6 +61,10 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Shows username, Discord user ID, ticket count, update time, and next replenishment.
 - Keeps the persistent board and manual ticket-list responses in a single Discord message, with Previous and Next buttons for large lists.
 - Provides a visual ticket management panel for server managers, including remove, block tracking, and unblock actions.
+- Supports optional per-server ticket markers in member nicknames, disabled by default and managed through `HBS`.
+- Gives every member private UI controls to show or hide only their own marker without removing their ticket-board entry.
+- Adds a persistent **My nickname** button to ticket boards plus `/boss-ticket-nickname`, `H boss nickname`, and `HBN`.
+- Safely restores managed nicknames when markers are disabled, a member opts out, or a ticket entry is removed or blocked.
 - Supports paginated managed user selection for servers with more than 25 tracked or blocked users.
 - Uses `America/Los_Angeles` so Pacific daylight-saving changes are handled automatically.
 - Supports manual list display and board refresh commands.
@@ -146,9 +150,10 @@ Required permissions:
 - Read Message History
 - Add Reactions
 
-Optional permission:
+Optional permissions:
 
 - Manage Messages — allows guided team setup to remove completed user command messages.
+- Manage Nicknames — allows a server manager to enable optional ticket markers through `HBS`. The bot role must be above members whose nicknames it edits.
 
 The bot does not require Administrator permission.
 
@@ -191,7 +196,7 @@ This selects the channel for new-boss, defeat, escape, cooldown, and ready alert
 H help
 ```
 
-`H help` now lists only commands currently supported by the bot, including the ticket-management panel and the 100-template workflow.
+`H help` lists only commands currently supported by the bot, including the ticket-management panel, optional nickname markers, and the 100-template workflow.
 
 ## Team templates
 
@@ -318,7 +323,40 @@ The panel supports:
 - **Remove from list** — deletes the current board entry, but the user can reappear after their next OwO ticket check.
 - **Block tracking** — removes the user and ignores their future ticket checks in that server.
 - **Unblock** — allows future ticket checks to be recorded again.
+- **Enable/Disable nickname markers** — turns optional ticket markers on or off for the server.
+- **Sync nickname markers** — reapplies the current recorded ticket values to tracked members who have not hidden their marker.
 - Paginated user selection for servers with more than 25 tracked or blocked users.
+
+Nickname markers are disabled by default. Enabling them requires the bot role to have **Manage Nicknames** and to be above the members it edits. Discord does not allow bots to edit the server owner's nickname, so the owner is skipped. Members at or above the bot's highest role are also skipped.
+
+The marker format uses Unicode so it works without custom server emojis:
+
+```text
+3/3 → Falcon · 🎟🎟🎟
+2/3 → Falcon · 🎟🎟▫
+1/3 → Falcon · 🎟▫▫
+0/3 → Falcon · ▫▫▫
+```
+
+The helper changes only the server nickname, preserves prefixes added by tools such as AFK bots, and removes only its own suffix when restoring a name. Custom ticket emojis are intentionally reserved for a later UI update.
+
+### Personal nickname control
+
+Every member can privately control only their own nickname marker with:
+
+```text
+/boss-ticket-nickname
+H boss nickname
+HBN
+```
+
+They can also click **My nickname** under any ticket-board message. **Hide my marker** removes only the ticket suffix; it does not remove the member from the ticket list or stop ticket tracking. **Show my marker** reapplies the latest recorded count, or waits for the next `w boss t` check when no count exists yet.
+
+After a successful ticket check, the helper reacts to the member's command with:
+
+- `🏷️` — the nickname marker is active.
+- `🔕` — the member has chosen to hide their marker.
+- `⚠️` — Discord permissions, server ownership, or role hierarchy prevented the nickname update.
 
 The existing `/boss-ticket-remove` command remains available for direct removal by Discord user ID or mention.
 
@@ -398,7 +436,7 @@ logs/
 
 These files are ignored by Git.
 
-When moving the bot to another computer or host, copy `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, and `boss_cooldown_config.json` to preserve saved teams, ticket data, developer statistics, board configuration, and boss watcher state.
+When moving the bot to another computer or host, copy `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, and `boss_cooldown_config.json` to preserve saved teams, ticket data, optional nickname-marker settings, personal marker preferences, managed nickname restoration state, developer statistics, board configuration, and boss watcher state.
 
 ## Project structure
 
