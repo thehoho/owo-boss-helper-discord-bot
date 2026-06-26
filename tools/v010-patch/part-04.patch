@@ -1,0 +1,173 @@
++    ) -> TicketNicknameState | None:
++        async with self.lock:
++            return await asyncio.to_thread(
++                self._get_nickname_state_sync, guild_id, user_id
++            )
++
++    def _get_nickname_state_sync(
++        self, guild_id: int, user_id: int
++    ) -> TicketNicknameState | None:
++        with self._connect() as connection:
++            row = connection.execute(
++                """
++                SELECT guild_id, user_id, base_nickname, last_applied_nickname, updated_at
++                FROM ticket_nickname_state
++                WHERE guild_id = ? AND user_id = ?
++                """,
++                (guild_id, user_id),
++            ).fetchone()
++        if row is None:
++            return None
++        return TicketNicknameState(
++            guild_id=int(row["guild_id"]),
++            user_id=int(row["user_id"]),
++            base_nickname=(
++                str(row["base_nickname"])
++                if row["base_nickname"] is not None
++                else None
++            ),
++            last_applied_nickname=str(row["last_applied_nickname"]),
++            updated_at=int(row["updated_at"]),
++        )
++
++    async def delete_nickname_state(self, guild_id: int, user_id: int) -> None:
++        async with self.lock:
++            await asyncio.to_thread(
++                self._delete_nickname_state_sync, guild_id, user_id
++            )
++
++    def _delete_nickname_state_sync(self, guild_id: int, user_id: int) -> None:
++        with self._connect() as connection:
++            connection.execute(
++                "DELETE FROM ticket_nickname_state WHERE guild_id = ? AND user_id = ?",
++                (guild_id, user_id),
++            )
++
++    async def list_nickname_states(
++        self, guild_id: int
++    ) -> list[TicketNicknameState]:
++        async with self.lock:
++            return await asyncio.to_thread(
++                self._list_nickname_states_sync, guild_id
++            )
++
++    def _list_nickname_states_sync(
++        self, guild_id: int
++    ) -> list[TicketNicknameState]:
++        with self._connect() as connection:
++            rows = connection.execute(
++                """
++                SELECT guild_id, user_id, base_nickname, last_applied_nickname, updated_at
++                FROM ticket_nickname_state
++                WHERE guild_id = ?
++                ORDER BY user_id
++                """,
++                (guild_id,),
++            ).fetchall()
++        return [
++            TicketNicknameState(
++                guild_id=int(row["guild_id"]),
++                user_id=int(row["user_id"]),
++                base_nickname=(
++                    str(row["base_nickname"])
++                    if row["base_nickname"] is not None
++                    else None
++                ),
++                last_applied_nickname=str(row["last_applied_nickname"]),
++                updated_at=int(row["updated_at"]),
++            )
++            for row in rows
++        ]
++
++    async def get_status(
++        self, guild_id: int, user_id: int
++    ) -> TicketStatus | None:
++        async with self.lock:
++            return await asyncio.to_thread(
++                self._get_status_sync, guild_id, user_id
++            )
++
++    def _get_status_sync(
++        self, guild_id: int, user_id: int
++    ) -> TicketStatus | None:
++        cycle = current_pacific_date().isoformat()
++        with self._connect() as connection:
++            self._normalize_guild_cycle_sync(connection, guild_id, cycle)
++            row = connection.execute(
++                """
++                SELECT guild_id, user_id, username, tickets, updated_at, cycle_date
++                FROM ticket_status
++                WHERE guild_id = ? AND user_id = ?
++                """,
++                (guild_id, user_id),
++            ).fetchone()
++        if row is None:
++            return None
++        return TicketStatus(
++            guild_id=int(row["guild_id"]),
++            user_id=int(row["user_id"]),
++            username=str(row["username"]),
++            tickets=int(row["tickets"]),
++            updated_at=int(row["updated_at"]),
++            cycle_date=str(row["cycle_date"]),
++        )
++
+     async def list_status(self, guild_id: int) -> list[TicketStatus]:
+         async with self.lock:
+             return await asyncio.to_thread(self._list_status_sync, guild_id)
+@@ -771,6 +1065,7 @@ class TicketManagementView(discord.ui.View):
+         page: int = 0,
+         selected_user_id: int | None = None,
+         notice: str | None = None,
++        nickname_enabled: bool = False,
+     ) -> None:
+         super().__init__(timeout=600)
+         self.tracker = tracker
+@@ -780,6 +1075,7 @@ class TicketManagementView(discord.ui.View):
+         self.page = max(0, min(page, self.page_count - 1))
+         self.selected_user_id = selected_user_id
+         self.notice = notice
++        self.nickname_enabled = nickname_enabled
+ 
+         if entries:
+             self.add_item(TicketManagementSelect(self))
+@@ -825,6 +1121,27 @@ class TicketManagementView(discord.ui.View):
+             disabled=selected_user_id is None or not self.selected_entry_is_blocked(),
+             row=2,
+         )
++        toggle_nicknames = discord.ui.Button(
++            label=(
++                "Disable nickname markers"
++                if self.nickname_enabled
++                else "Enable nickname markers"
++            ),
++            emoji="🏷️",
++            style=(
++                discord.ButtonStyle.danger
++                if self.nickname_enabled
++                else discord.ButtonStyle.success
++            ),
++            row=3,
++        )
++        sync_nicknames = discord.ui.Button(
++            label="Sync nickname markers",
++            emoji="🔄",
++            style=discord.ButtonStyle.secondary,
++            disabled=not self.nickname_enabled,
++            row=3,
++        )
+ 
+         previous.callback = self.previous_page
+         next_button.callback = self.next_page
+@@ -832,7 +1149,18 @@ class TicketManagementView(discord.ui.View):
+         remove.callback = self.remove_selected
+         block.callback = self.block_selected
+         unblock.callback = self.unblock_selected
+-        for item in (previous, next_button, refresh, remove, block, unblock):
++        toggle_nicknames.callback = self.toggle_nickname_markers
++        sync_nicknames.callback = self.sync_nickname_markers
++        for item in (
++            previous,
++            next_button,
++            refresh,
++            remove,
