@@ -1,0 +1,87 @@
+name: Apply v0.10 ticket nickname update
+
+on:
+  push:
+    paths:
+      - .github/workflows/apply-v010.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Apply prepared patch
+        run: |
+          cat tools/v010-patch/part-*.patch > /tmp/v010.patch
+          git apply --check /tmp/v010.patch
+          git apply /tmp/v010.patch
+
+      - name: Install dependencies
+        run: python -m pip install -r requirements.txt
+
+      - name: Validate syntax
+        run: |
+          python -m py_compile \
+            bot.py \
+            cogs/boss_generator.py \
+            cogs/team_templates.py \
+            cogs/ticket_tracker.py \
+            cogs/bot_info.py
+
+      - name: Validate nickname helpers and migration
+        shell: bash
+        run: |
+          python - <<'PY'
+          import asyncio
+          import tempfile
+          from pathlib import Path
+          from cogs.ticket_tracker import (
+              TicketStore,
+              build_ticket_nickname,
+              strip_ticket_nickname_marker,
+          )
+
+          assert build_ticket_nickname("Falcon", 3) == "Falcon · 🎟🎟🎟"
+          assert build_ticket_nickname("Falcon", 2) == "Falcon · 🎟🎟▫"
+          assert build_ticket_nickname("Falcon", 1) == "Falcon · 🎟▫▫"
+          assert build_ticket_nickname("Falcon", 0) == "Falcon · ▫▫▫"
+          assert len(build_ticket_nickname("X" * 80, 2)) <= 32
+          assert strip_ticket_nickname_marker("[AFK] Falcon · 🎟🎟▫") == "[AFK] Falcon"
+
+          async def main():
+              with tempfile.TemporaryDirectory() as td:
+                  store = TicketStore(Path(td) / "boss_tickets.db")
+                  await store.initialize()
+                  assert not await store.nickname_markers_enabled(123)
+                  await store.set_nickname_markers_enabled(123, True, 999)
+                  assert await store.nickname_markers_enabled(123)
+                  await store.save_nickname_state(123, 456, None, "Falcon · 🎟🎟▫")
+                  state = await store.get_nickname_state(123, 456)
+                  assert state is not None
+                  assert state.last_applied_nickname == "Falcon · 🎟🎟▫"
+                  await store.upsert_status(123, 456, "Falcon", 2)
+                  status = await store.get_status(123, 456)
+                  assert status is not None and status.tickets == 2
+
+          asyncio.run(main())
+          PY
+
+      - name: Commit update
+        run: |
+          rm -rf tools/v010-patch
+          rm -f .github/workflows/apply-v010.yml
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -A
+          git commit -m "feat: add optional ticket nickname markers"
+          git push origin main
