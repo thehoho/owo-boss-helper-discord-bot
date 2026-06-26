@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 26 June 2026_
+_Last updated: 27 June 2026_
 
 OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 
@@ -11,6 +11,7 @@ The bot stores only the information needed to provide its features and operate s
 - Discord server IDs, server names, owner IDs, approximate member counts, channel counts, installation status, and aggregate command-use counts.
 - Discord user IDs, display names, and Discord account usernames associated with saved team templates and boss-ticket entries.
 - When a server manager enables optional ticket nickname markers, the bot stores the member's prior server nickname, the last nickname applied by the bot, and whether that member chose to show or hide the suffix so it can update or restore the name safely.
+- The bot stores whether a member has personally paused ticket tracking in a server. Paused members are not added by later ticket checks until they resume tracking.
 - Saved team animals, positions, and weapon IDs.
 - Reported boss-ticket counts and update times.
 - Configured Discord channel and message IDs used for cooldown and ticket boards.
@@ -29,7 +30,7 @@ Runtime data is stored on the bot's private hosting server in local SQLite datab
 ## Retention and deletion
 
 - Server managers can remove ticket-board users with `/boss-ticket-remove`.
-- Ticket nickname markers are disabled by default. Each member can hide or show their own marker without removing their ticket-board entry. Disabling the server feature attempts to restore every nickname managed by the bot and remove the associated restoration state after a successful cleanup.
+- Ticket nickname markers are disabled by default. Each member can hide or show their marker, remove their current board entry, pause ticket tracking, or resume it later. Disabling the server feature attempts to restore every nickname managed by the bot and remove the associated restoration state after a successful cleanup.
 - Users can delete saved team templates through the documented team commands.
 - Server metadata may remain as historical installation statistics after the bot leaves a server.
 - The developer can remove stored records when requested and reasonably verifiable.

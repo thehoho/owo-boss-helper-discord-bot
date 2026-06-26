@@ -25,6 +25,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .ui_emojis import ensure_ui_emojis, ui_emoji_button, ui_emoji_text
+
 logger = logging.getLogger(__name__)
 
 OWO_BOT_ID = 408785106942164992
@@ -32,11 +34,13 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 PACIFIC = ZoneInfo("America/Los_Angeles")
 PENDING_REQUEST_SECONDS = 60
-BOARD_PAGE_SIZE = 20
+BOARD_PAGE_SIZE = 15
 MANAGEMENT_PAGE_SIZE = 25
 MAX_TICKETS = 3
 NICKNAME_MAX_LENGTH = 32
 NICKNAME_SYNC_DELAY_SECONDS = 0.20
+IDENTITY_REFRESH_TTL_SECONDS = 10 * 60
+IDENTITY_REFRESH_CONCURRENCY = 4
 TICKET_NICKNAME_MARKERS = {
     3: "🎟🎟🎟",
     2: "🎟🎟▫",
@@ -473,6 +477,21 @@ class TicketStore:
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_ticket_nickname_preferences_guild "
                 "ON ticket_nickname_preferences(guild_id, enabled)"
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_tracking_preferences (
+                    guild_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    enabled INTEGER NOT NULL DEFAULT 1,
+                    updated_at INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, user_id)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ticket_tracking_preferences_guild "
+                "ON ticket_tracking_preferences(guild_id, enabled)"
             )
 
     async def set_channel(self, guild_id: int, channel_id: int) -> None:
@@ -1085,6 +1104,75 @@ class TicketStore:
                 (guild_id, user_id, int(enabled), int(time.time())),
             )
 
+    async def ticket_tracking_allowed(self, guild_id: int, user_id: int) -> bool:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._ticket_tracking_allowed_sync, guild_id, user_id
+            )
+
+    def _ticket_tracking_allowed_sync(self, guild_id: int, user_id: int) -> bool:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT enabled
+                FROM ticket_tracking_preferences
+                WHERE guild_id = ? AND user_id = ?
+                """,
+                (guild_id, user_id),
+            ).fetchone()
+        return row is None or bool(int(row["enabled"]))
+
+    async def set_ticket_tracking_allowed(
+        self,
+        guild_id: int,
+        user_id: int,
+        enabled: bool,
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._set_ticket_tracking_allowed_sync,
+                guild_id,
+                user_id,
+                enabled,
+            )
+
+    def _set_ticket_tracking_allowed_sync(
+        self,
+        guild_id: int,
+        user_id: int,
+        enabled: bool,
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO ticket_tracking_preferences
+                    (guild_id, user_id, enabled, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                    enabled = excluded.enabled,
+                    updated_at = excluded.updated_at
+                """,
+                (guild_id, user_id, int(enabled), int(time.time())),
+            )
+
+    async def load_all_tracking_opt_outs(self) -> dict[int, set[int]]:
+        async with self.lock:
+            return await asyncio.to_thread(self._load_all_tracking_opt_outs_sync)
+
+    def _load_all_tracking_opt_outs_sync(self) -> dict[int, set[int]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT guild_id, user_id
+                FROM ticket_tracking_preferences
+                WHERE enabled = 0
+                """
+            ).fetchall()
+        result: dict[int, set[int]] = {}
+        for row in rows:
+            result.setdefault(int(row["guild_id"]), set()).add(int(row["user_id"]))
+        return result
+
     async def list_status(self, guild_id: int) -> list[TicketStatus]:
         async with self.lock:
             return await asyncio.to_thread(self._list_status_sync, guild_id)
@@ -1117,7 +1205,7 @@ class TicketStore:
 
 
 class TicketBoardView(discord.ui.View):
-    """Persistent ticket-board navigation, display modes, and nickname controls."""
+    """Persistent ticket-board navigation, display modes, and personal controls."""
 
     def __init__(
         self,
@@ -1162,14 +1250,35 @@ class TicketBoardView(discord.ui.View):
         display_mode.callback = self.toggle_display_mode
         self.add_item(display_mode)
 
-        nickname = discord.ui.Button(
-            label="My nickname",
-            emoji="🏷️",
+        settings = discord.ui.Button(
+            label="My settings",
+            emoji="⚙️",
             style=discord.ButtonStyle.primary,
             custom_id="owo-helper:ticket-board:my-nickname",
         )
-        nickname.callback = self.my_nickname
-        self.add_item(nickname)
+        settings.callback = self.my_settings
+        self.add_item(settings)
+
+    async def on_error(
+        self,
+        interaction: discord.Interaction,
+        error: Exception,
+        item: discord.ui.Item[Any],
+    ) -> None:
+        logger.exception(
+            "Ticket-board interaction failed for custom_id=%s in guild %s",
+            getattr(item, "custom_id", None),
+            interaction.guild_id,
+            exc_info=(type(error), error, error.__traceback__),
+        )
+        message = "I could not update this ticket board. Please try again in a moment."
+        try:
+            if interaction.response.is_done():
+                await interaction.followup.send(message, ephemeral=True)
+            else:
+                await interaction.response.send_message(message, ephemeral=True)
+        except discord.HTTPException:
+            pass
 
     async def _render(
         self,
@@ -1184,6 +1293,11 @@ class TicketBoardView(discord.ui.View):
             )
             return
 
+        # Large boards can require several individual member lookups. Acknowledge the
+        # button immediately so Discord does not show "This interaction failed" while
+        # those identities are refreshed.
+        await interaction.response.defer()
+
         statuses = await self.tracker.store.list_status(interaction.guild_id)
         page_count = self.tracker.board_page_count(statuses)
         page = max(0, min(page, page_count - 1))
@@ -1197,7 +1311,7 @@ class TicketBoardView(discord.ui.View):
             page_count = self.tracker.board_page_count(statuses)
             page = max(0, min(page, page_count - 1))
 
-        await interaction.response.edit_message(
+        await interaction.edit_original_response(
             embed=self.tracker.build_board_embed(
                 statuses,
                 page,
@@ -1209,6 +1323,7 @@ class TicketBoardView(discord.ui.View):
                 page_count=page_count,
                 mention_mode=mention_mode,
             ),
+            allowed_mentions=discord.AllowedMentions.none(),
         )
 
     async def _move(self, interaction: discord.Interaction, offset: int) -> None:
@@ -1239,12 +1354,12 @@ class TicketBoardView(discord.ui.View):
             mention_mode=not mention_mode,
         )
 
-    async def my_nickname(self, interaction: discord.Interaction) -> None:
+    async def my_settings(self, interaction: discord.Interaction) -> None:
         await self.tracker.send_personal_nickname_panel(interaction)
 
 
 class TicketNicknamePreferenceView(discord.ui.View):
-    """Private user controls for showing or hiding only their nickname marker."""
+    """Private controls for a member's marker, board entry, and tracking consent."""
 
     def __init__(
         self,
@@ -1254,6 +1369,9 @@ class TicketNicknamePreferenceView(discord.ui.View):
         *,
         server_enabled: bool,
         user_enabled: bool,
+        tracking_enabled: bool,
+        has_status: bool,
+        admin_blocked: bool,
         notice: str | None = None,
     ) -> None:
         super().__init__(timeout=300)
@@ -1262,37 +1380,68 @@ class TicketNicknamePreferenceView(discord.ui.View):
         self.user_id = user_id
         self.server_enabled = server_enabled
         self.user_enabled = user_enabled
+        self.tracking_enabled = tracking_enabled
+        self.has_status = has_status
+        self.admin_blocked = admin_blocked
         self.notice = notice
 
         show = discord.ui.Button(
-            label="Show my marker",
+            label="Show marker",
             emoji="🏷️",
             style=discord.ButtonStyle.success,
-            disabled=not server_enabled or user_enabled,
+            disabled=(
+                not server_enabled
+                or user_enabled
+                or not tracking_enabled
+                or admin_blocked
+            ),
+            row=0,
         )
         hide = discord.ui.Button(
-            label="Hide my marker",
+            label="Hide marker",
             emoji="🔕",
-            style=discord.ButtonStyle.danger,
+            style=discord.ButtonStyle.secondary,
             disabled=not server_enabled or not user_enabled,
+            row=0,
         )
         refresh = discord.ui.Button(
             label="Refresh",
             emoji="🔄",
             style=discord.ButtonStyle.secondary,
+            row=0,
         )
+        remove_entry = discord.ui.Button(
+            label="Remove me from list",
+            emoji="🗑️",
+            style=discord.ButtonStyle.danger,
+            disabled=not has_status,
+            row=1,
+        )
+        tracking = discord.ui.Button(
+            label="Resume tracking" if not tracking_enabled else "Stop tracking me",
+            emoji="▶️" if not tracking_enabled else "⏸️",
+            style=(
+                discord.ButtonStyle.success
+                if not tracking_enabled
+                else discord.ButtonStyle.danger
+            ),
+            disabled=admin_blocked,
+            row=1,
+        )
+
         show.callback = self.show_marker
         hide.callback = self.hide_marker
         refresh.callback = self.refresh
-        self.add_item(show)
-        self.add_item(hide)
-        self.add_item(refresh)
+        remove_entry.callback = self.remove_entry
+        tracking.callback = self.toggle_tracking
+        for item in (show, hide, refresh, remove_entry, tracking):
+            self.add_item(item)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.user_id and interaction.guild_id == self.guild_id:
             return True
         await interaction.response.send_message(
-            "These nickname controls belong to another member.", ephemeral=True
+            "These personal ticket controls belong to another member.", ephemeral=True
         )
         return False
 
@@ -1301,12 +1450,22 @@ class TicketNicknamePreferenceView(discord.ui.View):
         user_enabled = await self.tracker.store.nickname_marker_allowed(
             self.guild_id, self.user_id
         )
+        tracking_enabled = self.user_id not in self.tracker.tracking_opt_outs.get(
+            self.guild_id, set()
+        )
+        admin_blocked = self.user_id in self.tracker.blocked_users.get(
+            self.guild_id, set()
+        )
+        status = await self.tracker.store.get_status(self.guild_id, self.user_id)
         view = TicketNicknamePreferenceView(
             self.tracker,
             self.guild_id,
             self.user_id,
             server_enabled=server_enabled,
             user_enabled=user_enabled,
+            tracking_enabled=tracking_enabled,
+            has_status=status is not None,
+            admin_blocked=admin_blocked,
             notice=self.notice,
         )
         embed = await self.tracker.build_personal_nickname_embed(
@@ -1314,6 +1473,8 @@ class TicketNicknamePreferenceView(discord.ui.View):
             self.user_id,
             server_enabled=server_enabled,
             user_enabled=user_enabled,
+            tracking_enabled=tracking_enabled,
+            admin_blocked=admin_blocked,
             notice=self.notice,
         )
         if interaction.response.is_done():
@@ -1339,8 +1500,25 @@ class TicketNicknamePreferenceView(discord.ui.View):
         )
         await self.edit(interaction)
 
+    async def remove_entry(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+        self.notice = await self.tracker.remove_personal_ticket_entry(
+            self.guild_id,
+            self.user_id,
+        )
+        await self.edit(interaction)
+
+    async def toggle_tracking(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
+        self.notice = await self.tracker.set_personal_tracking_preference(
+            self.guild_id,
+            self.user_id,
+            not self.tracking_enabled,
+        )
+        await self.edit(interaction)
+
     async def refresh(self, interaction: discord.Interaction) -> None:
-        self.notice = "Nickname status refreshed."
+        self.notice = "Your ticket settings were refreshed."
         await self.edit(interaction)
 
 
@@ -1356,7 +1534,9 @@ class TicketManagementSelect(discord.ui.Select):
                 emoji = "🚫"
             else:
                 state = f"Currently {entry.tickets}/3 tickets"
-                emoji = "🎟️"
+                emoji = ui_emoji_button(
+                    view.tracker.bot, "ticket_available", "🎟️"
+                )
             options.append(
                 discord.SelectOption(
                     label=entry.username[:100],
@@ -1733,11 +1913,14 @@ class TicketTracker(commands.Cog):
         self.processed_responses: dict[tuple[int, int], float] = {}
         self.capture_tasks: dict[tuple[int, int], asyncio.Task[bool]] = {}
         self.blocked_users: dict[int, set[int]] = {}
+        self.tracking_opt_outs: dict[int, set[int]] = {}
+        self.identity_refresh_seen: dict[tuple[int, int], float] = {}
         self._restored = False
 
     async def cog_load(self) -> None:
         await self.store.initialize()
         self.blocked_users = await self.store.load_all_blocked_ids()
+        self.tracking_opt_outs = await self.store.load_all_tracking_opt_outs()
         self.bot.add_view(TicketBoardView(self))
         self.reset_task = asyncio.create_task(self.daily_reset_loop())
         logger.info("Boss ticket storage ready at %s", DATABASE_FILE)
@@ -1808,36 +1991,63 @@ class TicketTracker(commands.Cog):
         self,
         guild_id: int,
         statuses: list[TicketStatus],
+        *,
+        force: bool = False,
     ) -> bool:
-        """Refresh known display/account names without changing ticket timestamps."""
+        """Refresh visible identities without requiring the Guild Members intent."""
         guild = self.bot.get_guild(guild_id)
         if guild is None or not statuses:
             return False
 
-        changed = False
-        for status in statuses:
-            member = await self.fetch_known_member(guild, status.user_id)
+        now = time.monotonic()
+        candidates = [
+            status
+            for status in statuses
+            if force
+            or now - self.identity_refresh_seen.get((guild_id, status.user_id), 0.0)
+            >= IDENTITY_REFRESH_TTL_SECONDS
+        ]
+        if not candidates:
+            return False
+
+        semaphore = asyncio.Semaphore(IDENTITY_REFRESH_CONCURRENCY)
+
+        async def refresh_one(status: TicketStatus) -> bool:
+            async with semaphore:
+                member = await self.fetch_known_member(guild, status.user_id)
+            self.identity_refresh_seen[(guild_id, status.user_id)] = time.monotonic()
             if member is None:
-                continue
+                return False
             raw_display_name = getattr(member, "display_name", member.name)
-            display_name = (
-                strip_ticket_nickname_marker(raw_display_name)
-                or raw_display_name
-            )
+            display_name = strip_ticket_nickname_marker(raw_display_name) or raw_display_name
             account_username = getattr(member, "name", "")
             if (
-                display_name != status.username
-                or account_username != status.account_username
+                display_name == status.username
+                and account_username == status.account_username
             ):
-                changed = (
-                    await self.store.update_identity(
-                        guild_id,
-                        status.user_id,
-                        display_name,
-                        account_username,
-                    )
-                    or changed
+                return False
+            return await self.store.update_identity(
+                guild_id,
+                status.user_id,
+                display_name,
+                account_username,
+            )
+
+        results = await asyncio.gather(
+            *(refresh_one(status) for status in candidates),
+            return_exceptions=True,
+        )
+        changed = False
+        for status, result in zip(candidates, results):
+            if isinstance(result, Exception):
+                logger.warning(
+                    "Could not refresh ticket identity for user %s in guild %s: %s",
+                    status.user_id,
+                    guild_id,
+                    result,
                 )
+                continue
+            changed = bool(result) or changed
         return changed
 
     def nickname_edit_status(
@@ -1920,6 +2130,14 @@ class TicketTracker(commands.Cog):
     ) -> str:
         if not await self.store.nickname_markers_enabled(guild_id):
             return "disabled"
+        if user_id in self.tracking_opt_outs.get(guild_id, set()):
+            if await self.store.get_nickname_state(guild_id, user_id) is not None:
+                await self._clear_ticket_nickname_unlocked(
+                    guild_id,
+                    user_id,
+                    reason="Member opted out of OwO boss-ticket tracking",
+                )
+            return "opted-out"
         if not await self.store.nickname_marker_allowed(guild_id, user_id):
             if await self.store.get_nickname_state(guild_id, user_id) is not None:
                 await self._clear_ticket_nickname_unlocked(
@@ -2116,6 +2334,8 @@ class TicketTracker(commands.Cog):
         *,
         server_enabled: bool,
         user_enabled: bool,
+        tracking_enabled: bool,
+        admin_blocked: bool,
         notice: str | None = None,
     ) -> discord.Embed:
         status = await self.store.get_status(guild_id, user_id)
@@ -2123,39 +2343,53 @@ class TicketTracker(commands.Cog):
         guild = self.bot.get_guild(guild_id)
         owner_note = bool(guild and guild.owner_id == user_id)
 
-        if not server_enabled:
-            description = (
-                "Ticket nickname markers are currently **disabled for this server**. "
-                "A server manager can enable them through `HBS`. Your ticket entry and "
-                "ticket-board tracking are unaffected."
-            )
+        if admin_blocked:
+            tracking_text = "Blocked by a server manager"
+        elif tracking_enabled:
+            tracking_text = "Active"
         else:
-            preference = "Shown" if user_enabled else "Hidden by you"
-            count_text = f"{status.tickets}/3" if status else "No ticket check recorded yet"
-            managed_text = "Currently managed" if state else "Not currently applied"
-            description = (
-                f"**Your preference:** {preference}\n"
-                f"**Recorded tickets:** {count_text}\n"
-                f"**Nickname status:** {managed_text}\n\n"
-                "Hiding the marker removes only the `· 🎟🎟▫` suffix. Your ticket count "
-                "stays on the server ticket board. You can show it again at any time."
+            tracking_text = "Paused by you"
+
+        if not server_enabled:
+            marker_text = "Disabled for this server"
+        elif not user_enabled:
+            marker_text = "Hidden by you"
+        elif state:
+            marker_text = "Shown and managed"
+        else:
+            marker_text = "Enabled; waiting for a ticket check or sync"
+
+        count_text = f"{status.tickets}/3" if status else "Not currently listed"
+        description = (
+            f"**Ticket tracking:** {tracking_text}\n"
+            f"**Board entry:** {count_text}\n"
+            f"**Nickname marker:** {marker_text}\n\n"
+            "**Remove me from list** deletes only your current board entry. Your next "
+            "ticket check can add you again. **Stop tracking me** removes your entry, "
+            "clears the nickname marker, and ignores future ticket checks until you "
+            "choose **Resume tracking**."
+        )
+        if owner_note:
+            description += (
+                "\n\n⚠️ Discord does not allow bots to edit the server owner's "
+                "nickname, but your board and tracking controls still work."
             )
-            if owner_note:
-                description += (
-                    "\n\n⚠️ Discord does not allow bots to edit the server owner's "
-                    "nickname, so your preference can be saved but no marker can be applied."
-                )
+        if admin_blocked:
+            description += (
+                "\n\n⚠️ A server manager blocked ticket tracking for you. Only a "
+                "server manager can remove that block."
+            )
         if notice:
-            description += f"\n\n✅ {notice}"
+            description += f"\n\n**Update:** {notice}"
         embed = discord.Embed(
-            title="🏷️ My Boss-Ticket Nickname",
+            title="⚙️ My Boss-Ticket Settings",
             description=description,
             color=0x5865F2,
         )
         embed.set_footer(
             text=(
-                "Open this panel with the ticket board button, "
-                "/boss-ticket-nickname, H boss nickname, or HBN."
+                "Open with My settings, /boss-ticket-nickname, "
+                "H boss nickname, or HBN."
             )
         )
         return embed
@@ -2169,22 +2403,30 @@ class TicketTracker(commands.Cog):
                 "This control only works inside a server.", ephemeral=True
             )
             return
-        server_enabled = await self.store.nickname_markers_enabled(interaction.guild_id)
-        user_enabled = await self.store.nickname_marker_allowed(
-            interaction.guild_id, interaction.user.id
-        )
+        guild_id = interaction.guild_id
+        user_id = interaction.user.id
+        server_enabled = await self.store.nickname_markers_enabled(guild_id)
+        user_enabled = await self.store.nickname_marker_allowed(guild_id, user_id)
+        tracking_enabled = user_id not in self.tracking_opt_outs.get(guild_id, set())
+        admin_blocked = user_id in self.blocked_users.get(guild_id, set())
+        status = await self.store.get_status(guild_id, user_id)
         view = TicketNicknamePreferenceView(
             self,
-            interaction.guild_id,
-            interaction.user.id,
+            guild_id,
+            user_id,
             server_enabled=server_enabled,
             user_enabled=user_enabled,
+            tracking_enabled=tracking_enabled,
+            has_status=status is not None,
+            admin_blocked=admin_blocked,
         )
         embed = await self.build_personal_nickname_embed(
-            interaction.guild_id,
-            interaction.user.id,
+            guild_id,
+            user_id,
             server_enabled=server_enabled,
             user_enabled=user_enabled,
+            tracking_enabled=tracking_enabled,
+            admin_blocked=admin_blocked,
         )
         await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
 
@@ -2194,22 +2436,30 @@ class TicketTracker(commands.Cog):
     ) -> None:
         if message.guild is None:
             return
-        server_enabled = await self.store.nickname_markers_enabled(message.guild.id)
-        user_enabled = await self.store.nickname_marker_allowed(
-            message.guild.id, message.author.id
-        )
+        guild_id = message.guild.id
+        user_id = message.author.id
+        server_enabled = await self.store.nickname_markers_enabled(guild_id)
+        user_enabled = await self.store.nickname_marker_allowed(guild_id, user_id)
+        tracking_enabled = user_id not in self.tracking_opt_outs.get(guild_id, set())
+        admin_blocked = user_id in self.blocked_users.get(guild_id, set())
+        status = await self.store.get_status(guild_id, user_id)
         view = TicketNicknamePreferenceView(
             self,
-            message.guild.id,
-            message.author.id,
+            guild_id,
+            user_id,
             server_enabled=server_enabled,
             user_enabled=user_enabled,
+            tracking_enabled=tracking_enabled,
+            has_status=status is not None,
+            admin_blocked=admin_blocked,
         )
         embed = await self.build_personal_nickname_embed(
-            message.guild.id,
-            message.author.id,
+            guild_id,
+            user_id,
             server_enabled=server_enabled,
             user_enabled=user_enabled,
+            tracking_enabled=tracking_enabled,
+            admin_blocked=admin_blocked,
         )
         await message.reply(
             embed=embed,
@@ -2238,15 +2488,19 @@ class TicketTracker(commands.Cog):
                 outcome,
             )
             if outcome in {"restored", "already-cleared", "not-managed", "missing"}:
-                return "Your nickname marker is hidden. Your ticket-board entry remains tracked."
+                return "Your nickname marker is hidden. Your board entry is unchanged."
             if outcome == "owner":
-                return "Your preference is saved. Discord does not allow bots to edit the server owner."
+                return "Your preference is saved. Discord cannot edit the server owner."
             if outcome == "hierarchy":
-                return "Your preference is saved, but I could not restore the name because of role hierarchy."
-            return "Your preference is saved, but I could not fully restore the nickname."
+                return "Your preference is saved, but role hierarchy prevented restoration."
+            return "Your preference is saved, but the nickname could not be fully restored."
 
+        if user_id in self.tracking_opt_outs.get(guild_id, set()):
+            return "Resume ticket tracking before showing a nickname marker."
+        if user_id in self.blocked_users.get(guild_id, set()):
+            return "A server manager has blocked your ticket tracking."
         if not await self.store.nickname_markers_enabled(guild_id):
-            return "Your preference is saved. A server manager must enable nickname markers first."
+            return "Your preference is saved. A manager must enable markers first."
         status = await self.store.get_status(guild_id, user_id)
         if status is None:
             return "Your marker is enabled. Run `w boss t` to record a count and apply it."
@@ -2258,14 +2512,75 @@ class TicketTracker(commands.Cog):
             outcome,
         )
         if outcome in {"updated", "unchanged"}:
-            return "Your nickname marker is enabled and synced to your current ticket count."
+            return "Your marker is enabled and synced to the current ticket count."
         if outcome == "owner":
-            return "Your preference is saved, but Discord does not allow bots to edit the server owner."
+            return "Saved, but Discord cannot edit the server owner's nickname."
         if outcome == "hierarchy":
-            return "Your preference is saved, but my role is not high enough to edit your nickname."
+            return "Saved, but my role is not high enough to edit your nickname."
         if outcome == "permission":
-            return "Your preference is saved, but the bot needs Manage Nicknames permission."
-        return "Your preference is saved, but the nickname could not be updated right now."
+            return "Saved, but the bot needs Manage Nicknames permission."
+        return "Saved, but the nickname could not be updated right now."
+
+    async def remove_personal_ticket_entry(
+        self,
+        guild_id: int,
+        user_id: int,
+    ) -> str:
+        removed = await self.store.remove_status(guild_id, user_id)
+        self.drop_pending_for_user(guild_id, user_id)
+        await self.clear_ticket_nickname(
+            guild_id,
+            user_id,
+            reason="Member removed their OwO boss-ticket board entry",
+        )
+        if await self.store.get_config(guild_id) is not None:
+            await self.refresh_board(guild_id)
+        logger.info(
+            "User %s removed their own ticket entry in guild %s",
+            user_id,
+            guild_id,
+        )
+        if removed is None:
+            return "You were already absent from the ticket list."
+        return "Your current entry was removed. A later `w boss t` can add you again."
+
+    async def set_personal_tracking_preference(
+        self,
+        guild_id: int,
+        user_id: int,
+        enabled: bool,
+    ) -> str:
+        if enabled and user_id in self.blocked_users.get(guild_id, set()):
+            return "A server manager blocked your tracking. Ask a manager to unblock you."
+
+        await self.store.set_ticket_tracking_allowed(guild_id, user_id, enabled)
+        opted_out = self.tracking_opt_outs.setdefault(guild_id, set())
+        if enabled:
+            opted_out.discard(user_id)
+            logger.info(
+                "User %s resumed ticket tracking in guild %s",
+                user_id,
+                guild_id,
+            )
+            return "Ticket tracking resumed. Run `w boss t` to add your current count."
+
+        opted_out.add(user_id)
+        removed = await self.store.remove_status(guild_id, user_id)
+        self.drop_pending_for_user(guild_id, user_id)
+        await self.clear_ticket_nickname(
+            guild_id,
+            user_id,
+            reason="Member opted out of OwO boss-ticket tracking",
+        )
+        if await self.store.get_config(guild_id) is not None:
+            await self.refresh_board(guild_id)
+        logger.info(
+            "User %s opted out of ticket tracking in guild %s",
+            user_id,
+            guild_id,
+        )
+        suffix = " and your current entry was removed" if removed else ""
+        return f"Ticket tracking is paused{suffix}. Future ticket checks will be ignored."
 
     async def add_ticket_command_marker_reaction(
         self,
@@ -2413,6 +2728,13 @@ class TicketTracker(commands.Cog):
                 message.guild.id,
             )
             return False
+        if message.author.id in self.tracking_opt_outs.get(message.guild.id, set()):
+            logger.info(
+                "Ignored ticket check from opted-out user %s in guild %s",
+                message.author.id,
+                message.guild.id,
+            )
+            return False
         pending = self.purge_pending(message.channel.id)
         pending = [item for item in pending if item.user_id != message.author.id]
         pending.append(
@@ -2519,6 +2841,7 @@ class TicketTracker(commands.Cog):
         if self._restored:
             return
         self._restored = True
+        await ensure_ui_emojis(self.bot)
         changed_guilds = await self.store.reset_all_for_current_cycle()
         configured = await self.store.list_configured_guilds()
         for guild_id in configured:
@@ -2576,6 +2899,14 @@ class TicketTracker(commands.Cog):
             self.consume_pending(request)
             logger.info(
                 "Ignored completed ticket response from blocked user %s in guild %s",
+                request.user_id,
+                request.guild_id,
+            )
+            return True
+        if request.user_id in self.tracking_opt_outs.get(request.guild_id, set()):
+            self.consume_pending(request)
+            logger.info(
+                "Ignored completed ticket response from opted-out user %s in guild %s",
                 request.user_id,
                 request.guild_id,
             )
@@ -2721,7 +3052,16 @@ class TicketTracker(commands.Cog):
                     await self.send_ticket_list(message)
                     return
                 if is_ticket_command(message.content or ""):
-                    self.arm_ticket_request(message)
+                    armed = self.arm_ticket_request(message)
+                    if (
+                        not armed
+                        and message.author.id
+                        in self.tracking_opt_outs.get(message.guild.id, set())
+                    ):
+                        try:
+                            await message.add_reaction("⏸️")
+                        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                            pass
                 return
 
             if message.author.id != OWO_BOT_ID:
@@ -3027,6 +3367,14 @@ class TicketTracker(commands.Cog):
         title = message.embeds[0].title or ""
         return "Ping view" in title
 
+    def ticket_icons(self, tickets: int) -> str:
+        tickets = max(0, min(MAX_TICKETS, tickets))
+        available = ui_emoji_text(self.bot, "ticket_available", "🎟️")
+        used = ui_emoji_text(self.bot, "ticket_used", "▫️")
+        return "".join(
+            [available] * tickets + [used] * (MAX_TICKETS - tickets)
+        )
+
     def build_board_embed(
         self,
         statuses: list[TicketStatus],
@@ -3048,47 +3396,48 @@ class TicketTracker(commands.Cog):
         )
 
         if current:
-            lines = []
+            lines: list[str] = []
             for status in current:
-                icon = "🎟️" if status.tickets else "▫️"
+                ticket_icons = self.ticket_icons(status.tickets)
                 account_name = (
                     f"@{status.account_username}"
                     if status.account_username
                     else "@unknown"
                 )
                 if mention_mode:
-                    identity = f"<@{status.user_id}> — `{account_name}`"
+                    identity = f"<@{status.user_id}> · `{account_name}`"
+                    trailing = f"<t:{status.updated_at}:R>"
                 else:
                     safe_name = discord.utils.escape_markdown(status.username)
-                    identity = f"**{safe_name}** — `{account_name}`"
+                    identity = f"**{safe_name}** · `{account_name}`"
+                    trailing = f"`{status.user_id}` · <t:{status.updated_at}:R>"
                 lines.append(
-                    f"{icon} **{status.tickets}/3** — {identity} — "
-                    f"`{status.user_id}` — <t:{status.updated_at}:R>"
+                    f"{ticket_icons} **{status.tickets}/3** · {identity} · {trailing}"
                 )
             body = "\n".join(lines)
         else:
             body = (
-                "No ticket checks have been recorded yet. Run `owo boss t` or "
-                "`w boss t` anywhere in this server to add your current count."
+                "No ticket checks are currently listed. Run `owo boss t` or "
+                "`w boss t` to add your current count."
             )
 
-        title = "🎟️ Guild Boss Tickets"
+        title_icon = ui_emoji_text(self.bot, "ticket_available", "🎟️")
+        title = f"{title_icon} Guild Boss Tickets"
         if page_count > 1:
-            title += f" — Page {page + 1}/{page_count}"
-        title += " — Ping view" if mention_mode else " — Text view"
+            title += f" · Page {page + 1}/{page_count}"
+        title += " · Ping view" if mention_mode else " · Text view"
         embed = discord.Embed(
             title=title,
             description=(
                 f"{summary}\n\n{body}\n\n"
-                f"**All tickets replenish:** <t:{next_reset}:R> "
-                f"(<t:{next_reset}:F>)"
+                f"**Next refill:** <t:{next_reset}:R> · <t:{next_reset}:F>"
             ),
             color=0x5865F2,
         )
         embed.set_footer(
             text=(
-                "Use Ping view for clickable members and Text view for stored names. "
-                "Names refresh when a page is opened. Tickets replenish at Pacific midnight."
+                "Ping view shows clickable members. My settings controls your "
+                "nickname marker, board entry, and tracking preference."
             )
         )
         return embed

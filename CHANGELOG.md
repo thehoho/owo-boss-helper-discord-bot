@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.2-beta
+
+- Fixed large ticket-board button interactions timing out while visible-page member identities were fetched.
+- Added immediate interaction acknowledgement, bounded concurrent member refreshes, and a 10-minute identity cache.
+- Added an error response and detailed logging instead of silent `This interaction failed` messages.
+- Reduced ticket-board pages to 15 entries so three custom ticket emojis per member remain safely below Discord embed limits.
+- Activated application-owned UI emojis from `assets/ui_emojis/`; missing emojis are created automatically on startup and existing names are reused.
+- Replaced ticket-board ticket indicators and guild-boss appeared, escaped, and defeated titles with the new application emojis.
+- Added **My settings** controls for members to remove their own current board entry, pause ticket tracking completely, or resume tracking later.
+- Added persistent per-server member tracking preferences in `boss_tickets.db`; no manual database migration is required.
+- Kept nickname-marker reactions and personal show/hide controls.
+- Updated the public bot version to `0.10.2-beta`.
+
 ## 0.10.1-beta
 
 - Fixed HP extraction when three or more OwO pixel-font digits touch horizontally, including endings such as `444` and groups such as `744`.

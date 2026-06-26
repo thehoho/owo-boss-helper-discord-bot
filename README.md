@@ -59,18 +59,19 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Stores reported `0/3`–`3/3` counts per server.
 - Maintains one persistent board in a configured channel.
 - Shows display name, exact Discord account username, numeric user ID, ticket count, update time, and next replenishment.
-- Keeps the persistent board and manual ticket-list responses in a single Discord message, with Previous and Next buttons for large lists.
-- Adds **Text view** and **Ping view** buttons. Ping view uses clickable member mentions without notifying users.
+- Keeps the persistent board and manual ticket-list responses in a single Discord message, with Previous and Next buttons for large lists. Pages contain up to 15 entries so custom ticket emoji markup remains safely within Discord embed limits.
+- Adds **Text view** and **Ping view** buttons. Ping view uses clickable member mentions without notifying users. Large-page interactions are acknowledged immediately before identity refreshes, preventing Discord interaction timeouts.
 - Refreshes names for the visible page from known tracked user IDs, so changed Discord names are corrected without requiring Guild Members Intent.
 - Provides a visual ticket management panel for server managers, including remove, block tracking, and unblock actions.
 - Supports optional per-server ticket markers in member nicknames, disabled by default and managed through `HBS`.
-- Gives every member private UI controls to show or hide only their own marker without removing their ticket-board entry.
-- Adds a persistent **My nickname** button to ticket boards plus `/boss-ticket-nickname`, `H boss nickname`, and `HBN`.
+- Gives every member private controls to show or hide their marker, remove their current board entry, stop ticket tracking completely, or resume it later.
+- Adds a persistent **My settings** button to ticket boards plus `/boss-ticket-nickname`, `H boss nickname`, and `HBN`.
 - Safely restores managed nicknames when markers are disabled, a member opts out, or a ticket entry is removed or blocked.
 - Supports paginated managed user selection for servers with more than 25 tracked or blocked users.
 - Uses `America/Los_Angeles` so Pacific daylight-saving changes are handled automatically.
 - Supports manual list display and board refresh commands.
 - Reads Components V2 ticket responses from both message-create and message-edit events, with a bounded raw-message fallback only after an explicit ticket request.
+- Loads the five PNG files under `assets/ui_emojis/` as application-owned Discord emojis on startup. Existing application emoji names are reused and missing names are created automatically.
 
 ### Developer information and operational statistics
 
@@ -159,6 +160,20 @@ Optional permissions:
 - Manage Nicknames — allows a server manager to enable optional ticket markers through `HBS`. The bot role must be above members whose nicknames it edits.
 
 The bot does not require Administrator permission.
+
+### Application-owned UI emojis
+
+Keep these files in `assets/ui_emojis/`:
+
+```text
+ticket_available.png
+ticket_used.png
+boss_appeared.png
+boss_escaped.png
+boss_defeated.png
+```
+
+On startup the bot lists its application-owned emojis, reuses matching names, and creates any missing names from these source PNGs. Application emojis do not require the destination server's **Use External Emojis** permission. If artwork is changed later, delete the old application emoji from the Developer Portal once so the bot can recreate it from the new file.
 
 ## Commands
 
@@ -341,11 +356,11 @@ The marker format uses Unicode so it works without custom server emojis:
 0/3 → Falcon · ▫▫▫
 ```
 
-The helper changes only the server nickname, preserves prefixes added by tools such as AFK bots, and removes only its own suffix when restoring a name. Custom ticket emojis are intentionally reserved for a later UI update.
+The helper changes only the server nickname, preserves prefixes added by tools such as AFK bots, and removes only its own suffix when restoring a name. Discord nicknames are plain text, so the nickname suffix continues to use Unicode; the custom PNG emojis are used in bot messages and embeds.
 
-### Personal nickname control
+### Personal ticket controls
 
-Every member can privately control only their own nickname marker with:
+Every member can privately control their own nickname marker and ticket-list participation with:
 
 ```text
 /boss-ticket-nickname
@@ -353,7 +368,12 @@ H boss nickname
 HBN
 ```
 
-They can also click **My nickname** under any ticket-board message. **Hide my marker** removes only the ticket suffix; it does not remove the member from the ticket list or stop ticket tracking. **Show my marker** reapplies the latest recorded count, or waits for the next `w boss t` check when no count exists yet.
+They can also click **My settings** under any ticket-board message. The private panel provides:
+
+- **Show marker / Hide marker** — changes only the nickname suffix.
+- **Remove me from list** — deletes the current board entry, but the next `w boss t` can add it again.
+- **Stop tracking me** — removes the current entry and ignores later ticket checks until the member resumes tracking.
+- **Resume tracking** — allows the next ticket check to add the member again.
 
 After a successful ticket check, the helper reacts to the member's command with:
 
@@ -448,7 +468,7 @@ logs/
 
 These files are ignored by Git.
 
-When moving the bot to another computer or host, copy `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, and `boss_cooldown_config.json` to preserve saved teams, ticket data, optional nickname-marker settings, personal marker preferences, managed nickname restoration state, developer statistics, board configuration, and boss watcher state.
+When moving the bot to another computer or host, copy `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, and `boss_cooldown_config.json` to preserve saved teams, ticket data, personal tracking and nickname preferences, managed nickname restoration state, developer statistics, board configuration, and boss watcher state.
 
 ## Project structure
 
@@ -456,9 +476,10 @@ When moving the bot to another computer or host, copy `team_templates.db`, `boss
 owo-boss-helper-discord-bot/
 ├── assets/
 │   ├── hp_digits/
-│   └── ui_emojis/                 # reserved source PNGs for the UI emoji update
+│   └── ui_emojis/                 # source PNGs auto-synced as application emojis
 ├── cogs/
 │   ├── __init__.py
+│   ├── ui_emojis.py
 │   ├── boss_generator.py
 │   ├── team_templates.py
 │   ├── ticket_tracker.py

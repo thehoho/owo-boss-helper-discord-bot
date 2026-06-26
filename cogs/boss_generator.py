@@ -33,6 +33,8 @@ from PIL import Image
 from discord import app_commands
 from discord.ext import commands
 
+from .ui_emojis import ensure_ui_emojis, ui_emoji_text
+
 
 logger = logging.getLogger(__name__)
 
@@ -1173,6 +1175,9 @@ class BossGenerator(commands.Cog):
         self.hp_templates = load_hp_templates()
         self._restored = False
 
+    def ui_emoji(self, name: str, fallback: str) -> str:
+        return ui_emoji_text(self.bot, name, fallback)
+
     def cog_unload(self) -> None:
         for task in self.cooldown_tasks.values():
             task.cancel()
@@ -1320,7 +1325,7 @@ class BossGenerator(commands.Cog):
             color=0x5865F2,
         )
         embed.add_field(
-            name="⚔️ Boss command generator",
+            name=f"{self.ui_emoji('boss_appeared', '⚔️')} Boss command generator",
             value=(
                 "Send `owo boss i` or `w boss i`, then open pages `1/3`, `2/3`, "
                 "and `3/3`."
@@ -1343,8 +1348,9 @@ class BossGenerator(commands.Cog):
                 "**Text view** and clickable **Ping view** controls. Managers use "
                 "`HBS` / `H boss settings` / `/boss-ticket-manage` to remove or "
                 "block users and optionally enable nickname markers. Members control "
-                "their own marker with the board's **My nickname** button, "
-                "`/boss-ticket-nickname`, `H boss nickname`, or `HBN`. A `🏷️` reaction "
+                "their own marker, board entry, and tracking preference with the "
+                "board's **My settings** button, `/boss-ticket-nickname`, "
+                "`H boss nickname`, or `HBN`. A `🏷️` reaction "
                 "means the marker was applied; `🔕` means that member chose to hide it. "
                 "Nickname markers require **Manage Nicknames** and proper role order."
             ),
@@ -1392,6 +1398,7 @@ class BossGenerator(commands.Cog):
         if self._restored:
             return
         self._restored = True
+        await ensure_ui_emojis(self.bot)
         if self.http_session is None or self.http_session.closed:
             self.http_session = aiohttp.ClientSession()
         await self.restore_cooldowns()
@@ -2205,7 +2212,7 @@ class BossGenerator(commands.Cog):
 
         if cooldown_end > now:
             embed = discord.Embed(
-                title="⏳ Guild Boss Cooldown",
+                title=f"{self.ui_emoji('boss_defeated', '⏳')} Guild Boss Cooldown",
                 description=(
                     "The guild boss was **defeated**.\n\n"
                     f"**Next boss cooldown ends:** <t:{cooldown_end}:R>\n"
@@ -2253,14 +2260,14 @@ class BossGenerator(commands.Cog):
                     "a complete status card."
                 )
             return discord.Embed(
-                title="⚔️ Guild Boss Active",
+                title=f"{self.ui_emoji('boss_appeared', '⚔️')} Guild Boss Active",
                 description=description,
                 color=0x5865F2,
             )
 
         if result == "escaped":
             return discord.Embed(
-                title="✅ No Active Guild Boss",
+                title=f"{self.ui_emoji('boss_escaped', '✅')} No Active Guild Boss",
                 description=(
                     "The previous guild boss **escaped**. There is no cooldown after an "
                     "escape, and no new boss has been detected yet. Keep grinding to "
@@ -2348,7 +2355,7 @@ class BossGenerator(commands.Cog):
         try:
             await channel.send(
                 embed=discord.Embed(
-                    title="🏃 Guild Boss Escaped",
+                    title=f"{self.ui_emoji('boss_escaped', '🏃')} Guild Boss Escaped",
                     description=(
                         "The guild boss escaped. There is **no cooldown after an "
                         "escape**, so a new guild boss can appear immediately."
@@ -2381,7 +2388,7 @@ class BossGenerator(commands.Cog):
         try:
             await channel.send(
                 embed=discord.Embed(
-                    title="⚔️ New Guild Boss Appeared",
+                    title=f"{self.ui_emoji('boss_appeared', '⚔️')} New Guild Boss Appeared",
                     description=description,
                     color=0x5865F2,
                 )
@@ -2405,7 +2412,7 @@ class BossGenerator(commands.Cog):
         try:
             await channel.send(
                 embed=discord.Embed(
-                    title="✅ Guild Boss Ready",
+                    title=f"{self.ui_emoji('boss_defeated', '✅')} Guild Boss Ready",
                     description=(
                         "The 5-minute cooldown has ended. "
                         "A new guild boss can now appear."

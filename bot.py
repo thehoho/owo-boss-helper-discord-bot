@@ -99,6 +99,8 @@ async def on_ready() -> None:
 
 async def main() -> None:
     async with bot:
+        await bot.load_extension("cogs.ui_emojis")
+        logger.info("Application emoji manager loaded")
         await bot.load_extension("cogs.boss_generator")
         logger.info("Boss generator and cooldown tracker loaded")
         await bot.load_extension("cogs.team_templates")
