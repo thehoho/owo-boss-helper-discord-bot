@@ -1,0 +1,91 @@
+     async def send_management_panel(
+@@ -1095,7 +1818,13 @@ class TicketTracker(commands.Cog):
+         ephemeral: bool = False,
+     ) -> None:
+         entries = await self.management_entries(guild_id)
+-        view = TicketManagementView(self, guild_id, entries)
++        nickname_enabled = await self.store.nickname_markers_enabled(guild_id)
++        view = TicketManagementView(
++            self,
++            guild_id,
++            entries,
++            nickname_enabled=nickname_enabled,
++        )
+         kwargs: dict[str, Any] = {
+             "embed": self.build_management_embed(view),
+             "view": view,
+@@ -1234,6 +1963,21 @@ class TicketTracker(commands.Cog):
+                 await self.refresh_board(guild_id)
+             except Exception:
+                 logger.exception("Could not restore ticket board for guild %s", guild_id)
++        for guild_id in changed_guilds:
++            if not await self.store.nickname_markers_enabled(guild_id):
++                continue
++            try:
++                result = await self.sync_guild_nicknames(guild_id)
++                logger.info(
++                    "Synced ticket nickname reset for guild %s: %s processed",
++                    guild_id,
++                    result.total_processed,
++                )
++            except Exception:
++                logger.exception(
++                    "Could not sync ticket nicknames after startup reset for guild %s",
++                    guild_id,
++                )
+         if changed_guilds:
+             logger.info("Replenished stale boss-ticket entries for %s guild(s)", len(changed_guilds))
+ 
+@@ -1289,6 +2033,18 @@ class TicketTracker(commands.Cog):
+             request.guild_id,
+             tickets,
+         )
++        nickname_result = await self.apply_ticket_nickname(
++            request.guild_id,
++            request.user_id,
++            tickets,
++        )
++        if nickname_result not in {"disabled", "unchanged"}:
++            logger.info(
++                "Ticket nickname result for user %s in guild %s: %s",
++                request.user_id,
++                request.guild_id,
++                nickname_result,
++            )
+         if await self.store.get_config(request.guild_id) is not None:
+             await self.refresh_board(request.guild_id)
+         return True
+@@ -1543,6 +2299,11 @@ class TicketTracker(commands.Cog):
+         await interaction.response.defer(ephemeral=True)
+         removed = await self.store.remove_status(interaction.guild_id, target_id)
+         self.drop_pending_for_user(interaction.guild_id, target_id)
++        await self.clear_ticket_nickname(
++            interaction.guild_id,
++            target_id,
++            reason="Boss-ticket entry removed",
++        )
+         if removed is None:
+             await interaction.followup.send(
+                 f"No ticket entry exists for `{target_id}` in this server.",
+@@ -1792,6 +2553,21 @@ class TicketTracker(commands.Cog):
+                             "Could not refresh ticket board after daily reset for guild %s",
+                             guild_id,
+                         )
++                for guild_id in changed_guilds:
++                    if not await self.store.nickname_markers_enabled(guild_id):
++                        continue
++                    try:
++                        result = await self.sync_guild_nicknames(guild_id)
++                        logger.info(
++                            "Synced Pacific-midnight ticket nicknames for guild %s: %s processed",
++                            guild_id,
++                            result.total_processed,
++                        )
++                    except Exception:
++                        logger.exception(
++                            "Could not sync ticket nicknames after daily reset for guild %s",
++                            guild_id,
++                        )
+                 logger.info(
+                     "Replenished Pacific-midnight boss-ticket entries; %s guild(s) changed",
+                     len(changed_guilds),
