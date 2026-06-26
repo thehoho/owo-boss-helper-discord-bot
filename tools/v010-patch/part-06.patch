@@ -1,0 +1,169 @@
++        if guild is None:
++            return False, "I cannot access this server right now."
++        bot_member = guild.me
++        if bot_member is None and self.bot.user is not None:
++            try:
++                bot_member = await guild.fetch_member(self.bot.user.id)
++            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
++                bot_member = None
++        if bot_member is None:
++            return False, "I could not check my server permissions."
++        if not bot_member.guild_permissions.manage_nicknames:
++            return (
++                False,
++                "Grant my bot role **Manage Nicknames**, then reopen `HBS`. "
++                "The role must also be above members whose names should be updated.",
++            )
++        return True, "Nickname markers are ready."
++
++    async def fetch_known_member(
++        self, guild: discord.Guild, user_id: int
++    ) -> discord.Member | None:
++        member = guild.get_member(user_id)
++        if member is not None:
++            return member
++        try:
++            return await guild.fetch_member(user_id)
++        except discord.NotFound:
++            return None
++        except (discord.Forbidden, discord.HTTPException) as exc:
++            logger.warning(
++                "Could not fetch member %s in guild %s for ticket nickname: %s",
++                user_id,
++                guild.id,
++                exc,
++            )
++            return None
++
++    def nickname_edit_status(
++        self,
++        guild: discord.Guild,
++        member: discord.Member,
++    ) -> str | None:
++        if member.id == guild.owner_id:
++            return "owner"
++        bot_member = guild.me
++        if bot_member is None:
++            return "permission"
++        if not bot_member.guild_permissions.manage_nicknames:
++            return "permission"
++        if self.bot.user is not None and member.id == self.bot.user.id:
++            return "hierarchy"
++        if bot_member.top_role <= member.top_role:
++            return "hierarchy"
++        return None
++
++    @staticmethod
++    def add_nickname_result(result: NicknameSyncResult, status: str) -> None:
++        field = {
++            "updated": "updated",
++            "unchanged": "unchanged",
++            "restored": "restored",
++            "missing": "missing",
++            "owner": "skipped_owner",
++            "hierarchy": "skipped_hierarchy",
++            "permission": "missing_permission",
++            "failed": "failed",
++            "already-cleared": "unchanged",
++            "not-managed": "unchanged",
++            "disabled": "unchanged",
++        }.get(status, "failed")
++        setattr(result, field, getattr(result, field) + 1)
++
++    @staticmethod
++    def nickname_result_text(prefix: str, result: NicknameSyncResult) -> str:
++        parts: list[str] = []
++        if result.updated:
++            parts.append(f"{result.updated} updated")
++        if result.restored:
++            parts.append(f"{result.restored} restored")
++        if result.unchanged:
++            parts.append(f"{result.unchanged} unchanged")
++        if result.skipped_owner:
++            parts.append(f"{result.skipped_owner} server owner skipped")
++        if result.skipped_hierarchy:
++            parts.append(f"{result.skipped_hierarchy} above/equal role skipped")
++        if result.missing_permission:
++            parts.append(f"{result.missing_permission} missing permission")
++        if result.missing:
++            parts.append(f"{result.missing} no longer in server")
++        if result.failed:
++            parts.append(f"{result.failed} failed")
++        return f"{prefix}: " + (", ".join(parts) if parts else "nothing to change") + "."
++
++    async def apply_ticket_nickname(
++        self,
++        guild_id: int,
++        user_id: int,
++        tickets: int,
++    ) -> str:
++        async with self.nickname_user_lock(guild_id, user_id):
++            return await self._apply_ticket_nickname_unlocked(
++                guild_id,
++                user_id,
++                tickets,
++            )
++
++    async def _apply_ticket_nickname_unlocked(
++        self,
++        guild_id: int,
++        user_id: int,
++        tickets: int,
++    ) -> str:
++        if not await self.store.nickname_markers_enabled(guild_id):
++            return "disabled"
++        guild = self.bot.get_guild(guild_id)
++        if guild is None:
++            return "missing"
++        member = await self.fetch_known_member(guild, user_id)
++        if member is None:
++            return "missing"
++        edit_status = self.nickname_edit_status(guild, member)
++        if edit_status is not None:
++            logger.info(
++                "Skipped ticket nickname for user %s in guild %s: %s",
++                user_id,
++                guild_id,
++                edit_status,
++            )
++            return edit_status
++
++        state = await self.store.get_nickname_state(guild_id, user_id)
++        current_nickname = member.nick
++        if state is None:
++            # On the first application, preserve the complete existing nickname even
++            # if it coincidentally resembles our marker format.
++            base_nickname = current_nickname
++        elif current_nickname == state.last_applied_nickname:
++            base_nickname = state.base_nickname
++        else:
++            # Another bot or an administrator changed the name after our last edit.
++            # Preserve that change while removing only our known suffix.
++            base_nickname = strip_ticket_nickname_marker(current_nickname)
++
++        display_base = (
++            base_nickname
++            or getattr(member, "global_name", None)
++            or member.name
++        )
++        new_nickname = build_ticket_nickname(display_base, tickets)
++        if current_nickname == new_nickname:
++            await self.store.save_nickname_state(
++                guild_id,
++                user_id,
++                base_nickname,
++                new_nickname,
++            )
++            return "unchanged"
++
++        try:
++            await member.edit(
++                nick=new_nickname,
++                reason=f"OwO boss tickets updated to {tickets}/3",
++            )
++        except discord.Forbidden:
++            logger.warning(
++                "Missing permission or role hierarchy for ticket nickname user %s in guild %s",
++                user_id,
++                guild_id,
++            )
