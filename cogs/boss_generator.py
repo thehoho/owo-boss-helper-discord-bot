@@ -630,13 +630,12 @@ def _recognize_hp_run(
     glyph_mask: list[list[bool]],
     templates: dict[str, list[Image.Image]],
 ) -> list[tuple[str, float]]:
-    """Recognize one projected run, splitting two touching digits when needed.
+    """Recognize one projected run, including several touching digits.
 
-    OwO's pixel font occasionally renders adjacent digits without a completely blank
-    column between them. A known example is ``74``, which appears as one 15-pixel
-    run. Treating that run as a single glyph can look vaguely like ``0``. For wide
-    runs, try every sensible two-digit split and use it only when both resulting
-    characters are strong digit matches.
+    OwO's pixel font can join adjacent digits into one continuous horizontal run.
+    Earlier builds could split only two touching digits, so sequences such as
+    ``444`` or ``744`` were treated as one glyph and the HP reader fell back to
+    its default value. This version scores dynamic 2–6 digit segmentations.
     """
     glyph = _normalize_glyph(glyph_mask)
     if glyph is None:
@@ -645,43 +644,118 @@ def _recognize_hp_run(
     single_char, single_score = _best_glyph_match(glyph, templates)
     width = len(glyph_mask[0]) if glyph_mask else 0
 
-    # Normal OwO digits are roughly 3-8 pixels wide. Runs wider than 10 pixels
-    # are usually two touching digits rather than one legitimate character.
-    if width > 10:
-        digit_chars = set("0123456789")
-        best_pair: list[tuple[str, float]] | None = None
-        best_pair_score = -1.0
+    # Normal OwO digits are roughly 3–8 pixels wide. Runs wider than eight
+    # columns may contain multiple touching digits and need segmentation.
+    if width <= 8:
+        return [(single_char, single_score)] if single_char is not None else []
 
-        for split_at in range(3, width - 2):
-            left_mask = [row[:split_at] for row in glyph_mask]
-            right_mask = [row[split_at:] for row in glyph_mask]
-            left_glyph = _normalize_glyph(left_mask)
-            right_glyph = _normalize_glyph(right_mask)
-            if left_glyph is None or right_glyph is None:
-                continue
+    digit_chars = set("0123456789")
+    min_segment_width = 3
+    max_segment_width = 10
+    max_digits = min(6, width // min_segment_width)
+    expected_digits = max(2, min(max_digits, round(width / 7.5)))
 
-            left_char, left_score = _best_glyph_match(
-                left_glyph, templates, digit_chars
+    segment_cache: dict[tuple[int, int], tuple[str, float] | None] = {}
+
+    def match_segment(left: int, right: int) -> tuple[str, float] | None:
+        key = (left, right)
+        if key in segment_cache:
+            return segment_cache[key]
+
+        segment_mask = [row[left:right] for row in glyph_mask]
+        segment_glyph = _normalize_glyph(segment_mask)
+        if segment_glyph is None:
+            segment_cache[key] = None
+            return None
+
+        char, score = _best_glyph_match(
+            segment_glyph,
+            templates,
+            digit_chars,
+        )
+        result = (char, score) if char is not None else None
+        segment_cache[key] = result
+        return result
+
+    best_parts: list[tuple[str, float]] | None = None
+    best_quality = -1.0
+
+    # Dynamic programming keeps the search bounded even for four or more touching
+    # digits. Each state stores the strongest segmentation from this column.
+    for digit_count in range(2, max_digits + 1):
+        memo: dict[tuple[int, int], tuple[list[tuple[str, float]], float] | None] = {}
+
+        def solve(
+            position: int,
+            remaining: int,
+        ) -> tuple[list[tuple[str, float]], float] | None:
+            key = (position, remaining)
+            if key in memo:
+                return memo[key]
+
+            columns_left = width - position
+            if (
+                columns_left < remaining * min_segment_width
+                or columns_left > remaining * max_segment_width
+            ):
+                memo[key] = None
+                return None
+
+            if remaining == 1:
+                matched = match_segment(position, width)
+                if matched is None:
+                    memo[key] = None
+                    return None
+                char, score = matched
+                memo[key] = ([(char, score)], score)
+                return memo[key]
+
+            best: tuple[list[tuple[str, float]], float] | None = None
+            minimum_end = position + min_segment_width
+            maximum_end = min(
+                position + max_segment_width,
+                width - (remaining - 1) * min_segment_width,
             )
-            right_char, right_score = _best_glyph_match(
-                right_glyph, templates, digit_chars
-            )
-            if left_char is None or right_char is None:
-                continue
+            for end_at in range(minimum_end, maximum_end + 1):
+                matched = match_segment(position, end_at)
+                if matched is None:
+                    continue
+                char, score = matched
+                tail = solve(end_at, remaining - 1)
+                if tail is None:
+                    continue
+                tail_parts, tail_score = tail
+                total_score = score + tail_score
+                if best is None or total_score > best[1]:
+                    best = ([(char, score), *tail_parts], total_score)
 
-            pair_score = (left_score + right_score) / 2
-            if pair_score > best_pair_score:
-                best_pair_score = pair_score
-                best_pair = [(left_char, left_score), (right_char, right_score)]
+            memo[key] = best
+            return best
 
-        # Require both halves to be convincing and materially better than treating
-        # the entire wide run as one character.
-        if (
-            best_pair
-            and min(score for _, score in best_pair) >= 0.60
-            and best_pair_score >= single_score + 0.15
-        ):
-            return best_pair
+        candidate = solve(0, digit_count)
+        if candidate is None:
+            continue
+
+        parts, total_score = candidate
+        scores = [score for _, score in parts]
+        average_score = total_score / digit_count
+        minimum_score = min(scores)
+
+        # Prefer convincing glyph matches and a digit count that agrees with the
+        # physical width of the run. The width prior prevents a 23-pixel ``444``
+        # run from being over-segmented into four weak digits.
+        quality = (
+            average_score
+            + minimum_score * 0.20
+            - abs(digit_count - expected_digits) * 0.04
+            - abs((width / digit_count) - 7.5) * 0.01
+        )
+        if minimum_score >= 0.50 and average_score >= 0.58 and quality > best_quality:
+            best_parts = parts
+            best_quality = quality
+
+    if best_parts is not None:
+        return best_parts
 
     return [(single_char, single_score)] if single_char is not None else []
 
@@ -1265,7 +1339,8 @@ class BossGenerator(commands.Cog):
             name="🎟️ Boss tickets",
             value=(
                 "Update with `owo boss t` / `w boss t`; view with `H boss t`, "
-                "`H boss list`, `HBL`, or `/boss-ticket-list`. Managers use "
+                "`H boss list`, `HBL`, or `/boss-ticket-list`. Ticket boards include "
+                "**Text view** and clickable **Ping view** controls. Managers use "
                 "`HBS` / `H boss settings` / `/boss-ticket-manage` to remove or "
                 "block users and optionally enable nickname markers. Members control "
                 "their own marker with the board's **My nickname** button, "

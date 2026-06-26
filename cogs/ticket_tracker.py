@@ -93,6 +93,7 @@ class PendingTicketRequest:
     user_id: int
     command_message_id: int
     username: str
+    account_username: str
     identity_tokens: tuple[str, ...]
     created_at: float
 
@@ -102,6 +103,7 @@ class TicketStatus:
     guild_id: int
     user_id: int
     username: str
+    account_username: str
     tickets: int
     updated_at: int
     cycle_date: str
@@ -394,6 +396,7 @@ class TicketStore:
                     guild_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
                     username TEXT NOT NULL,
+                    account_username TEXT NOT NULL DEFAULT '',
                     tickets INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
                     cycle_date TEXT NOT NULL,
@@ -401,6 +404,15 @@ class TicketStore:
                 )
                 """
             )
+            ticket_status_columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(ticket_status)")
+            }
+            if "account_username" not in ticket_status_columns:
+                connection.execute(
+                    "ALTER TABLE ticket_status "
+                    "ADD COLUMN account_username TEXT NOT NULL DEFAULT ''"
+                )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_ticket_status_guild "
                 "ON ticket_status(guild_id, tickets DESC, username COLLATE NOCASE)"
@@ -534,6 +546,7 @@ class TicketStore:
         guild_id: int,
         user_id: int,
         username: str,
+        account_username: str,
         tickets: int,
     ) -> None:
         async with self.lock:
@@ -542,6 +555,7 @@ class TicketStore:
                 guild_id,
                 user_id,
                 username,
+                account_username,
                 tickets,
             )
 
@@ -550,6 +564,7 @@ class TicketStore:
         guild_id: int,
         user_id: int,
         username: str,
+        account_username: str,
         tickets: int,
     ) -> None:
         now = int(time.time())
@@ -559,16 +574,75 @@ class TicketStore:
             connection.execute(
                 """
                 INSERT INTO ticket_status
-                    (guild_id, user_id, username, tickets, updated_at, cycle_date)
-                VALUES (?, ?, ?, ?, ?, ?)
+                    (
+                        guild_id,
+                        user_id,
+                        username,
+                        account_username,
+                        tickets,
+                        updated_at,
+                        cycle_date
+                    )
+                VALUES (?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(guild_id, user_id) DO UPDATE SET
                     username = excluded.username,
+                    account_username = excluded.account_username,
                     tickets = excluded.tickets,
                     updated_at = excluded.updated_at,
                     cycle_date = excluded.cycle_date
                 """,
-                (guild_id, user_id, username[:100], tickets, now, cycle),
+                (
+                    guild_id,
+                    user_id,
+                    username[:100],
+                    account_username[:100],
+                    tickets,
+                    now,
+                    cycle,
+                ),
             )
+
+    async def update_identity(
+        self,
+        guild_id: int,
+        user_id: int,
+        username: str,
+        account_username: str,
+    ) -> bool:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._update_identity_sync,
+                guild_id,
+                user_id,
+                username,
+                account_username,
+            )
+
+    def _update_identity_sync(
+        self,
+        guild_id: int,
+        user_id: int,
+        username: str,
+        account_username: str,
+    ) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE ticket_status
+                SET username = ?, account_username = ?
+                WHERE guild_id = ? AND user_id = ?
+                  AND (username <> ? OR account_username <> ?)
+                """,
+                (
+                    username[:100],
+                    account_username[:100],
+                    guild_id,
+                    user_id,
+                    username[:100],
+                    account_username[:100],
+                ),
+            )
+        return cursor.rowcount > 0
 
     async def normalize_guild_cycle(self, guild_id: int) -> bool:
         async with self.lock:
@@ -633,7 +707,7 @@ class TicketStore:
         with self._connect() as connection:
             row = connection.execute(
                 """
-                SELECT guild_id, user_id, username, tickets, updated_at, cycle_date
+                SELECT guild_id, user_id, username, account_username, tickets, updated_at, cycle_date
                 FROM ticket_status
                 WHERE guild_id = ? AND user_id = ?
                 """,
@@ -649,6 +723,7 @@ class TicketStore:
             guild_id=int(row["guild_id"]),
             user_id=int(row["user_id"]),
             username=str(row["username"]),
+            account_username=str(row["account_username"] or ""),
             tickets=int(row["tickets"]),
             updated_at=int(row["updated_at"]),
             cycle_date=str(row["cycle_date"]),
@@ -940,7 +1015,7 @@ class TicketStore:
             self._normalize_guild_cycle_sync(connection, guild_id, cycle)
             row = connection.execute(
                 """
-                SELECT guild_id, user_id, username, tickets, updated_at, cycle_date
+                SELECT guild_id, user_id, username, account_username, tickets, updated_at, cycle_date
                 FROM ticket_status
                 WHERE guild_id = ? AND user_id = ?
                 """,
@@ -952,6 +1027,7 @@ class TicketStore:
             guild_id=int(row["guild_id"]),
             user_id=int(row["user_id"]),
             username=str(row["username"]),
+            account_username=str(row["account_username"] or ""),
             tickets=int(row["tickets"]),
             updated_at=int(row["updated_at"]),
             cycle_date=str(row["cycle_date"]),
@@ -1019,7 +1095,7 @@ class TicketStore:
             self._normalize_guild_cycle_sync(connection, guild_id, cycle)
             rows = connection.execute(
                 """
-                SELECT guild_id, user_id, username, tickets, updated_at, cycle_date
+                SELECT guild_id, user_id, username, account_username, tickets, updated_at, cycle_date
                 FROM ticket_status
                 WHERE guild_id = ?
                 ORDER BY tickets DESC, username COLLATE NOCASE ASC, user_id ASC
@@ -1031,6 +1107,7 @@ class TicketStore:
                 guild_id=int(row["guild_id"]),
                 user_id=int(row["user_id"]),
                 username=str(row["username"]),
+                account_username=str(row["account_username"] or ""),
                 tickets=int(row["tickets"]),
                 updated_at=int(row["updated_at"]),
                 cycle_date=str(row["cycle_date"]),
@@ -1040,7 +1117,7 @@ class TicketStore:
 
 
 class TicketBoardView(discord.ui.View):
-    """Persistent ticket-board navigation plus personal nickname controls."""
+    """Persistent ticket-board navigation, display modes, and nickname controls."""
 
     def __init__(
         self,
@@ -1048,11 +1125,13 @@ class TicketBoardView(discord.ui.View):
         *,
         page: int = 0,
         page_count: int = 2,
+        mention_mode: bool = False,
     ) -> None:
         super().__init__(timeout=None)
         self.tracker = tracker
         self.page = max(0, page)
         self.page_count = max(1, page_count)
+        self.mention_mode = mention_mode
 
         if self.page_count > 1:
             previous = discord.ui.Button(
@@ -1074,6 +1153,15 @@ class TicketBoardView(discord.ui.View):
             self.add_item(previous)
             self.add_item(next_button)
 
+        display_mode = discord.ui.Button(
+            label="Text view" if mention_mode else "Ping view",
+            emoji="📝" if mention_mode else "📣",
+            style=discord.ButtonStyle.secondary,
+            custom_id="owo-helper:ticket-board:display-mode",
+        )
+        display_mode.callback = self.toggle_display_mode
+        self.add_item(display_mode)
+
         nickname = discord.ui.Button(
             label="My nickname",
             emoji="🏷️",
@@ -1083,23 +1171,55 @@ class TicketBoardView(discord.ui.View):
         nickname.callback = self.my_nickname
         self.add_item(nickname)
 
-    async def _move(self, interaction: discord.Interaction, offset: int) -> None:
+    async def _render(
+        self,
+        interaction: discord.Interaction,
+        *,
+        page: int,
+        mention_mode: bool,
+    ) -> None:
         if interaction.guild_id is None:
             await interaction.response.send_message(
                 "This ticket board is no longer attached to a server.", ephemeral=True
             )
             return
+
         statuses = await self.tracker.store.list_status(interaction.guild_id)
         page_count = self.tracker.board_page_count(statuses)
-        current = self.tracker.page_from_message(interaction.message)
-        target = max(0, min(current + offset, page_count - 1))
+        page = max(0, min(page, page_count - 1))
+        start = page * BOARD_PAGE_SIZE
+        changed = await self.tracker.refresh_status_identities(
+            interaction.guild_id,
+            statuses[start:start + BOARD_PAGE_SIZE],
+        )
+        if changed:
+            statuses = await self.tracker.store.list_status(interaction.guild_id)
+            page_count = self.tracker.board_page_count(statuses)
+            page = max(0, min(page, page_count - 1))
+
         await interaction.response.edit_message(
-            embed=self.tracker.build_board_embed(statuses, target),
+            embed=self.tracker.build_board_embed(
+                statuses,
+                page,
+                mention_mode=mention_mode,
+            ),
             view=TicketBoardView(
                 self.tracker,
-                page=target,
+                page=page,
                 page_count=page_count,
+                mention_mode=mention_mode,
             ),
+        )
+
+    async def _move(self, interaction: discord.Interaction, offset: int) -> None:
+        current = self.tracker.page_from_message(interaction.message)
+        mention_mode = self.tracker.board_mention_mode_from_message(
+            interaction.message
+        )
+        await self._render(
+            interaction,
+            page=current + offset,
+            mention_mode=mention_mode,
         )
 
     async def previous_page(self, interaction: discord.Interaction) -> None:
@@ -1107,6 +1227,17 @@ class TicketBoardView(discord.ui.View):
 
     async def next_page(self, interaction: discord.Interaction) -> None:
         await self._move(interaction, 1)
+
+    async def toggle_display_mode(self, interaction: discord.Interaction) -> None:
+        current = self.tracker.page_from_message(interaction.message)
+        mention_mode = self.tracker.board_mention_mode_from_message(
+            interaction.message
+        )
+        await self._render(
+            interaction,
+            page=current,
+            mention_mode=not mention_mode,
+        )
 
     async def my_nickname(self, interaction: discord.Interaction) -> None:
         await self.tracker.send_personal_nickname_panel(interaction)
@@ -1672,6 +1803,42 @@ class TicketTracker(commands.Cog):
                 exc,
             )
             return None
+
+    async def refresh_status_identities(
+        self,
+        guild_id: int,
+        statuses: list[TicketStatus],
+    ) -> bool:
+        """Refresh known display/account names without changing ticket timestamps."""
+        guild = self.bot.get_guild(guild_id)
+        if guild is None or not statuses:
+            return False
+
+        changed = False
+        for status in statuses:
+            member = await self.fetch_known_member(guild, status.user_id)
+            if member is None:
+                continue
+            raw_display_name = getattr(member, "display_name", member.name)
+            display_name = (
+                strip_ticket_nickname_marker(raw_display_name)
+                or raw_display_name
+            )
+            account_username = getattr(member, "name", "")
+            if (
+                display_name != status.username
+                or account_username != status.account_username
+            ):
+                changed = (
+                    await self.store.update_identity(
+                        guild_id,
+                        status.user_id,
+                        display_name,
+                        account_username,
+                    )
+                    or changed
+                )
+        return changed
 
     def nickname_edit_status(
         self,
@@ -2254,7 +2421,13 @@ class TicketTracker(commands.Cog):
                 channel_id=message.channel.id,
                 user_id=message.author.id,
                 command_message_id=message.id,
-                username=getattr(message.author, "display_name", message.author.name),
+                username=(
+                    strip_ticket_nickname_marker(
+                        getattr(message.author, "display_name", message.author.name)
+                    )
+                    or getattr(message.author, "display_name", message.author.name)
+                ),
+                account_username=getattr(message.author, "name", ""),
                 identity_tokens=identity_tokens_for_user(message.author),
                 created_at=time.monotonic(),
             )
@@ -2415,6 +2588,7 @@ class TicketTracker(commands.Cog):
             request.guild_id,
             request.user_id,
             request.username,
+            request.account_username,
             tickets,
         )
         logger.info(
@@ -2744,10 +2918,16 @@ class TicketTracker(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True)
         statuses = await self.store.list_status(interaction.guild_id)
+        if await self.refresh_status_identities(
+            interaction.guild_id,
+            statuses[:BOARD_PAGE_SIZE],
+        ):
+            statuses = await self.store.list_status(interaction.guild_id)
         page_count = self.board_page_count(statuses)
         await interaction.followup.send(
             embed=self.build_board_embed(statuses, 0),
             view=TicketBoardView(self, page=0, page_count=page_count),
+            allowed_mentions=discord.AllowedMentions.none(),
             ephemeral=True,
         )
         logger.info(
@@ -2761,11 +2941,17 @@ class TicketTracker(commands.Cog):
             return
         config = await self.store.get_config(message.guild.id)
         statuses = await self.store.list_status(message.guild.id)
+        if await self.refresh_status_identities(
+            message.guild.id,
+            statuses[:BOARD_PAGE_SIZE],
+        ):
+            statuses = await self.store.list_status(message.guild.id)
         page_count = self.board_page_count(statuses)
         await message.reply(
             embed=self.build_board_embed(statuses, 0),
             view=TicketBoardView(self, page=0, page_count=page_count),
             mention_author=False,
+            allowed_mentions=discord.AllowedMentions.none(),
         )
         if config is None:
             await message.channel.send(
@@ -2833,10 +3019,20 @@ class TicketTracker(commands.Cog):
         match = re.search(r"Page\s+(\d+)\s*/\s*(\d+)", title, re.IGNORECASE)
         return max(0, int(match.group(1)) - 1) if match else 0
 
+    def board_mention_mode_from_message(
+        self, message: discord.Message | None
+    ) -> bool:
+        if message is None or not message.embeds:
+            return False
+        title = message.embeds[0].title or ""
+        return "Ping view" in title
+
     def build_board_embed(
         self,
         statuses: list[TicketStatus],
         page: int = 0,
+        *,
+        mention_mode: bool = False,
     ) -> discord.Embed:
         next_reset = next_pacific_reset_timestamp()
         page_count = self.board_page_count(statuses)
@@ -2854,10 +3050,19 @@ class TicketTracker(commands.Cog):
         if current:
             lines = []
             for status in current:
-                safe_name = discord.utils.escape_markdown(status.username)
                 icon = "🎟️" if status.tickets else "▫️"
+                account_name = (
+                    f"@{status.account_username}"
+                    if status.account_username
+                    else "@unknown"
+                )
+                if mention_mode:
+                    identity = f"<@{status.user_id}> — `{account_name}`"
+                else:
+                    safe_name = discord.utils.escape_markdown(status.username)
+                    identity = f"**{safe_name}** — `{account_name}`"
                 lines.append(
-                    f"{icon} **{status.tickets}/3** — **{safe_name}** — "
+                    f"{icon} **{status.tickets}/3** — {identity} — "
                     f"`{status.user_id}` — <t:{status.updated_at}:R>"
                 )
             body = "\n".join(lines)
@@ -2870,6 +3075,7 @@ class TicketTracker(commands.Cog):
         title = "🎟️ Guild Boss Tickets"
         if page_count > 1:
             title += f" — Page {page + 1}/{page_count}"
+        title += " — Ping view" if mention_mode else " — Text view"
         embed = discord.Embed(
             title=title,
             description=(
@@ -2881,8 +3087,8 @@ class TicketTracker(commands.Cog):
         )
         embed.set_footer(
             text=(
-                "Previously tracked members replenish to 3/3 at Pacific midnight. "
-                "Later OwO checks replace that reset value with the real count."
+                "Use Ping view for clickable members and Text view for stored names. "
+                "Names refresh when a page is opened. Tickets replenish at Pacific midnight."
             )
         )
         return embed
@@ -2912,6 +3118,7 @@ class TicketTracker(commands.Cog):
                 new_message = await channel.send(
                     embed=self.build_board_embed(statuses, 0),
                     view=TicketBoardView(self, page=0, page_count=page_count),
+                    allowed_mentions=discord.AllowedMentions.none(),
                 )
             except (discord.Forbidden, discord.HTTPException) as exc:
                 logger.warning(

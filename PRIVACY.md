@@ -9,7 +9,7 @@ OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 The bot stores only the information needed to provide its features and operate safely:
 
 - Discord server IDs, server names, owner IDs, approximate member counts, channel counts, installation status, and aggregate command-use counts.
-- Discord user IDs and display names associated with saved team templates and boss-ticket entries.
+- Discord user IDs, display names, and Discord account usernames associated with saved team templates and boss-ticket entries.
 - When a server manager enables optional ticket nickname markers, the bot stores the member's prior server nickname, the last nickname applied by the bot, and whether that member chose to show or hide the suffix so it can update or restore the name safely.
 - Saved team animals, positions, and weapon IDs.
 - Reported boss-ticket counts and update times.

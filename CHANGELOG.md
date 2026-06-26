@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.1-beta
+
+- Fixed HP extraction when three or more OwO pixel-font digits touch horizontally, including endings such as `444` and groups such as `744`.
+- Replaced the old two-digit-only split with bounded dynamic segmentation for 2–6 touching digits.
+- Preserved confidence checks, leading-zero rejection, and current-HP/max-HP validation.
+- Added Text view and Ping view controls to paginated ticket boards.
+- Text view now shows the stored display name, exact Discord account username, numeric user ID, ticket count, and update time.
+- Ping view shows a clickable Discord member mention while retaining the exact account username and numeric ID.
+- Prevented board mention views from notifying users.
+- Added automatic identity refresh for the visible page using only known tracked user IDs; Guild Members Intent remains unnecessary.
+- Added automatic SQLite migration for the new `account_username` ticket field.
+- Prevented the bot's own ticket suffix from being saved as part of a member's board name.
+- Added reserved UI emoji source-file names under `assets/ui_emojis/`.
+- Updated the public bot version to `0.10.1-beta`.
+
 ## 0.10.0-beta
 
 - Added optional per-server ticket nickname markers, disabled by default.

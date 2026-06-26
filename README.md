@@ -16,7 +16,7 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Reads all three boss pages in OwO's visible `1/3 → 2/3 → 3/3` order.
 - Extracts current HP from each individual boss image using bundled digit templates.
 - Generates the finished Neon battle command as normal inline-code text for easier mobile copying.
-- Handles touching HP digits and validates suspicious readings.
+- Handles two or more touching HP digits, including three-digit groups such as `444` and `744`, and validates suspicious readings.
 - Uses current Bleeding Gaze blueprint ordering with Weapon Cost last.
 
 ### Guild-boss tracking
@@ -58,8 +58,10 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Associates each OwO response with the requesting Discord user.
 - Stores reported `0/3`–`3/3` counts per server.
 - Maintains one persistent board in a configured channel.
-- Shows username, Discord user ID, ticket count, update time, and next replenishment.
+- Shows display name, exact Discord account username, numeric user ID, ticket count, update time, and next replenishment.
 - Keeps the persistent board and manual ticket-list responses in a single Discord message, with Previous and Next buttons for large lists.
+- Adds **Text view** and **Ping view** buttons. Ping view uses clickable member mentions without notifying users.
+- Refreshes names for the visible page from known tracked user IDs, so changed Discord names are corrected without requiring Guild Members Intent.
 - Provides a visual ticket management panel for server managers, including remove, block tracking, and unblock actions.
 - Supports optional per-server ticket markers in member nicknames, disabled by default and managed through `HBS`.
 - Gives every member private UI controls to show or hide only their own marker without removing their ticket-board entry.
@@ -111,6 +113,7 @@ The project has since been substantially expanded with automatic boss reading, H
 - Python 3.11 or newer
 - A Discord bot application
 - Message Content Intent enabled
+- Guild Members Intent is not required
 
 Install dependencies:
 
@@ -393,6 +396,15 @@ Private slash command:
 
 These commands display the current list wherever they are used. The configured persistent board is replaced automatically whenever a member updates their ticket count.
 
+### Text and Ping views
+
+Every ticket list includes a display-mode button:
+
+- **Text view** — shows the saved display name, exact Discord account username, and numeric user ID.
+- **Ping view** — shows a clickable `<@user>` mention, exact account username, and numeric user ID.
+
+Opening a page refreshes the names of the visible tracked users using their known Discord IDs. Mention rendering is configured not to notify members.
+
 ### Ticket replenishment
 
 Ticket cycles follow midnight in:
@@ -443,7 +455,8 @@ When moving the bot to another computer or host, copy `team_templates.db`, `boss
 ```text
 owo-boss-helper-discord-bot/
 ├── assets/
-│   └── hp_digits/
+│   ├── hp_digits/
+│   └── ui_emojis/                 # reserved source PNGs for the UI emoji update
 ├── cogs/
 │   ├── __init__.py
 │   ├── boss_generator.py
