@@ -1,0 +1,201 @@
++NICKNAME_MAX_LENGTH = 32
++NICKNAME_SYNC_DELAY_SECONDS = 0.20
++TICKET_NICKNAME_MARKERS = {
++    3: "🎟🎟🎟",
++    2: "🎟🎟▫",
++    1: "🎟▫▫",
++    0: "▫▫▫",
++}
++TICKET_NICKNAME_RE = re.compile(
++    r"\s*·\s*(?:(?:🎟|▫)\ufe0f?){3}\s*$"
++)
+ 
+ TICKET_COMMANDS = {
+     "owobosst",
+@@ -108,6 +119,56 @@ class TicketManagementEntry:
+     blocked: bool
+ 
+ 
++@dataclass(frozen=True)
++class TicketNicknameState:
++    guild_id: int
++    user_id: int
++    base_nickname: str | None
++    last_applied_nickname: str
++    updated_at: int
++
++
++@dataclass
++class NicknameSyncResult:
++    updated: int = 0
++    unchanged: int = 0
++    restored: int = 0
++    missing: int = 0
++    skipped_owner: int = 0
++    skipped_hierarchy: int = 0
++    missing_permission: int = 0
++    failed: int = 0
++
++    @property
++    def total_processed(self) -> int:
++        return (
++            self.updated
++            + self.unchanged
++            + self.restored
++            + self.missing
++            + self.skipped_owner
++            + self.skipped_hierarchy
++            + self.missing_permission
++            + self.failed
++        )
++
++
++def strip_ticket_nickname_marker(value: str | None) -> str | None:
++    if not value:
++        return None
++    stripped = TICKET_NICKNAME_RE.sub("", value).rstrip()
++    return stripped or None
++
++
++def build_ticket_nickname(base_name: str, tickets: int) -> str:
++    marker = TICKET_NICKNAME_MARKERS[max(0, min(MAX_TICKETS, tickets))]
++    suffix = f" · {marker}"
++    allowed = max(1, NICKNAME_MAX_LENGTH - len(suffix))
++    clean_base = (base_name or "Member").strip() or "Member"
++    truncated = clean_base[:allowed].rstrip() or clean_base[:allowed]
++    return f"{truncated}{suffix}"
++
++
+ def normalize_ticket_command(content: str) -> str:
+     return re.sub(r"\s+", "", content or "").lower()
+ 
+@@ -348,6 +409,32 @@ class TicketStore:
+                 "CREATE INDEX IF NOT EXISTS idx_ticket_blocked_guild "
+                 "ON ticket_blocked_users(guild_id, username COLLATE NOCASE)"
+             )
++            connection.execute(
++                """
++                CREATE TABLE IF NOT EXISTS ticket_nickname_config (
++                    guild_id INTEGER PRIMARY KEY,
++                    enabled INTEGER NOT NULL DEFAULT 0,
++                    updated_at INTEGER NOT NULL,
++                    updated_by INTEGER NOT NULL
++                )
++                """
++            )
++            connection.execute(
++                """
++                CREATE TABLE IF NOT EXISTS ticket_nickname_state (
++                    guild_id INTEGER NOT NULL,
++                    user_id INTEGER NOT NULL,
++                    base_nickname TEXT,
++                    last_applied_nickname TEXT NOT NULL,
++                    updated_at INTEGER NOT NULL,
++                    PRIMARY KEY (guild_id, user_id)
++                )
++                """
++            )
++            connection.execute(
++                "CREATE INDEX IF NOT EXISTS idx_ticket_nickname_state_guild "
++                "ON ticket_nickname_state(guild_id)"
++            )
+ 
+     async def set_channel(self, guild_id: int, channel_id: int) -> None:
+         async with self.lock:
+@@ -636,6 +723,213 @@ class TicketStore:
+             result.setdefault(int(row["guild_id"]), set()).add(int(row["user_id"]))
+         return result
+ 
++    async def nickname_markers_enabled(self, guild_id: int) -> bool:
++        async with self.lock:
++            return await asyncio.to_thread(
++                self._nickname_markers_enabled_sync, guild_id
++            )
++
++    def _nickname_markers_enabled_sync(self, guild_id: int) -> bool:
++        with self._connect() as connection:
++            row = connection.execute(
++                "SELECT enabled FROM ticket_nickname_config WHERE guild_id = ?",
++                (guild_id,),
++            ).fetchone()
++        return bool(row and int(row["enabled"]))
++
++    async def set_nickname_markers_enabled(
++        self,
++        guild_id: int,
++        enabled: bool,
++        updated_by: int,
++    ) -> None:
++        async with self.lock:
++            await asyncio.to_thread(
++                self._set_nickname_markers_enabled_sync,
++                guild_id,
++                enabled,
++                updated_by,
++            )
++
++    def _set_nickname_markers_enabled_sync(
++        self,
++        guild_id: int,
++        enabled: bool,
++        updated_by: int,
++    ) -> None:
++        with self._connect() as connection:
++            connection.execute(
++                """
++                INSERT INTO ticket_nickname_config
++                    (guild_id, enabled, updated_at, updated_by)
++                VALUES (?, ?, ?, ?)
++                ON CONFLICT(guild_id) DO UPDATE SET
++                    enabled = excluded.enabled,
++                    updated_at = excluded.updated_at,
++                    updated_by = excluded.updated_by
++                """,
++                (guild_id, int(enabled), int(time.time()), updated_by),
++            )
++
++    async def save_nickname_state(
++        self,
++        guild_id: int,
++        user_id: int,
++        base_nickname: str | None,
++        last_applied_nickname: str,
++    ) -> None:
++        async with self.lock:
++            await asyncio.to_thread(
++                self._save_nickname_state_sync,
++                guild_id,
++                user_id,
++                base_nickname,
++                last_applied_nickname,
++            )
++
++    def _save_nickname_state_sync(
++        self,
++        guild_id: int,
++        user_id: int,
++        base_nickname: str | None,
++        last_applied_nickname: str,
++    ) -> None:
++        with self._connect() as connection:
++            connection.execute(
++                """
++                INSERT INTO ticket_nickname_state
++                    (guild_id, user_id, base_nickname, last_applied_nickname, updated_at)
++                VALUES (?, ?, ?, ?, ?)
++                ON CONFLICT(guild_id, user_id) DO UPDATE SET
++                    base_nickname = excluded.base_nickname,
++                    last_applied_nickname = excluded.last_applied_nickname,
++                    updated_at = excluded.updated_at
++                """,
++                (
++                    guild_id,
++                    user_id,
++                    base_nickname,
++                    last_applied_nickname,
++                    int(time.time()),
++                ),
++            )
++
++    async def get_nickname_state(
++        self, guild_id: int, user_id: int
