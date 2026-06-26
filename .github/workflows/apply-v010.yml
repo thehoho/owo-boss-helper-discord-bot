@@ -1,6 +1,7 @@
 name: Apply v0.10 ticket nickname update
 
 on:
+  workflow_dispatch:
   push:
     paths:
       - .github/workflows/apply-v010.yml
