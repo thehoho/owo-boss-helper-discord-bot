@@ -38,9 +38,16 @@ BOARD_PAGE_SIZE = 15
 MANAGEMENT_PAGE_SIZE = 25
 MAX_TICKETS = 3
 NICKNAME_MAX_LENGTH = 32
-NICKNAME_SYNC_DELAY_SECONDS = 0.20
+NICKNAME_SYNC_DELAY_SECONDS = 0.75
 IDENTITY_REFRESH_TTL_SECONDS = 10 * 60
 IDENTITY_REFRESH_CONCURRENCY = 4
+BOARD_REFRESH_DEBOUNCE_SECONDS = 0.65
+BOARD_STATUS_CACHE_TTL_SECONDS = 15 * 60
+RECENT_MEMBER_TTL_SECONDS = 15 * 60
+REACTION_CONTROL_TTL_SECONDS = 6 * 60 * 60
+STARTUP_QUEUE_DELAY_SECONDS = 0.20
+NICKNAME_SHOW_EMOJI = "🏷️"
+NICKNAME_HIDE_EMOJI = "🔕"
 TICKET_NICKNAME_MARKERS = {
     3: "🎟🎟🎟",
     2: "🎟🎟▫",
@@ -99,6 +106,16 @@ class PendingTicketRequest:
     username: str
     account_username: str
     identity_tokens: tuple[str, ...]
+    created_at: float
+
+
+@dataclass(frozen=True)
+class TicketReactionControl:
+    guild_id: int
+    channel_id: int
+    message_id: int
+    user_id: int
+    emoji: str
     created_at: float
 
 
@@ -373,9 +390,11 @@ class TicketStore:
         self.lock = asyncio.Lock()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path)
+        connection = sqlite3.connect(self.path, timeout=10)
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
+        connection.execute("PRAGMA synchronous=NORMAL")
+        connection.execute("PRAGMA busy_timeout=5000")
         return connection
 
     async def initialize(self) -> None:
@@ -468,7 +487,7 @@ class TicketStore:
                 CREATE TABLE IF NOT EXISTS ticket_nickname_preferences (
                     guild_id INTEGER NOT NULL,
                     user_id INTEGER NOT NULL,
-                    enabled INTEGER NOT NULL DEFAULT 1,
+                    enabled INTEGER NOT NULL DEFAULT 0,
                     updated_at INTEGER NOT NULL,
                     PRIMARY KEY (guild_id, user_id)
                 )
@@ -1068,8 +1087,8 @@ class TicketStore:
                 """,
                 (guild_id, user_id),
             ).fetchone()
-        # No row means the server default applies: participate when the feature is on.
-        return row is None or bool(int(row["enabled"]))
+        # Nickname changes are explicitly opt-in. No row means disabled.
+        return bool(row and int(row["enabled"]))
 
     async def set_nickname_marker_allowed(
         self,
@@ -1103,6 +1122,24 @@ class TicketStore:
                 """,
                 (guild_id, user_id, int(enabled), int(time.time())),
             )
+
+    async def list_nickname_opt_in_ids(self, guild_id: int) -> set[int]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._list_nickname_opt_in_ids_sync, guild_id
+            )
+
+    def _list_nickname_opt_in_ids_sync(self, guild_id: int) -> set[int]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT user_id
+                FROM ticket_nickname_preferences
+                WHERE guild_id = ? AND enabled = 1
+                """,
+                (guild_id,),
+            ).fetchall()
+        return {int(row["user_id"]) for row in rows}
 
     async def ticket_tracking_allowed(self, guild_id: int, user_id: int) -> bool:
         async with self.lock:
@@ -1293,23 +1330,15 @@ class TicketBoardView(discord.ui.View):
             )
             return
 
-        # Large boards can require several individual member lookups. Acknowledge the
-        # button immediately so Discord does not show "This interaction failed" while
-        # those identities are refreshed.
+        started = time.monotonic()
         await interaction.response.defer()
 
-        statuses = await self.tracker.store.list_status(interaction.guild_id)
+        # Page navigation never performs Discord member requests. The sticky-board
+        # replacement populates this cache, while a post-restart first click needs only
+        # one fast SQLite read.
+        statuses = await self.tracker.get_board_statuses(interaction.guild_id)
         page_count = self.tracker.board_page_count(statuses)
         page = max(0, min(page, page_count - 1))
-        start = page * BOARD_PAGE_SIZE
-        changed = await self.tracker.refresh_status_identities(
-            interaction.guild_id,
-            statuses[start:start + BOARD_PAGE_SIZE],
-        )
-        if changed:
-            statuses = await self.tracker.store.list_status(interaction.guild_id)
-            page_count = self.tracker.board_page_count(statuses)
-            page = max(0, min(page, page_count - 1))
 
         await interaction.edit_original_response(
             embed=self.tracker.build_board_embed(
@@ -1324,6 +1353,11 @@ class TicketBoardView(discord.ui.View):
                 mention_mode=mention_mode,
             ),
             allowed_mentions=discord.AllowedMentions.none(),
+        )
+        logger.info(
+            "Rendered cached ticket-board page for guild %s in %.3fs",
+            interaction.guild_id,
+            time.monotonic() - started,
         )
 
     async def _move(self, interaction: discord.Interaction, offset: int) -> None:
@@ -1386,7 +1420,7 @@ class TicketNicknamePreferenceView(discord.ui.View):
         self.notice = notice
 
         show = discord.ui.Button(
-            label="Show marker",
+            label="Enable my marker",
             emoji="🏷️",
             style=discord.ButtonStyle.success,
             disabled=(
@@ -1398,7 +1432,7 @@ class TicketNicknamePreferenceView(discord.ui.View):
             row=0,
         )
         hide = discord.ui.Button(
-            label="Hide marker",
+            label="Disable my marker",
             emoji="🔕",
             style=discord.ButtonStyle.secondary,
             disabled=not server_enabled or not user_enabled,
@@ -1439,6 +1473,7 @@ class TicketNicknamePreferenceView(discord.ui.View):
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.user_id and interaction.guild_id == self.guild_id:
+            self.tracker.remember_member(interaction.user)
             return True
         await interaction.response.send_message(
             "These personal ticket controls belong to another member.", ephemeral=True
@@ -1518,6 +1553,7 @@ class TicketNicknamePreferenceView(discord.ui.View):
         await self.edit(interaction)
 
     async def refresh(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         self.notice = "Your ticket settings were refreshed."
         await self.edit(interaction)
 
@@ -1554,6 +1590,7 @@ class TicketManagementSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         self.management_view.selected_user_id = int(self.values[0])
         self.management_view.notice = None
         await self.management_view.edit(interaction)
@@ -1721,18 +1758,21 @@ class TicketManagementView(discord.ui.View):
             )
 
     async def previous_page(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         self.page = max(0, self.page - 1)
         self.selected_user_id = None
         self.notice = None
         await self.edit(interaction)
 
     async def next_page(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         self.page = min(self.page_count - 1, self.page + 1)
         self.selected_user_id = None
         self.notice = None
         await self.edit(interaction)
 
     async def refresh(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer()
         self.notice = "List refreshed."
         await self.edit(interaction)
 
@@ -1750,6 +1790,7 @@ class TicketManagementView(discord.ui.View):
             return
         await interaction.response.defer()
         removed = await self.tracker.store.remove_status(self.guild_id, entry.user_id)
+        self.tracker.invalidate_board_cache(self.guild_id)
         self.tracker.drop_pending_for_user(self.guild_id, entry.user_id)
         await self.tracker.clear_ticket_nickname(
             self.guild_id,
@@ -1757,7 +1798,7 @@ class TicketManagementView(discord.ui.View):
             reason="Boss-ticket entry removed",
         )
         if await self.tracker.store.get_config(self.guild_id) is not None:
-            await self.tracker.refresh_board(self.guild_id)
+            self.tracker.queue_board_refresh(self.guild_id)
         self.selected_user_id = None
         self.notice = (
             f"Removed {entry.username} from the current board. They can reappear "
@@ -1786,6 +1827,7 @@ class TicketManagementView(discord.ui.View):
             entry.username,
             interaction.user.id,
         )
+        self.tracker.invalidate_board_cache(self.guild_id)
         self.tracker.blocked_users.setdefault(self.guild_id, set()).add(entry.user_id)
         self.tracker.drop_pending_for_user(self.guild_id, entry.user_id)
         await self.tracker.clear_ticket_nickname(
@@ -1794,7 +1836,7 @@ class TicketManagementView(discord.ui.View):
             reason="Boss-ticket tracking blocked",
         )
         if await self.tracker.store.get_config(self.guild_id) is not None:
-            await self.tracker.refresh_board(self.guild_id)
+            self.tracker.queue_board_refresh(self.guild_id)
         self.selected_user_id = None
         self.notice = (
             f"Blocked {entry.username}. Future ticket checks from this user will "
@@ -1841,11 +1883,11 @@ class TicketManagementView(discord.ui.View):
                 False,
                 interaction.user.id,
             )
-            result = await self.tracker.restore_guild_nicknames(self.guild_id)
             self.nickname_enabled = False
-            self.notice = self.tracker.nickname_result_text(
-                "Nickname markers disabled and managed names restored",
-                result,
+            self.tracker.queue_nickname_job(self.guild_id, "restore")
+            self.notice = (
+                "Nickname markers were disabled immediately. Existing managed suffixes "
+                "are being restored in the background."
             )
         else:
             allowed, message = await self.tracker.nickname_feature_ready(
@@ -1861,10 +1903,13 @@ class TicketManagementView(discord.ui.View):
                 interaction.user.id,
             )
             self.nickname_enabled = True
-            result = await self.tracker.sync_guild_nicknames(self.guild_id)
-            self.notice = self.tracker.nickname_result_text(
-                "Nickname markers enabled and synced",
-                result,
+            self.tracker.queue_nickname_job(self.guild_id, "cleanup")
+            self.tracker.queue_nickname_job(self.guild_id, "sync")
+            self.notice = (
+                "Nickname markers are available. Members remain unchanged unless they "
+                "have explicitly opted in; saved opt-ins are syncing in the background. "
+                "Members can use My settings or the reaction shortcut under their ticket "
+                "command."
             )
         logger.info(
             "Ticket nickname markers set to %s in guild %s by %s",
@@ -1888,13 +1933,13 @@ class TicketManagementView(discord.ui.View):
             self.notice = message
             await self.edit(interaction)
             return
-        result = await self.tracker.sync_guild_nicknames(self.guild_id)
-        self.notice = self.tracker.nickname_result_text(
-            "Nickname markers synced",
-            result,
+        self.tracker.queue_nickname_job(self.guild_id, "sync")
+        self.notice = (
+            "A background sync was queued for members who explicitly enabled their "
+            "marker. The management panel remains responsive while it runs."
         )
         logger.info(
-            "Ticket nickname marker sync requested in guild %s by %s",
+            "Ticket nickname marker sync queued in guild %s by %s",
             self.guild_id,
             interaction.user.id,
         )
@@ -1910,14 +1955,30 @@ class TicketTracker(commands.Cog):
         self.nickname_locks: dict[int, asyncio.Lock] = {}
         self.nickname_user_locks: dict[tuple[int, int], asyncio.Lock] = {}
         self.reset_task: asyncio.Task[None] | None = None
+        self.startup_task: asyncio.Task[None] | None = None
         self.processed_responses: dict[tuple[int, int], float] = {}
         self.capture_tasks: dict[tuple[int, int], asyncio.Task[bool]] = {}
+        self.board_refresh_tasks: dict[int, asyncio.Task[None]] = {}
+        self.board_refresh_dirty: set[int] = set()
+        self.board_status_cache: dict[
+            int, tuple[float, tuple[TicketStatus, ...]]
+        ] = {}
+        self.nickname_job_tasks: dict[int, asyncio.Task[None]] = {}
+        self.nickname_job_requests: dict[int, list[str]] = {}
+        self.recent_members: dict[
+            tuple[int, int], tuple[float, discord.Member]
+        ] = {}
+        self.reaction_controls: dict[
+            tuple[int, int, int], TicketReactionControl
+        ] = {}
         self.blocked_users: dict[int, set[int]] = {}
         self.tracking_opt_outs: dict[int, set[int]] = {}
         self.identity_refresh_seen: dict[tuple[int, int], float] = {}
         self._restored = False
+        self._closing = False
 
     async def cog_load(self) -> None:
+        self._closing = False
         await self.store.initialize()
         self.blocked_users = await self.store.load_all_blocked_ids()
         self.tracking_opt_outs = await self.store.load_all_tracking_opt_outs()
@@ -1926,12 +1987,26 @@ class TicketTracker(commands.Cog):
         logger.info("Boss ticket storage ready at %s", DATABASE_FILE)
 
     async def cog_unload(self) -> None:
+        self._closing = True
         if self.reset_task:
             self.reset_task.cancel()
             self.reset_task = None
+        if self.startup_task:
+            self.startup_task.cancel()
+            self.startup_task = None
         for task in self.capture_tasks.values():
             task.cancel()
+        for task in self.board_refresh_tasks.values():
+            task.cancel()
+        for task in self.nickname_job_tasks.values():
+            task.cancel()
         self.capture_tasks.clear()
+        self.board_refresh_tasks.clear()
+        self.board_refresh_dirty.clear()
+        self.nickname_job_tasks.clear()
+        self.nickname_job_requests.clear()
+        self.reaction_controls.clear()
+        self.recent_members.clear()
 
     def board_lock(self, guild_id: int) -> asyncio.Lock:
         return self.board_locks.setdefault(guild_id, asyncio.Lock())
@@ -1941,6 +2016,143 @@ class TicketTracker(commands.Cog):
 
     def nickname_user_lock(self, guild_id: int, user_id: int) -> asyncio.Lock:
         return self.nickname_user_locks.setdefault((guild_id, user_id), asyncio.Lock())
+
+    def remember_member(self, user: discord.abc.User) -> None:
+        if not isinstance(user, discord.Member):
+            return
+        self.recent_members[(user.guild.id, user.id)] = (time.monotonic(), user)
+
+    def recent_member(self, guild_id: int, user_id: int) -> discord.Member | None:
+        cached = self.recent_members.get((guild_id, user_id))
+        if cached is None:
+            return None
+        seen_at, member = cached
+        if time.monotonic() - seen_at > RECENT_MEMBER_TTL_SECONDS:
+            self.recent_members.pop((guild_id, user_id), None)
+            return None
+        return member
+
+    def invalidate_board_cache(self, guild_id: int) -> None:
+        self.board_status_cache.pop(guild_id, None)
+
+    async def get_board_statuses(
+        self,
+        guild_id: int,
+        *,
+        force: bool = False,
+    ) -> list[TicketStatus]:
+        cached = self.board_status_cache.get(guild_id)
+        if (
+            not force
+            and cached is not None
+            and time.monotonic() - cached[0] <= BOARD_STATUS_CACHE_TTL_SECONDS
+        ):
+            return list(cached[1])
+        statuses = await self.store.list_status(guild_id)
+        self.board_status_cache[guild_id] = (
+            time.monotonic(),
+            tuple(statuses),
+        )
+        return statuses
+
+    def queue_board_refresh(self, guild_id: int) -> None:
+        if self._closing:
+            return
+        self.invalidate_board_cache(guild_id)
+        self.board_refresh_dirty.add(guild_id)
+        task = self.board_refresh_tasks.get(guild_id)
+        if task is None or task.done():
+            self.board_refresh_tasks[guild_id] = asyncio.create_task(
+                self._board_refresh_worker(guild_id)
+            )
+
+    async def _board_refresh_worker(self, guild_id: int) -> None:
+        try:
+            await asyncio.sleep(BOARD_REFRESH_DEBOUNCE_SECONDS)
+            while guild_id in self.board_refresh_dirty:
+                self.board_refresh_dirty.discard(guild_id)
+                try:
+                    await self.refresh_board(guild_id)
+                except Exception:
+                    logger.exception(
+                        "Queued ticket-board refresh failed for guild %s", guild_id
+                    )
+                if guild_id in self.board_refresh_dirty:
+                    await asyncio.sleep(BOARD_REFRESH_DEBOUNCE_SECONDS)
+        except asyncio.CancelledError:
+            return
+        finally:
+            self.board_refresh_tasks.pop(guild_id, None)
+            # Close the tiny race where a new dirty flag is set after the loop has
+            # observed an empty set but before this task is removed from the registry.
+            if not self._closing and guild_id in self.board_refresh_dirty:
+                self.board_refresh_tasks[guild_id] = asyncio.create_task(
+                    self._board_refresh_worker(guild_id)
+                )
+
+    def queue_nickname_job(self, guild_id: int, mode: str) -> None:
+        if self._closing:
+            return
+        if mode not in {"sync", "cleanup", "restore"}:
+            raise ValueError(f"Unsupported nickname job mode: {mode}")
+        queue = self.nickname_job_requests.setdefault(guild_id, [])
+        if mode == "restore":
+            queue.clear()
+        if not queue or queue[-1] != mode:
+            queue.append(mode)
+        task = self.nickname_job_tasks.get(guild_id)
+        if task is None or task.done():
+            self.nickname_job_tasks[guild_id] = asyncio.create_task(
+                self._nickname_job_worker(guild_id)
+            )
+
+    async def _nickname_job_worker(self, guild_id: int) -> None:
+        try:
+            await asyncio.sleep(0)
+            while True:
+                queue = self.nickname_job_requests.get(guild_id, [])
+                if not queue:
+                    break
+                mode = queue.pop(0)
+                started = time.monotonic()
+                if mode == "restore":
+                    result = await self.restore_guild_nicknames(guild_id)
+                elif mode == "cleanup":
+                    result = await self.cleanup_unopted_nicknames(guild_id)
+                else:
+                    result = await self.sync_guild_nicknames(guild_id)
+                logger.info(
+                    "Background ticket nickname %s completed for guild %s: %s processed in %.2fs",
+                    mode,
+                    guild_id,
+                    result.total_processed,
+                    time.monotonic() - started,
+                )
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception(
+                "Background ticket nickname job failed for guild %s", guild_id
+            )
+        finally:
+            self.nickname_job_tasks.pop(guild_id, None)
+            pending = self.nickname_job_requests.get(guild_id, [])
+            if pending and not self._closing:
+                # A request can arrive between the worker's empty-queue check and
+                # cleanup. Start a successor instead of losing that request.
+                self.nickname_job_tasks[guild_id] = asyncio.create_task(
+                    self._nickname_job_worker(guild_id)
+                )
+            else:
+                self.nickname_job_requests.pop(guild_id, None)
+
+    def purge_reaction_controls(self) -> None:
+        cutoff = time.monotonic() - REACTION_CONTROL_TTL_SECONDS
+        self.reaction_controls = {
+            key: control
+            for key, control in self.reaction_controls.items()
+            if control.created_at >= cutoff
+        }
 
     def has_management_permission(self, user: discord.abc.User) -> bool:
         owner_id = int((os.getenv("BOT_OWNER_ID") or "0").strip() or 0)
@@ -1971,11 +2183,12 @@ class TicketTracker(commands.Cog):
     async def fetch_known_member(
         self, guild: discord.Guild, user_id: int
     ) -> discord.Member | None:
-        member = guild.get_member(user_id)
+        member = self.recent_member(guild.id, user_id) or guild.get_member(user_id)
         if member is not None:
+            self.remember_member(member)
             return member
         try:
-            return await guild.fetch_member(user_id)
+            member = await guild.fetch_member(user_id)
         except discord.NotFound:
             return None
         except (discord.Forbidden, discord.HTTPException) as exc:
@@ -1986,6 +2199,8 @@ class TicketTracker(commands.Cog):
                 exc,
             )
             return None
+        self.remember_member(member)
+        return member
 
     async def refresh_status_identities(
         self,
@@ -2294,7 +2509,12 @@ class TicketTracker(commands.Cog):
     async def sync_guild_nicknames(self, guild_id: int) -> NicknameSyncResult:
         result = NicknameSyncResult()
         async with self.nickname_lock(guild_id):
-            statuses = await self.store.list_status(guild_id)
+            opted_in = await self.store.list_nickname_opt_in_ids(guild_id)
+            statuses = [
+                status
+                for status in await self.store.list_status(guild_id)
+                if status.user_id in opted_in
+            ]
             for index, status in enumerate(statuses):
                 async with self.nickname_user_lock(guild_id, status.user_id):
                     latest = await self.store.get_status(guild_id, status.user_id)
@@ -2308,6 +2528,34 @@ class TicketTracker(commands.Cog):
                         )
                 self.add_nickname_result(result, outcome)
                 if index + 1 < len(statuses):
+                    await asyncio.sleep(NICKNAME_SYNC_DELAY_SECONDS)
+        return result
+
+    async def cleanup_unopted_nicknames(self, guild_id: int) -> NicknameSyncResult:
+        result = NicknameSyncResult()
+        async with self.nickname_lock(guild_id):
+            opted_in = await self.store.list_nickname_opt_in_ids(guild_id)
+            states = [
+                state
+                for state in await self.store.list_nickname_states(guild_id)
+                if state.user_id not in opted_in
+            ]
+            for index, state in enumerate(states):
+                async with self.nickname_user_lock(guild_id, state.user_id):
+                    # A member can opt in while this background cleanup is running.
+                    # Recheck inside the per-user lock so a fresh choice is never undone.
+                    if await self.store.nickname_marker_allowed(
+                        guild_id, state.user_id
+                    ):
+                        outcome = "unchanged"
+                    else:
+                        outcome = await self._clear_ticket_nickname_unlocked(
+                            guild_id,
+                            state.user_id,
+                            reason="OwO boss-ticket nickname now requires member opt-in",
+                        )
+                self.add_nickname_result(result, outcome)
+                if index + 1 < len(states):
                     await asyncio.sleep(NICKNAME_SYNC_DELAY_SECONDS)
         return result
 
@@ -2351,19 +2599,22 @@ class TicketTracker(commands.Cog):
             tracking_text = "Paused by you"
 
         if not server_enabled:
-            marker_text = "Disabled for this server"
+            marker_text = "Unavailable because the server feature is off"
         elif not user_enabled:
-            marker_text = "Hidden by you"
+            marker_text = "Off by default — only you can enable it"
         elif state:
-            marker_text = "Shown and managed"
+            marker_text = "Enabled by you and currently managed"
         else:
-            marker_text = "Enabled; waiting for a ticket check or sync"
+            marker_text = "Enabled by you; waiting for a ticket check or sync"
 
         count_text = f"{status.tickets}/3" if status else "Not currently listed"
         description = (
             f"**Ticket tracking:** {tracking_text}\n"
             f"**Board entry:** {count_text}\n"
             f"**Nickname marker:** {marker_text}\n\n"
+            "Nickname changes are off by default for every member. Use **Enable my "
+            "marker** only when you want the bot to add the ticket suffix. You can also "
+            "toggle it from the action reaction under your own ticket command.\n\n"
             "**Remove me from list** deletes only your current board entry. Your next "
             "ticket check can add you again. **Stop tracking me** removes your entry, "
             "clears the nickname marker, and ignores future ticket checks until you "
@@ -2405,6 +2656,8 @@ class TicketTracker(commands.Cog):
             return
         guild_id = interaction.guild_id
         user_id = interaction.user.id
+        self.remember_member(interaction.user)
+        await interaction.response.defer(ephemeral=True, thinking=True)
         server_enabled = await self.store.nickname_markers_enabled(guild_id)
         user_enabled = await self.store.nickname_marker_allowed(guild_id, user_id)
         tracking_enabled = user_id not in self.tracking_opt_outs.get(guild_id, set())
@@ -2428,7 +2681,7 @@ class TicketTracker(commands.Cog):
             tracking_enabled=tracking_enabled,
             admin_blocked=admin_blocked,
         )
-        await interaction.response.send_message(embed=embed, view=view, ephemeral=True)
+        await interaction.followup.send(embed=embed, view=view, ephemeral=True)
 
     async def send_personal_nickname_panel_message(
         self,
@@ -2527,6 +2780,7 @@ class TicketTracker(commands.Cog):
         user_id: int,
     ) -> str:
         removed = await self.store.remove_status(guild_id, user_id)
+        self.invalidate_board_cache(guild_id)
         self.drop_pending_for_user(guild_id, user_id)
         await self.clear_ticket_nickname(
             guild_id,
@@ -2534,7 +2788,7 @@ class TicketTracker(commands.Cog):
             reason="Member removed their OwO boss-ticket board entry",
         )
         if await self.store.get_config(guild_id) is not None:
-            await self.refresh_board(guild_id)
+            self.queue_board_refresh(guild_id)
         logger.info(
             "User %s removed their own ticket entry in guild %s",
             user_id,
@@ -2566,6 +2820,7 @@ class TicketTracker(commands.Cog):
 
         opted_out.add(user_id)
         removed = await self.store.remove_status(guild_id, user_id)
+        self.invalidate_board_cache(guild_id)
         self.drop_pending_for_user(guild_id, user_id)
         await self.clear_ticket_nickname(
             guild_id,
@@ -2573,7 +2828,7 @@ class TicketTracker(commands.Cog):
             reason="Member opted out of OwO boss-ticket tracking",
         )
         if await self.store.get_config(guild_id) is not None:
-            await self.refresh_board(guild_id)
+            self.queue_board_refresh(guild_id)
         logger.info(
             "User %s opted out of ticket tracking in guild %s",
             user_id,
@@ -2587,15 +2842,13 @@ class TicketTracker(commands.Cog):
         request: PendingTicketRequest,
         nickname_result: str,
     ) -> None:
-        emoji = None
-        if nickname_result in {"updated", "unchanged"}:
-            emoji = "🏷️"
-        elif nickname_result == "opted-out":
-            emoji = "🔕"
-        elif nickname_result in {"owner", "hierarchy", "permission", "failed"}:
-            emoji = "⚠️"
-        if emoji is None:
+        del nickname_result  # The reaction is now an action, not a passive status icon.
+        if not await self.store.nickname_markers_enabled(request.guild_id):
             return
+        enabled = await self.store.nickname_marker_allowed(
+            request.guild_id, request.user_id
+        )
+        emoji = NICKNAME_HIDE_EMOJI if enabled else NICKNAME_SHOW_EMOJI
         channel = self.bot.get_channel(request.channel_id)
         if channel is None:
             try:
@@ -2609,6 +2862,16 @@ class TicketTracker(commands.Cog):
             await get_partial(request.command_message_id).add_reaction(emoji)
         except (discord.Forbidden, discord.NotFound, discord.HTTPException):
             return
+        self.purge_reaction_controls()
+        key = (request.guild_id, request.channel_id, request.command_message_id)
+        self.reaction_controls[key] = TicketReactionControl(
+            guild_id=request.guild_id,
+            channel_id=request.channel_id,
+            message_id=request.command_message_id,
+            user_id=request.user_id,
+            emoji=emoji,
+            created_at=time.monotonic(),
+        )
 
     def drop_pending_for_user(self, guild_id: int, user_id: int) -> None:
         for channel_id, pending in list(self.pending_by_channel.items()):
@@ -2660,6 +2923,10 @@ class TicketTracker(commands.Cog):
             "their current entry; their next ticket check can add them again. "
             "**Block tracking** removes them and ignores future ticket checks until "
             "an admin unblocks them.\n\n"
+            "Enabling nickname markers only makes the feature available; every member "
+            "stays unchanged until they explicitly opt in. Members can use **My "
+            "settings** or the action reaction under their own ticket command. Bulk "
+            "syncs run in the background and include opted-in members only.\n\n"
             "Nickname markers use `Name · 🎟🎟▫`, require **Manage Nicknames**, and "
             "cannot edit the server owner or members whose highest role is equal to "
             "or above the bot role."
@@ -2721,6 +2988,7 @@ class TicketTracker(commands.Cog):
     def arm_ticket_request(self, message: discord.Message) -> bool:
         if message.guild is None:
             return False
+        self.remember_member(message.author)
         if message.author.id in self.blocked_users.get(message.guild.id, set()):
             logger.info(
                 "Ignored ticket check from blocked user %s in guild %s",
@@ -2842,30 +3110,38 @@ class TicketTracker(commands.Cog):
             return
         self._restored = True
         await ensure_ui_emojis(self.bot)
-        changed_guilds = await self.store.reset_all_for_current_cycle()
-        configured = await self.store.list_configured_guilds()
-        for guild_id in configured:
-            try:
-                await self.refresh_board(guild_id)
-            except Exception:
-                logger.exception("Could not restore ticket board for guild %s", guild_id)
-        for guild_id in changed_guilds:
-            if not await self.store.nickname_markers_enabled(guild_id):
-                continue
-            try:
-                result = await self.sync_guild_nicknames(guild_id)
+        self.startup_task = asyncio.create_task(self.restore_startup_state())
+
+    async def restore_startup_state(self) -> None:
+        try:
+            changed_guilds = await self.store.reset_all_for_current_cycle()
+            configured = await self.store.list_configured_guilds()
+            for index, guild_id in enumerate(configured):
+                self.queue_board_refresh(guild_id)
+                if await self.store.nickname_markers_enabled(guild_id):
+                    # Remove markers inherited from the old implicit-opt-in behavior,
+                    # then reapply only preferences that were explicitly enabled.
+                    self.queue_nickname_job(guild_id, "cleanup")
+                    self.queue_nickname_job(guild_id, "sync")
+                if index + 1 < len(configured):
+                    await asyncio.sleep(STARTUP_QUEUE_DELAY_SECONDS)
+            configured_ids = set(configured)
+            for guild_id in changed_guilds:
+                self.invalidate_board_cache(guild_id)
+                if (
+                    guild_id not in configured_ids
+                    and await self.store.nickname_markers_enabled(guild_id)
+                ):
+                    self.queue_nickname_job(guild_id, "sync")
+            if changed_guilds:
                 logger.info(
-                    "Synced ticket nickname reset for guild %s: %s processed",
-                    guild_id,
-                    result.total_processed,
+                    "Replenished stale boss-ticket entries for %s guild(s)",
+                    len(changed_guilds),
                 )
-            except Exception:
-                logger.exception(
-                    "Could not sync ticket nicknames after startup reset for guild %s",
-                    guild_id,
-                )
-        if changed_guilds:
-            logger.info("Replenished stale boss-ticket entries for %s guild(s)", len(changed_guilds))
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception("Could not restore boss-ticket state after startup")
 
     async def record_ticket_response(
         self,
@@ -2922,6 +3198,9 @@ class TicketTracker(commands.Cog):
             request.account_username,
             tickets,
         )
+        self.invalidate_board_cache(request.guild_id)
+        if await self.store.get_config(request.guild_id) is not None:
+            self.queue_board_refresh(request.guild_id)
         logger.info(
             "Updated boss tickets for user %s in guild %s: %s/3",
             request.user_id,
@@ -2933,7 +3212,7 @@ class TicketTracker(commands.Cog):
             request.user_id,
             tickets,
         )
-        if nickname_result not in {"disabled", "unchanged"}:
+        if nickname_result not in {"disabled", "unchanged", "opted-out"}:
             logger.info(
                 "Ticket nickname result for user %s in guild %s: %s",
                 request.user_id,
@@ -2941,8 +3220,7 @@ class TicketTracker(commands.Cog):
                 nickname_result,
             )
         await self.add_ticket_command_marker_reaction(request, nickname_result)
-        if await self.store.get_config(request.guild_id) is not None:
-            await self.refresh_board(request.guild_id)
+        # The sticky-board refresh was already queued immediately after the DB write.
         return True
 
     async def capture_ticket_response_with_retries(
@@ -3035,6 +3313,108 @@ class TicketTracker(commands.Cog):
                 )
 
         task.add_done_callback(cleanup)
+
+    @commands.Cog.listener()
+    async def on_raw_reaction_add(
+        self, payload: discord.RawReactionActionEvent
+    ) -> None:
+        try:
+            if (
+                payload.guild_id is None
+                or self.bot.user is None
+                or payload.user_id == self.bot.user.id
+            ):
+                return
+            emoji = str(payload.emoji)
+            if emoji not in {NICKNAME_SHOW_EMOJI, NICKNAME_HIDE_EMOJI}:
+                return
+            self.purge_reaction_controls()
+            key = (payload.guild_id, payload.channel_id, payload.message_id)
+            control = self.reaction_controls.get(key)
+            if (
+                control is None
+                or control.user_id != payload.user_id
+                or control.emoji != emoji
+            ):
+                # Ignore unrelated uses of the same common emoji without fetching the
+                # message. This keeps reaction shortcuts cheap in large servers.
+                return
+            channel = await self.get_text_channel(payload.channel_id)
+            if channel is None:
+                return
+            try:
+                message = await channel.fetch_message(payload.message_id)
+            except discord.NotFound:
+                self.reaction_controls.pop(key, None)
+                return
+            except (discord.Forbidden, discord.HTTPException):
+                return
+            bot_added_action = any(
+                str(item.emoji) == emoji and item.me for item in message.reactions
+            )
+            if not bot_added_action:
+                return
+            if (
+                message.author.id != control.user_id
+                or not is_ticket_command(message.content or "")
+            ):
+                self.reaction_controls.pop(key, None)
+                return
+            actor = payload.member or discord.Object(id=payload.user_id)
+            if not await self.store.nickname_markers_enabled(payload.guild_id):
+                for target in (actor, self.bot.user):
+                    try:
+                        await message.remove_reaction(payload.emoji, target)
+                    except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                        pass
+                self.reaction_controls.pop(key, None)
+                return
+
+            if payload.member is not None:
+                self.remember_member(payload.member)
+            desired = emoji == NICKNAME_SHOW_EMOJI
+            current = await self.store.nickname_marker_allowed(
+                payload.guild_id, payload.user_id
+            )
+            if desired != current:
+                notice = await self.set_personal_nickname_preference(
+                    payload.guild_id,
+                    payload.user_id,
+                    desired,
+                )
+            else:
+                notice = "Preference was already in the requested state."
+
+            try:
+                await message.remove_reaction(payload.emoji, actor)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+            try:
+                await message.remove_reaction(payload.emoji, self.bot.user)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+            next_emoji = NICKNAME_HIDE_EMOJI if desired else NICKNAME_SHOW_EMOJI
+            try:
+                await message.add_reaction(next_emoji)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+            self.reaction_controls[key] = TicketReactionControl(
+                guild_id=control.guild_id,
+                channel_id=control.channel_id,
+                message_id=control.message_id,
+                user_id=control.user_id,
+                emoji=next_emoji,
+                created_at=time.monotonic(),
+            )
+            logger.info(
+                "User %s toggled ticket nickname marker to %s in guild %s via reaction: %s",
+                payload.user_id,
+                desired,
+                payload.guild_id,
+                notice,
+            )
+        except Exception:
+            logger.exception("Unhandled ticket nickname reaction toggle")
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -3177,9 +3557,10 @@ class TicketTracker(commands.Cog):
                 ephemeral=True,
             )
             return
+        await interaction.response.defer(ephemeral=True)
         await self.send_management_panel(
             guild_id=interaction.guild_id,
-            send=interaction.response.send_message,
+            send=interaction.followup.send,
             ephemeral=True,
         )
         logger.info(
@@ -3218,6 +3599,7 @@ class TicketTracker(commands.Cog):
         target_id = int(match.group(1) or match.group(2))
         await interaction.response.defer(ephemeral=True)
         removed = await self.store.remove_status(interaction.guild_id, target_id)
+        self.invalidate_board_cache(interaction.guild_id)
         self.drop_pending_for_user(interaction.guild_id, target_id)
         await self.clear_ticket_nickname(
             interaction.guild_id,
@@ -3232,7 +3614,7 @@ class TicketTracker(commands.Cog):
             return
 
         if await self.store.get_config(interaction.guild_id) is not None:
-            await self.refresh_board(interaction.guild_id)
+            self.queue_board_refresh(interaction.guild_id)
 
         await interaction.followup.send(
             f"🗑️ Removed **{discord.utils.escape_markdown(removed.username)}** "
@@ -3257,12 +3639,7 @@ class TicketTracker(commands.Cog):
             )
             return
         await interaction.response.defer(ephemeral=True)
-        statuses = await self.store.list_status(interaction.guild_id)
-        if await self.refresh_status_identities(
-            interaction.guild_id,
-            statuses[:BOARD_PAGE_SIZE],
-        ):
-            statuses = await self.store.list_status(interaction.guild_id)
+        statuses = await self.get_board_statuses(interaction.guild_id)
         page_count = self.board_page_count(statuses)
         await interaction.followup.send(
             embed=self.build_board_embed(statuses, 0),
@@ -3280,12 +3657,7 @@ class TicketTracker(commands.Cog):
         if message.guild is None:
             return
         config = await self.store.get_config(message.guild.id)
-        statuses = await self.store.list_status(message.guild.id)
-        if await self.refresh_status_identities(
-            message.guild.id,
-            statuses[:BOARD_PAGE_SIZE],
-        ):
-            statuses = await self.store.list_status(message.guild.id)
+        statuses = await self.get_board_statuses(message.guild.id)
         page_count = self.board_page_count(statuses)
         await message.reply(
             embed=self.build_board_embed(statuses, 0),
@@ -3436,8 +3808,8 @@ class TicketTracker(commands.Cog):
         )
         embed.set_footer(
             text=(
-                "Ping view shows clickable members. My settings controls your "
-                "nickname marker, board entry, and tracking preference."
+                "Pages use cached ticket data for fast switching. My settings controls "
+                "your opt-in nickname marker, board entry, and tracking preference."
             )
         )
         return embed
@@ -3449,6 +3821,7 @@ class TicketTracker(commands.Cog):
         workflow. Sending the new board first and deleting the previous board keeps
         the configured channel clean while guaranteeing that the visible list is new.
         """
+        started = time.monotonic()
         async with self.board_lock(guild_id):
             config = await self.store.get_config(guild_id)
             if config is None:
@@ -3460,7 +3833,7 @@ class TicketTracker(commands.Cog):
                 return
 
             await self.store.normalize_guild_cycle(guild_id)
-            statuses = await self.store.list_status(guild_id)
+            statuses = await self.get_board_statuses(guild_id, force=True)
             page_count = self.board_page_count(statuses)
 
             try:
@@ -3490,10 +3863,11 @@ class TicketTracker(commands.Cog):
                     continue
 
             logger.info(
-                "Replaced boss-ticket board for guild %s: %s entries in one paginated message (%s page(s))",
+                "Replaced boss-ticket board for guild %s: %s entries in one paginated message (%s page(s)) in %.3fs",
                 guild_id,
                 len(statuses),
                 page_count,
+                time.monotonic() - started,
             )
 
     async def daily_reset_loop(self) -> None:
@@ -3504,29 +3878,14 @@ class TicketTracker(commands.Cog):
                 await asyncio.sleep(max(1, reset_at - time.time() + 1))
                 changed_guilds = await self.store.reset_all_for_current_cycle()
                 configured = await self.store.list_configured_guilds()
-                for guild_id in configured:
-                    try:
-                        await self.refresh_board(guild_id)
-                    except Exception:
-                        logger.exception(
-                            "Could not refresh ticket board after daily reset for guild %s",
-                            guild_id,
-                        )
+                for index, guild_id in enumerate(configured):
+                    self.invalidate_board_cache(guild_id)
+                    self.queue_board_refresh(guild_id)
+                    if index + 1 < len(configured):
+                        await asyncio.sleep(STARTUP_QUEUE_DELAY_SECONDS)
                 for guild_id in changed_guilds:
-                    if not await self.store.nickname_markers_enabled(guild_id):
-                        continue
-                    try:
-                        result = await self.sync_guild_nicknames(guild_id)
-                        logger.info(
-                            "Synced Pacific-midnight ticket nicknames for guild %s: %s processed",
-                            guild_id,
-                            result.total_processed,
-                        )
-                    except Exception:
-                        logger.exception(
-                            "Could not sync ticket nicknames after daily reset for guild %s",
-                            guild_id,
-                        )
+                    if await self.store.nickname_markers_enabled(guild_id):
+                        self.queue_nickname_job(guild_id, "sync")
                 logger.info(
                     "Replenished Pacific-midnight boss-ticket entries; %s guild(s) changed",
                     len(changed_guilds),

@@ -60,11 +60,15 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Maintains one persistent board in a configured channel.
 - Shows display name, exact Discord account username, numeric user ID, ticket count, update time, and next replenishment.
 - Keeps the persistent board and manual ticket-list responses in a single Discord message, with Previous and Next buttons for large lists. Pages contain up to 15 entries so custom ticket emoji markup remains safely within Discord embed limits.
-- Adds **Text view** and **Ping view** buttons. Ping view uses clickable member mentions without notifying users. Large-page interactions are acknowledged immediately before identity refreshes, preventing Discord interaction timeouts.
-- Refreshes names for the visible page from known tracked user IDs, so changed Discord names are corrected without requiring Guild Members Intent.
+- Keeps the configured board sticky by sending a fresh replacement first and deleting the previous board afterward.
+- Caches the complete ticket snapshot used by Previous, Next, Text view, and Ping view, so page switching performs no Discord member lookups.
+- Coalesces bursts of ticket updates into a single background sticky-board replacement.
+- Updates stored names from the member who actually ran the ticket command instead of scanning or loading the full server member list.
 - Provides a visual ticket management panel for server managers, including remove, block tracking, and unblock actions.
 - Supports optional per-server ticket markers in member nicknames, disabled by default and managed through `HBS`.
-- Gives every member private controls to show or hide their marker, remove their current board entry, stop ticket tracking completely, or resume it later.
+- Uses explicit per-member opt-in: enabling the server feature does not change any nickname until that member enables their own marker.
+- Gives every member private controls to enable or disable their marker, remove their current board entry, stop ticket tracking completely, or resume it later.
+- Adds a functional action reaction under successful ticket commands: `🏷️` enables the member's marker and `🔕` disables it.
 - Adds a persistent **My settings** button to ticket boards plus `/boss-ticket-nickname`, `H boss nickname`, and `HBN`.
 - Safely restores managed nicknames when markers are disabled, a member opts out, or a ticket entry is removed or blocked.
 - Supports paginated managed user selection for servers with more than 25 tracked or blocked users.
@@ -156,7 +160,7 @@ Required permissions:
 
 Optional permissions:
 
-- Manage Messages — allows guided team setup to remove completed user command messages.
+- Manage Messages — allows guided team setup to remove completed commands and lets nickname action reactions flip cleanly by removing the member's click reaction.
 - Manage Nicknames — allows a server manager to enable optional ticket markers through `HBS`. The bot role must be above members whose nicknames it edits.
 
 The bot does not require Administrator permission.
@@ -341,11 +345,13 @@ The panel supports:
 - **Remove from list** — deletes the current board entry, but the user can reappear after their next OwO ticket check.
 - **Block tracking** — removes the user and ignores their future ticket checks in that server.
 - **Unblock** — allows future ticket checks to be recorded again.
-- **Enable/Disable nickname markers** — turns optional ticket markers on or off for the server.
-- **Sync nickname markers** — reapplies the current recorded ticket values to tracked members who have not hidden their marker.
+- **Enable/Disable nickname markers** — makes the optional feature available or unavailable without blocking the panel on a server-wide loop.
+- **Sync nickname markers** — queues a background sync for members who explicitly opted in.
 - Paginated user selection for servers with more than 25 tracked or blocked users.
 
-Nickname markers are disabled by default. Enabling them requires the bot role to have **Manage Nicknames** and to be above the members it edits. Discord does not allow bots to edit the server owner's nickname, so the owner is skipped. Members at or above the bot's highest role are also skipped.
+Nickname markers are disabled for the server by default, and they are also off for every member by default. Enabling the server feature only exposes the opt-in controls; it does not rename the tracked member list. Each member must choose **Enable my marker** or click the `🏷️` action reaction under their own successful ticket command. Disabling the server feature returns immediately and restores managed names through a throttled background job.
+
+Enabling the feature requires the bot role to have **Manage Nicknames** and to be above the members it edits. Discord does not allow bots to edit the server owner's nickname, so the owner is skipped. Members at or above the bot's highest role are also skipped.
 
 The marker format uses Unicode so it works without custom server emojis:
 
@@ -370,16 +376,17 @@ HBN
 
 They can also click **My settings** under any ticket-board message. The private panel provides:
 
-- **Show marker / Hide marker** — changes only the nickname suffix.
+- **Enable my marker / Disable my marker** — explicitly opts the member's nickname in or out.
 - **Remove me from list** — deletes the current board entry, but the next `w boss t` can add it again.
 - **Stop tracking me** — removes the current entry and ignores later ticket checks until the member resumes tracking.
 - **Resume tracking** — allows the next ticket check to add the member again.
 
-After a successful ticket check, the helper reacts to the member's command with:
+When the server feature is available, a successful ticket check receives one action reaction:
 
-- `🏷️` — the nickname marker is active.
-- `🔕` — the member has chosen to hide their marker.
-- `⚠️` — Discord permissions, server ownership, or role hierarchy prevented the nickname update.
+- `🏷️` — click to enable your own nickname marker.
+- `🔕` — click to disable your own nickname marker.
+
+Only the author of that ticket command can use its reaction shortcut. The icon flips after the preference changes. Permission or role-hierarchy details remain available in **My settings** and the bot logs.
 
 The existing `/boss-ticket-remove` command remains available for direct removal by Discord user ID or mention.
 

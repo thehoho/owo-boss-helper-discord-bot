@@ -1,5 +1,20 @@
 # Changelog
 
+## 0.10.3-beta
+
+- Kept the persistent ticket board sticky by continuing to send the replacement first and delete the previous message afterward.
+- Added a cached ticket-board snapshot so Previous, Next, Text view, and Ping view no longer perform Discord member lookups.
+- Coalesced bursts of ticket updates into one background board replacement instead of blocking every ticket response on a send/delete cycle.
+- Changed nickname markers to explicit per-member opt-in; enabling the server feature no longer changes everyone automatically.
+- Made HBS enable, disable, and sync actions return immediately while bulk nickname cleanup or opted-in synchronization runs in the background; saved explicit opt-ins are reapplied when the feature is enabled again.
+- Added functional `🏷️` / `🔕` action reactions under successful ticket commands so the command author can enable or disable their own marker directly, while unrelated emoji reactions are ignored without message fetches.
+- Reused the member object from the ticket command or interaction for immediate nickname changes, reducing individual member fetches and Discord 429 pressure.
+- Limited bulk nickname synchronization to opted-in members and slowed background nickname edits to a safer bounded pace.
+- Added automatic cleanup of nickname suffixes inherited from the old implicit-opt-in behavior.
+- Added SQLite busy-timeout and synchronous settings plus timing logs for board navigation and replacement.
+- Moved startup and Pacific-midnight board/nickname restoration into background queues.
+- Updated the public bot version to `0.10.3-beta`.
+
 ## 0.10.2-beta
 
 - Fixed large ticket-board button interactions timing out while visible-page member identities were fetched.
