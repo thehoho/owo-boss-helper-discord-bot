@@ -41,4 +41,8 @@ The Discord bot token and runtime databases are not committed to the public sour
 
 ## Contact
 
-Questions or deletion requests can be opened through the project's GitHub repository or sent to the developer through the bot's support server when one is configured.
+Questions and deletion requests can be opened through the project's GitHub issue tracker:
+
+https://github.com/thehoho/owo-boss-helper-discord-bot/issues/new
+
+Users should not post sensitive information publicly. The developer will arrange private verification when needed before deleting user-associated records.
