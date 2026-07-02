@@ -22,6 +22,8 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .message_utils import safe_reply
+
 logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -30,7 +32,7 @@ TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.10.3-beta"
+BOT_VERSION = "0.10.4-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -63,6 +65,15 @@ def compact_command(content: str) -> str:
 
 
 def classify_message_usage(content: str) -> str | None:
+    first_line = next(
+        (line.strip() for line in (content or "").splitlines() if line.strip()),
+        "",
+    )
+    if re.match(r"^h\s*help\b", first_line, re.IGNORECASE):
+        return "help_views"
+    if re.match(r"^hbt(?:\s|$)", first_line, re.IGNORECASE):
+        return "ticket_lookups"
+
     compact = compact_command(content)
     if compact in {"owobossi", "wbossi"}:
         return "boss_generator_requests"
@@ -81,8 +92,6 @@ def classify_message_usage(content: str) -> str | None:
         return "ticket_list_views"
     if compact in {"hbosssettings", "hbs"}:
         return "ticket_management"
-    if compact == "hhelp":
-        return "help_views"
     if compact == "habout":
         return "about_views"
     if compact.startswith(("ht", "htm", "hteam")):
@@ -502,7 +511,8 @@ class BotInfo(commands.Cog):
         if metric is not None:
             await self.store.record_usage(message.guild.id, metric)
         if compact_command(message.content or "") in ABOUT_COMMANDS:
-            await message.reply(
+            await safe_reply(
+                message,
                 embed=self.build_about_embed(),
                 view=AboutLinks(self.github_url, self.support_url),
                 mention_author=False,
@@ -524,6 +534,112 @@ class BotInfo(commands.Cog):
         await interaction.response.send_message(
             embed=self.build_about_embed(),
             view=AboutLinks(self.github_url, self.support_url),
+        )
+
+    @app_commands.command(
+        name="channel-diagnostics",
+        description="Check the helper's effective permissions in this channel.",
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def channel_diagnostics(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        channel = interaction.channel
+        if guild is None or channel is None:
+            await interaction.response.send_message(
+                "This command only works inside a server channel.",
+                ephemeral=True,
+            )
+            return
+
+        bot_user = self.bot.user
+        bot_member = guild.me
+        if bot_member is None and bot_user is not None:
+            bot_member = guild.get_member(bot_user.id)
+        permissions_for = getattr(channel, "permissions_for", None)
+        if bot_member is None or not callable(permissions_for):
+            await interaction.response.send_message(
+                "I could not resolve my effective permissions in this channel.",
+                ephemeral=True,
+            )
+            return
+
+        permissions = permissions_for(bot_member)
+        is_thread = isinstance(channel, discord.Thread)
+        checks: list[tuple[str, bool, bool]] = [
+            ("View Channel", bool(permissions.view_channel), True),
+            ("Send Messages", bool(permissions.send_messages), True),
+            ("Read Message History", bool(permissions.read_message_history), True),
+            ("Embed Links", bool(permissions.embed_links), True),
+            ("Add Reactions", bool(permissions.add_reactions), False),
+            (
+                "Send Messages in Threads",
+                bool(getattr(permissions, "send_messages_in_threads", False)),
+                is_thread,
+            ),
+            ("Manage Messages", bool(permissions.manage_messages), False),
+            ("Manage Nicknames", bool(permissions.manage_nicknames), False),
+        ]
+        lines: list[str] = []
+        required_missing: list[str] = []
+        for label, allowed, required in checks:
+            marker = "✅" if allowed else "❌"
+            suffix = " — required here" if required else " — optional"
+            lines.append(f"{marker} **{label}**{suffix}")
+            if required and not allowed:
+                required_missing.append(label)
+
+        parent = getattr(channel, "parent", None)
+        details = [
+            f"**Channel:** {getattr(channel, 'mention', f'`{channel.id}`')}",
+            f"**Channel ID:** `{channel.id}`",
+            f"**Type:** `{type(channel).__name__}`",
+        ]
+        if parent is not None:
+            details.append(
+                f"**Parent:** {getattr(parent, 'mention', getattr(parent, 'name', parent.id))} "
+                f"(`{parent.id}`)"
+            )
+        if is_thread:
+            details.append(f"**Archived:** `{bool(channel.archived)}`")
+            details.append(f"**Locked:** `{bool(channel.locked)}`")
+
+        reply_ready = not required_missing
+        if reply_ready:
+            conclusion = (
+                "✅ The core text-command permissions look correct. If Discord rejects "
+                "a message reply anyway, v0.10.4 falls back to a normal channel message "
+                "and records the reply error in the bot log."
+            )
+            color = 0x57F287
+        else:
+            conclusion = (
+                "❌ Prefix responses can fail here because these required permissions "
+                "are missing: **" + ", ".join(required_missing) + "**."
+            )
+            color = 0xED4245
+
+        embed = discord.Embed(
+            title="🔎 Channel Diagnostics",
+            description="\n".join(details),
+            color=color,
+        )
+        embed.add_field(
+            name="Effective permissions",
+            value="\n".join(lines),
+            inline=False,
+        )
+        embed.add_field(name="Result", value=conclusion, inline=False)
+        embed.set_footer(
+            text="Run this command inside the channel or thread you want to test."
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        logger.info(
+            "Channel diagnostics requested by %s in guild %s channel %s; missing=%s",
+            interaction.user.id,
+            guild.id,
+            channel.id,
+            required_missing,
         )
 
     @app_commands.command(
@@ -572,6 +688,7 @@ class BotInfo(commands.Cog):
             "cooldown_checks": "Cooldown checks",
             "ticket_list_views": "Ticket-list views",
             "ticket_management": "Ticket management",
+            "ticket_lookups": "Ticket lookups",
             "help_views": "Help views",
             "about_views": "About views",
         }

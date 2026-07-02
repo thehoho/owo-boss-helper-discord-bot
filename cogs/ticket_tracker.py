@@ -1,8 +1,9 @@
-"""Per-guild OwO boss-ticket board with Pacific-midnight resets.
+"""Per-guild OwO boss-ticket board with safe automatic hit reconciliation.
 
-The tracker only records a user's ticket count after that user explicitly runs an
-OwO boss-ticket command in a server where the helper is present. It does not infer
-usage from battles or from activity in other servers.
+Manual OwO ticket checks remain authoritative. While a guild boss is active, the
+tracker also reads public Top 10 battle-log UUIDs from OwO's edited boss card and
+subtracts newly observed hits only for members already present on that server's
+ticket board. Entries expire after 48 hours without a manual check or confirmed hit.
 """
 
 from __future__ import annotations
@@ -25,6 +26,7 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .message_utils import safe_reply
 from .ui_emojis import ensure_ui_emojis, ui_emoji_button, ui_emoji_text
 
 logger = logging.getLogger(__name__)
@@ -46,6 +48,8 @@ BOARD_STATUS_CACHE_TTL_SECONDS = 15 * 60
 RECENT_MEMBER_TTL_SECONDS = 15 * 60
 REACTION_CONTROL_TTL_SECONDS = 6 * 60 * 60
 STARTUP_QUEUE_DELAY_SECONDS = 0.20
+STALE_ENTRY_SECONDS = 48 * 60 * 60
+STALE_CLEANUP_INTERVAL_SECONDS = 5 * 60
 NICKNAME_SHOW_EMOJI = "🏷️"
 NICKNAME_HIDE_EMOJI = "🔕"
 TICKET_NICKNAME_MARKERS = {
@@ -95,6 +99,12 @@ ZERO_TICKET_RE = re.compile(
 TICKET_CAPTURE_RETRY_DELAYS = (0.20, 0.65, 1.35, 2.40, 3.75)
 ZERO_WIDTH_RE = re.compile(r"[\u200b-\u200f\u202a-\u202e\u2060\ufeff]")
 USER_ID_RE = re.compile(r"^(?:<@!?(\d{15,22})>|(\d{15,22}))$")
+TICKET_LOOKUP_RE = re.compile(r"^\s*hbt(?:\s+(.+?))?\s*$", re.IGNORECASE)
+BATTLE_LOG_UUID_RE = re.compile(
+    r"owobot\.com/battle-log\?uuid=([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})",
+    re.IGNORECASE,
+)
+BATTLE_USER_MENTION_RE = re.compile(r"<@!?(\d{15,22})>")
 
 
 @dataclass(frozen=True)
@@ -128,6 +138,27 @@ class TicketStatus:
     tickets: int
     updated_at: int
     cycle_date: str
+
+
+@dataclass(frozen=True)
+class TicketLookupResult:
+    guild_id: int
+    user_id: int
+    username: str
+    account_username: str
+    tickets: int
+    updated_at: int
+    last_activity_at: int
+    last_source: str
+
+
+@dataclass(frozen=True)
+class AutoTicketUpdate:
+    guild_id: int
+    user_id: int
+    previous_tickets: int
+    tickets: int
+    hits_applied: int
 
 
 @dataclass(frozen=True)
@@ -218,6 +249,53 @@ def is_ticket_settings_command(content: str) -> bool:
 
 def is_ticket_nickname_command(content: str) -> bool:
     return normalize_ticket_command(content) in TICKET_NICKNAME_COMMANDS
+
+
+def parse_ticket_lookup_query(content: str) -> str | None:
+    """Return the HBT lookup query, an empty string for bare HBT, or None."""
+    first_line = next(
+        (line.strip() for line in (content or "").splitlines() if line.strip()),
+        "",
+    )
+    match = TICKET_LOOKUP_RE.fullmatch(first_line)
+    if match is None:
+        return None
+    return (match.group(1) or "").strip()
+
+
+def looks_like_guild_boss_card(text: str) -> bool:
+    lowered = (text or "").lower()
+    if "top 10 damage dealt" in lowered or "owobot.com/battle-log?uuid=" in lowered:
+        return True
+    return "guild boss" in lowered and any(
+        marker in lowered
+        for marker in ("fight!", "fighters", "defeated", "escaped", "damage dealt")
+    )
+
+
+def extract_top10_battle_logs(text: str) -> dict[int, set[str]]:
+    """Map each mentioned Top 10 fighter to the public battle-log UUIDs shown."""
+    if not text:
+        return {}
+    lowered = text.lower()
+    start = lowered.find("top 10 damage dealt")
+    if start < 0:
+        return {}
+    section = text[start:]
+    lowered_section = section.lower()
+    rewards_at = lowered_section.find("rewards")
+    if rewards_at >= 0:
+        section = section[:rewards_at]
+
+    mentions = list(BATTLE_USER_MENTION_RE.finditer(section))
+    result: dict[int, set[str]] = {}
+    for index, match in enumerate(mentions):
+        segment_end = mentions[index + 1].start() if index + 1 < len(mentions) else len(section)
+        segment = section[match.end():segment_end]
+        uuids = {value.lower() for value in BATTLE_LOG_UUID_RE.findall(segment)}
+        if uuids:
+            result.setdefault(int(match.group(1)), set()).update(uuids)
+    return result
 
 
 def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
@@ -370,6 +448,12 @@ def next_pacific_reset_timestamp(now: datetime | None = None) -> int:
     return pacific_midnight_timestamp(next_day)
 
 
+def second_upcoming_pacific_reset_timestamp(now: datetime | None = None) -> int:
+    """Return the second Pacific midnight after now for rollout grace migration."""
+    current = (now or datetime.now(tz=PACIFIC)).astimezone(PACIFIC)
+    return pacific_midnight_timestamp(current.date() + timedelta(days=2))
+
+
 def identity_tokens_for_user(user: discord.abc.User) -> tuple[str, ...]:
     sources = (
         getattr(user, "display_name", ""),
@@ -384,13 +468,32 @@ def identity_tokens_for_user(user: discord.abc.User) -> tuple[str, ...]:
     return tuple(sorted((token for token in tokens if len(token) >= 2), key=len, reverse=True))
 
 
+class ClosingSQLiteConnection(sqlite3.Connection):
+    """Commit/rollback and then close when leaving a ``with`` block.
+
+    ``sqlite3.Connection`` normally commits or rolls back in ``__exit__`` but does
+    not close the file handle. Explicit closure avoids descriptor buildup in the
+    long-running bot and Windows file-lock failures in deterministic tests.
+    """
+
+    def __exit__(self, exc_type, exc_value, traceback) -> bool:
+        try:
+            return bool(super().__exit__(exc_type, exc_value, traceback))
+        finally:
+            self.close()
+
+
 class TicketStore:
     def __init__(self, path: Path) -> None:
         self.path = path
         self.lock = asyncio.Lock()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path, timeout=10)
+        connection = sqlite3.connect(
+            self.path,
+            timeout=10,
+            factory=ClosingSQLiteConnection,
+        )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA synchronous=NORMAL")
@@ -423,6 +526,9 @@ class TicketStore:
                     tickets INTEGER NOT NULL,
                     updated_at INTEGER NOT NULL,
                     cycle_date TEXT NOT NULL,
+                    last_activity_at INTEGER NOT NULL DEFAULT 0,
+                    stale_after INTEGER NOT NULL DEFAULT 0,
+                    last_source TEXT NOT NULL DEFAULT 'manual',
                     PRIMARY KEY (guild_id, user_id)
                 )
                 """
@@ -436,6 +542,40 @@ class TicketStore:
                     "ALTER TABLE ticket_status "
                     "ADD COLUMN account_username TEXT NOT NULL DEFAULT ''"
                 )
+            if "last_activity_at" not in ticket_status_columns:
+                connection.execute(
+                    "ALTER TABLE ticket_status "
+                    "ADD COLUMN last_activity_at INTEGER NOT NULL DEFAULT 0"
+                )
+            if "stale_after" not in ticket_status_columns:
+                connection.execute(
+                    "ALTER TABLE ticket_status "
+                    "ADD COLUMN stale_after INTEGER NOT NULL DEFAULT 0"
+                )
+            if "last_source" not in ticket_status_columns:
+                connection.execute(
+                    "ALTER TABLE ticket_status "
+                    "ADD COLUMN last_source TEXT NOT NULL DEFAULT 'manual'"
+                )
+
+            # Existing entries receive a one-time rollout grace ending at the second
+            # upcoming Pacific reset. Future manual checks and confirmed hits receive
+            # a rolling 48-hour activity window.
+            now = int(time.time())
+            rollout_expiry = second_upcoming_pacific_reset_timestamp()
+            connection.execute(
+                """
+                UPDATE ticket_status
+                SET last_activity_at = ?,
+                    stale_after = ?,
+                    last_source = 'migration'
+                WHERE last_activity_at <= 0 OR stale_after <= 0
+                """,
+                (now, rollout_expiry),
+            )
+            connection.execute(
+                "UPDATE ticket_status SET last_source = 'migration' WHERE last_source = ''"
+            )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_ticket_status_guild "
                 "ON ticket_status(guild_id, tickets DESC, username COLLATE NOCASE)"
@@ -512,6 +652,35 @@ class TicketStore:
                 "CREATE INDEX IF NOT EXISTS idx_ticket_tracking_preferences_guild "
                 "ON ticket_tracking_preferences(guild_id, enabled)"
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_boss_observations (
+                    guild_id INTEGER NOT NULL,
+                    boss_message_id INTEGER NOT NULL,
+                    channel_id INTEGER NOT NULL,
+                    initialized_at INTEGER NOT NULL,
+                    last_seen_at INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, boss_message_id)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS ticket_battle_events (
+                    guild_id INTEGER NOT NULL,
+                    boss_message_id INTEGER NOT NULL,
+                    user_id INTEGER NOT NULL,
+                    battle_uuid TEXT NOT NULL,
+                    detected_at INTEGER NOT NULL,
+                    applied INTEGER NOT NULL DEFAULT 0,
+                    PRIMARY KEY (guild_id, battle_uuid)
+                )
+                """
+            )
+            connection.execute(
+                "CREATE INDEX IF NOT EXISTS idx_ticket_battle_events_boss "
+                "ON ticket_battle_events(guild_id, boss_message_id, user_id)"
+            )
 
     async def set_channel(self, guild_id: int, channel_id: int) -> None:
         async with self.lock:
@@ -586,6 +755,8 @@ class TicketStore:
         username: str,
         account_username: str,
         tickets: int,
+        *,
+        source: str = "manual",
     ) -> None:
         async with self.lock:
             await asyncio.to_thread(
@@ -595,6 +766,7 @@ class TicketStore:
                 username,
                 account_username,
                 tickets,
+                source,
             )
 
     def _upsert_status_sync(
@@ -604,9 +776,12 @@ class TicketStore:
         username: str,
         account_username: str,
         tickets: int,
+        source: str,
     ) -> None:
         now = int(time.time())
         cycle = current_pacific_date().isoformat()
+        stale_after = now + STALE_ENTRY_SECONDS
+        clean_source = (source or "manual")[:40]
         with self._connect() as connection:
             self._normalize_guild_cycle_sync(connection, guild_id, cycle)
             connection.execute(
@@ -619,24 +794,33 @@ class TicketStore:
                         account_username,
                         tickets,
                         updated_at,
-                        cycle_date
+                        cycle_date,
+                        last_activity_at,
+                        stale_after,
+                        last_source
                     )
-                VALUES (?, ?, ?, ?, ?, ?, ?)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(guild_id, user_id) DO UPDATE SET
                     username = excluded.username,
                     account_username = excluded.account_username,
                     tickets = excluded.tickets,
                     updated_at = excluded.updated_at,
-                    cycle_date = excluded.cycle_date
+                    cycle_date = excluded.cycle_date,
+                    last_activity_at = excluded.last_activity_at,
+                    stale_after = excluded.stale_after,
+                    last_source = excluded.last_source
                 """,
                 (
                     guild_id,
                     user_id,
                     username[:100],
                     account_username[:100],
-                    tickets,
+                    max(0, min(MAX_TICKETS, tickets)),
                     now,
                     cycle,
+                    now,
+                    stale_after,
+                    clean_source,
                 ),
             )
 
@@ -695,8 +879,8 @@ class TicketStore:
     def _normalize_guild_cycle_sync(
         connection: sqlite3.Connection, guild_id: int, cycle: str
     ) -> bool:
-        # Previously tracked members replenish to 3/3 at Pacific midnight. A later
-        # ticket check from OwO replaces this reset value with the user's real count.
+        # Pacific midnight replenishes the visible count but deliberately preserves
+        # last_activity_at/stale_after. A reset is not proof that the member is active.
         reset_epoch = pacific_midnight_timestamp(date.fromisoformat(cycle))
         cursor = connection.execute(
             """
@@ -1239,6 +1423,265 @@ class TicketStore:
             )
             for row in rows
         ]
+
+
+
+    async def search_status(
+        self, guild_id: int, query: str, *, limit: int = 10
+    ) -> list[TicketLookupResult]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._search_status_sync, guild_id, query, limit
+            )
+
+    def _search_status_sync(
+        self, guild_id: int, query: str, limit: int
+    ) -> list[TicketLookupResult]:
+        cycle = current_pacific_date().isoformat()
+        raw_query = (query or "").strip()
+        id_match = USER_ID_RE.fullmatch(raw_query)
+        requested_id = int(id_match.group(1) or id_match.group(2)) if id_match else None
+        normalized = raw_query.casefold().lstrip("@").strip()
+        with self._connect() as connection:
+            self._normalize_guild_cycle_sync(connection, guild_id, cycle)
+            rows = connection.execute(
+                """
+                SELECT guild_id, user_id, username, account_username, tickets,
+                       updated_at, last_activity_at, last_source
+                FROM ticket_status
+                WHERE guild_id = ?
+                ORDER BY username COLLATE NOCASE ASC, user_id ASC
+                """,
+                (guild_id,),
+            ).fetchall()
+
+        def make(row: sqlite3.Row) -> TicketLookupResult:
+            return TicketLookupResult(
+                guild_id=int(row["guild_id"]),
+                user_id=int(row["user_id"]),
+                username=str(row["username"]),
+                account_username=str(row["account_username"] or ""),
+                tickets=int(row["tickets"]),
+                updated_at=int(row["updated_at"]),
+                last_activity_at=int(row["last_activity_at"] or 0),
+                last_source=str(row["last_source"] or "unknown"),
+            )
+
+        if requested_id is not None:
+            return [make(row) for row in rows if int(row["user_id"]) == requested_id][:1]
+        if not normalized:
+            return []
+
+        exact = [
+            row
+            for row in rows
+            if str(row["username"]).casefold() == normalized
+            or str(row["account_username"] or "").casefold() == normalized
+        ]
+        partial = [
+            row
+            for row in rows
+            if row not in exact
+            and (
+                normalized in str(row["username"]).casefold()
+                or normalized in str(row["account_username"] or "").casefold()
+            )
+        ]
+        return [make(row) for row in (exact + partial)[: max(1, limit)]]
+
+    async def cleanup_stale_statuses(
+        self, now: int | None = None
+    ) -> list[TicketStatus]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._cleanup_stale_statuses_sync, int(now or time.time())
+            )
+
+    def _cleanup_stale_statuses_sync(self, now: int) -> list[TicketStatus]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT guild_id, user_id, username, account_username, tickets,
+                       updated_at, cycle_date
+                FROM ticket_status
+                WHERE stale_after > 0 AND stale_after <= ?
+                ORDER BY guild_id, user_id
+                """,
+                (now,),
+            ).fetchall()
+            if rows:
+                connection.executemany(
+                    "DELETE FROM ticket_status WHERE guild_id = ? AND user_id = ?",
+                    [(int(row["guild_id"]), int(row["user_id"])) for row in rows],
+                )
+            # Public battle-log UUIDs are useful only for short-term deduplication.
+            retention_cutoff = now - 7 * 24 * 60 * 60
+            connection.execute(
+                "DELETE FROM ticket_battle_events WHERE detected_at < ?",
+                (retention_cutoff,),
+            )
+            connection.execute(
+                "DELETE FROM ticket_boss_observations WHERE last_seen_at < ?",
+                (retention_cutoff,),
+            )
+        return [
+            TicketStatus(
+                guild_id=int(row["guild_id"]),
+                user_id=int(row["user_id"]),
+                username=str(row["username"]),
+                account_username=str(row["account_username"] or ""),
+                tickets=int(row["tickets"]),
+                updated_at=int(row["updated_at"]),
+                cycle_date=str(row["cycle_date"]),
+            )
+            for row in rows
+        ]
+
+    async def record_boss_snapshot(
+        self,
+        guild_id: int,
+        channel_id: int,
+        boss_message_id: int,
+        hits: dict[int, set[str]],
+    ) -> tuple[list[AutoTicketUpdate], bool, int]:
+        normalized_hits = {
+            int(user_id): {str(value).lower() for value in values if value}
+            for user_id, values in hits.items()
+            if values
+        }
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._record_boss_snapshot_sync,
+                guild_id,
+                channel_id,
+                boss_message_id,
+                normalized_hits,
+            )
+
+    def _record_boss_snapshot_sync(
+        self,
+        guild_id: int,
+        channel_id: int,
+        boss_message_id: int,
+        hits: dict[int, set[str]],
+    ) -> tuple[list[AutoTicketUpdate], bool, int]:
+        now = int(time.time())
+        cycle = current_pacific_date().isoformat()
+        with self._connect() as connection:
+            self._normalize_guild_cycle_sync(connection, guild_id, cycle)
+            observed = connection.execute(
+                """
+                SELECT 1 FROM ticket_boss_observations
+                WHERE guild_id = ? AND boss_message_id = ?
+                """,
+                (guild_id, boss_message_id),
+            ).fetchone()
+            initialized = observed is None
+            if initialized:
+                connection.execute(
+                    """
+                    INSERT INTO ticket_boss_observations
+                        (guild_id, boss_message_id, channel_id, initialized_at, last_seen_at)
+                    VALUES (?, ?, ?, ?, ?)
+                    """,
+                    (guild_id, boss_message_id, channel_id, now, now),
+                )
+            else:
+                connection.execute(
+                    """
+                    UPDATE ticket_boss_observations
+                    SET channel_id = ?, last_seen_at = ?
+                    WHERE guild_id = ? AND boss_message_id = ?
+                    """,
+                    (channel_id, now, guild_id, boss_message_id),
+                )
+
+            new_by_user: dict[int, list[str]] = {}
+            total_visible = 0
+            for user_id, uuids in hits.items():
+                total_visible += len(uuids)
+                for battle_uuid in sorted(uuids):
+                    cursor = connection.execute(
+                        """
+                        INSERT OR IGNORE INTO ticket_battle_events
+                            (guild_id, boss_message_id, user_id, battle_uuid, detected_at, applied)
+                        VALUES (?, ?, ?, ?, ?, 0)
+                        """,
+                        (guild_id, boss_message_id, user_id, battle_uuid, now),
+                    )
+                    if cursor.rowcount > 0:
+                        new_by_user.setdefault(user_id, []).append(battle_uuid)
+
+            # The first snapshot for a message is a baseline. This prevents a restart
+            # in the middle of a boss from retroactively subtracting every visible hit.
+            if initialized:
+                return [], True, total_visible
+
+            updates: list[AutoTicketUpdate] = []
+            stale_after = now + STALE_ENTRY_SECONDS
+            for user_id, new_uuids in new_by_user.items():
+                status = connection.execute(
+                    """
+                    SELECT tickets
+                    FROM ticket_status
+                    WHERE guild_id = ? AND user_id = ?
+                    """,
+                    (guild_id, user_id),
+                ).fetchone()
+                if status is None:
+                    continue
+                if connection.execute(
+                    "SELECT 1 FROM ticket_blocked_users WHERE guild_id = ? AND user_id = ?",
+                    (guild_id, user_id),
+                ).fetchone() is not None:
+                    continue
+                preference = connection.execute(
+                    """
+                    SELECT enabled FROM ticket_tracking_preferences
+                    WHERE guild_id = ? AND user_id = ?
+                    """,
+                    (guild_id, user_id),
+                ).fetchone()
+                if preference is not None and not bool(int(preference["enabled"])):
+                    continue
+
+                previous = max(0, min(MAX_TICKETS, int(status["tickets"])))
+                new_tickets = max(0, previous - len(new_uuids))
+                connection.execute(
+                    """
+                    UPDATE ticket_status
+                    SET tickets = ?, updated_at = ?, cycle_date = ?,
+                        last_activity_at = ?, stale_after = ?, last_source = 'boss_hit'
+                    WHERE guild_id = ? AND user_id = ?
+                    """,
+                    (
+                        new_tickets,
+                        now,
+                        cycle,
+                        now,
+                        stale_after,
+                        guild_id,
+                        user_id,
+                    ),
+                )
+                connection.executemany(
+                    """
+                    UPDATE ticket_battle_events
+                    SET applied = 1
+                    WHERE guild_id = ? AND battle_uuid = ?
+                    """,
+                    [(guild_id, value) for value in new_uuids],
+                )
+                updates.append(
+                    AutoTicketUpdate(
+                        guild_id=guild_id,
+                        user_id=user_id,
+                        previous_tickets=previous,
+                        tickets=new_tickets,
+                        hits_applied=len(new_uuids),
+                    )
+                )
+            return updates, False, total_visible
 
 
 class TicketBoardView(discord.ui.View):
@@ -1956,6 +2399,7 @@ class TicketTracker(commands.Cog):
         self.nickname_user_locks: dict[tuple[int, int], asyncio.Lock] = {}
         self.reset_task: asyncio.Task[None] | None = None
         self.startup_task: asyncio.Task[None] | None = None
+        self.stale_cleanup_task: asyncio.Task[None] | None = None
         self.processed_responses: dict[tuple[int, int], float] = {}
         self.capture_tasks: dict[tuple[int, int], asyncio.Task[bool]] = {}
         self.board_refresh_tasks: dict[int, asyncio.Task[None]] = {}
@@ -1965,6 +2409,8 @@ class TicketTracker(commands.Cog):
         ] = {}
         self.nickname_job_tasks: dict[int, asyncio.Task[None]] = {}
         self.nickname_job_requests: dict[int, list[str]] = {}
+        self.boss_snapshot_tasks: dict[tuple[int, int], asyncio.Task[None]] = {}
+        self.boss_snapshot_pending: dict[tuple[int, int], tuple[int, str]] = {}
         self.recent_members: dict[
             tuple[int, int], tuple[float, discord.Member]
         ] = {}
@@ -1984,27 +2430,32 @@ class TicketTracker(commands.Cog):
         self.tracking_opt_outs = await self.store.load_all_tracking_opt_outs()
         self.bot.add_view(TicketBoardView(self))
         self.reset_task = asyncio.create_task(self.daily_reset_loop())
+        self.stale_cleanup_task = asyncio.create_task(self.stale_cleanup_loop())
         logger.info("Boss ticket storage ready at %s", DATABASE_FILE)
 
     async def cog_unload(self) -> None:
         self._closing = True
-        if self.reset_task:
-            self.reset_task.cancel()
-            self.reset_task = None
-        if self.startup_task:
-            self.startup_task.cancel()
-            self.startup_task = None
+        for task in (self.reset_task, self.startup_task, self.stale_cleanup_task):
+            if task:
+                task.cancel()
+        self.reset_task = None
+        self.startup_task = None
+        self.stale_cleanup_task = None
         for task in self.capture_tasks.values():
             task.cancel()
         for task in self.board_refresh_tasks.values():
             task.cancel()
         for task in self.nickname_job_tasks.values():
             task.cancel()
+        for task in self.boss_snapshot_tasks.values():
+            task.cancel()
         self.capture_tasks.clear()
         self.board_refresh_tasks.clear()
         self.board_refresh_dirty.clear()
         self.nickname_job_tasks.clear()
         self.nickname_job_requests.clear()
+        self.boss_snapshot_tasks.clear()
+        self.boss_snapshot_pending.clear()
         self.reaction_controls.clear()
         self.recent_members.clear()
 
@@ -2145,6 +2596,162 @@ class TicketTracker(commands.Cog):
                 )
             else:
                 self.nickname_job_requests.pop(guild_id, None)
+
+    def is_active_boss_message(self, guild_id: int, message_id: int) -> bool:
+        cog = self.bot.get_cog("BossGenerator")
+        config = getattr(cog, "cooldown_config", {}).get(str(guild_id), {}) if cog else {}
+        return int(config.get("active_boss_message_id") or 0) == int(message_id)
+
+    def queue_boss_snapshot_data(
+        self,
+        guild_id: int,
+        channel_id: int,
+        message_id: int,
+        data: dict[str, Any],
+    ) -> None:
+        """Queue a raw Discord boss payload, preserving public link URLs."""
+        self.queue_boss_snapshot(
+            guild_id,
+            channel_id,
+            message_id,
+            extract_raw_text(data),
+        )
+
+    def queue_boss_snapshot(
+        self,
+        guild_id: int,
+        channel_id: int,
+        message_id: int,
+        text: str,
+    ) -> None:
+        if self._closing or not looks_like_guild_boss_card(text):
+            return
+        key = (guild_id, message_id)
+        self.boss_snapshot_pending[key] = (channel_id, text)
+        existing = self.boss_snapshot_tasks.get(key)
+        if existing is not None and not existing.done():
+            return
+        self._start_boss_snapshot_worker(key)
+
+    def _start_boss_snapshot_worker(self, key: tuple[int, int]) -> None:
+        task = asyncio.create_task(self._boss_snapshot_worker(key))
+        self.boss_snapshot_tasks[key] = task
+
+        def cleanup(done: asyncio.Task[None]) -> None:
+            if self.boss_snapshot_tasks.get(key) is done:
+                self.boss_snapshot_tasks.pop(key, None)
+            try:
+                done.result()
+            except asyncio.CancelledError:
+                pass
+            except Exception:
+                logger.exception(
+                    "Unhandled guild-boss ticket snapshot for guild %s message %s",
+                    key[0],
+                    key[1],
+                )
+            if (
+                not self._closing
+                and key in self.boss_snapshot_pending
+                and key not in self.boss_snapshot_tasks
+            ):
+                self._start_boss_snapshot_worker(key)
+
+        task.add_done_callback(cleanup)
+
+    async def _boss_snapshot_worker(self, key: tuple[int, int]) -> None:
+        while not self._closing:
+            pending = self.boss_snapshot_pending.pop(key, None)
+            if pending is None:
+                return
+            channel_id, text = pending
+            await self.process_boss_snapshot(
+                key[0], channel_id, key[1], text
+            )
+            await asyncio.sleep(0)
+
+    async def process_boss_snapshot(
+        self,
+        guild_id: int,
+        channel_id: int,
+        message_id: int,
+        text: str,
+    ) -> None:
+        hits = extract_top10_battle_logs(text)
+        updates, initialized, visible_logs = await self.store.record_boss_snapshot(
+            guild_id,
+            channel_id,
+            message_id,
+            hits,
+        )
+        if initialized:
+            logger.info(
+                "Initialized guild-boss ticket baseline for guild %s message %s with %s visible log(s)",
+                guild_id,
+                message_id,
+                visible_logs,
+            )
+            return
+        if not updates:
+            return
+
+        self.invalidate_board_cache(guild_id)
+        if await self.store.get_config(guild_id) is not None:
+            self.queue_board_refresh(guild_id)
+        for update in updates:
+            result = await self.apply_ticket_nickname(
+                guild_id,
+                update.user_id,
+                update.tickets,
+            )
+            logger.info(
+                "Auto-updated boss tickets for user %s in guild %s: %s/3 -> %s/3 from %s new battle log(s); nickname=%s",
+                update.user_id,
+                guild_id,
+                update.previous_tickets,
+                update.tickets,
+                update.hits_applied,
+                result,
+            )
+
+    async def cleanup_stale_once(self) -> int:
+        removed = await self.store.cleanup_stale_statuses()
+        if not removed:
+            return 0
+        guild_ids: set[int] = set()
+        for index, status in enumerate(removed):
+            guild_ids.add(status.guild_id)
+            self.drop_pending_for_user(status.guild_id, status.user_id)
+            nickname_result = await self.clear_ticket_nickname(
+                status.guild_id,
+                status.user_id,
+                reason="Boss-ticket entry expired after 48 hours without activity",
+            )
+            if nickname_result != "not-managed" and index + 1 < len(removed):
+                await asyncio.sleep(NICKNAME_SYNC_DELAY_SECONDS)
+        for guild_id in guild_ids:
+            self.invalidate_board_cache(guild_id)
+            if await self.store.get_config(guild_id) is not None:
+                self.queue_board_refresh(guild_id)
+        logger.info(
+            "Removed %s stale boss-ticket entr%s across %s guild(s)",
+            len(removed),
+            "y" if len(removed) == 1 else "ies",
+            len(guild_ids),
+        )
+        return len(removed)
+
+    async def stale_cleanup_loop(self) -> None:
+        try:
+            await self.bot.wait_until_ready()
+            while not self.bot.is_closed():
+                try:
+                    await self.cleanup_stale_once()
+                except Exception:
+                    logger.exception("Boss-ticket stale cleanup iteration failed")
+                await asyncio.sleep(STALE_CLEANUP_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            return
 
     def purge_reaction_controls(self) -> None:
         cutoff = time.monotonic() - REACTION_CONTROL_TTL_SECONDS
@@ -2714,7 +3321,8 @@ class TicketTracker(commands.Cog):
             tracking_enabled=tracking_enabled,
             admin_blocked=admin_blocked,
         )
-        await message.reply(
+        await safe_reply(
+            message,
             embed=embed,
             view=view,
             mention_author=False,
@@ -3422,6 +4030,10 @@ class TicketTracker(commands.Cog):
             if message.guild is None:
                 return
             if not message.author.bot:
+                lookup_query = parse_ticket_lookup_query(message.content or "")
+                if lookup_query is not None:
+                    await self.send_ticket_lookup(message, lookup_query)
+                    return
                 if is_ticket_nickname_command(message.content or ""):
                     await self.send_personal_nickname_panel_message(message)
                     return
@@ -3446,6 +4058,14 @@ class TicketTracker(commands.Cog):
 
             if message.author.id != OWO_BOT_ID:
                 return
+            text = extract_message_text(message)
+            if looks_like_guild_boss_card(text):
+                self.queue_boss_snapshot(
+                    message.guild.id,
+                    message.channel.id,
+                    message.id,
+                    text,
+                )
             if self.purge_pending(message.channel.id):
                 self.schedule_ticket_response_capture(message)
         except Exception:
@@ -3454,12 +4074,30 @@ class TicketTracker(commands.Cog):
     @commands.Cog.listener()
     async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
         try:
-            if payload.guild_id is None or not self.purge_pending(payload.channel_id):
+            if payload.guild_id is None:
                 return
             data = dict(payload.data)
             author_id = int((data.get("author") or {}).get("id", 0) or 0)
             text = extract_raw_text(data)
+            is_active_boss = self.is_active_boss_message(
+                payload.guild_id, payload.message_id
+            )
+            if (
+                (author_id == OWO_BOT_ID or is_active_boss)
+                and looks_like_guild_boss_card(text)
+            ):
+                self.queue_boss_snapshot(
+                    payload.guild_id,
+                    payload.channel_id,
+                    payload.message_id,
+                    text,
+                )
 
+            # Ticket-count response edits remain narrowly scoped to an explicitly
+            # pending `w boss t` request. Boss-card processing above never performs a
+            # REST fetch, preventing grinding traffic from recreating the old 429 issue.
+            if not self.purge_pending(payload.channel_id):
+                return
             if author_id != OWO_BOT_ID or parse_ticket_count(text) is None:
                 raw = await fetch_raw_message(
                     self.bot, payload.channel_id, payload.message_id
@@ -3470,7 +4108,6 @@ class TicketTracker(commands.Cog):
                     return
                 data = raw
                 text = extract_raw_text(raw)
-
             if parse_ticket_count(text) is None:
                 return
 
@@ -3490,7 +4127,7 @@ class TicketTracker(commands.Cog):
                 mentioned_ids=mentioned_ids,
             )
         except Exception:
-            logger.exception("Unhandled edited boss-ticket response")
+            logger.exception("Unhandled edited OwO ticket/boss response")
 
     @app_commands.command(
         name="boss-ticket-channel",
@@ -3653,13 +4290,70 @@ class TicketTracker(commands.Cog):
             len(statuses),
         )
 
+    async def send_ticket_lookup(
+        self, message: discord.Message, query: str
+    ) -> None:
+        if not query:
+            await safe_reply(
+                message,
+                "Use `HBT <name, username, mention, or user ID>`, for example `HBT hassaan`.",
+                mention_author=False,
+            )
+            return
+        matches = await self.store.search_status(message.guild.id, query)
+        if not matches:
+            await safe_reply(
+                message,
+                f"I could not find a current boss-ticket entry matching **{discord.utils.escape_markdown(query)}**.",
+                mention_author=False,
+            )
+            return
+        if len(matches) == 1:
+            item = matches[0]
+            account = f"@{item.account_username}" if item.account_username else "@unknown"
+            activity = item.last_activity_at or item.updated_at
+            source = {
+                "manual": "manual ticket check",
+                "boss_hit": "confirmed Top 10 battle log",
+                "migration": "v0.10.4 rollout baseline",
+            }.get(item.last_source, item.last_source.replace("_", " "))
+            embed = discord.Embed(
+                title=f"🎟️ {item.username}",
+                description=(
+                    f"**Tickets:** {self.ticket_icons(item.tickets)} **{item.tickets}/3**\n"
+                    f"**Account:** `{account}`\n"
+                    f"**User ID:** `{item.user_id}`\n"
+                    f"**Last activity:** <t:{activity}:R> · <t:{activity}:F>\n"
+                    f"**Source:** {source}"
+                ),
+                color=0x5865F2,
+            )
+            await safe_reply(message, embed=embed, mention_author=False)
+            return
+
+        lines = []
+        for index, item in enumerate(matches, start=1):
+            account = f"@{item.account_username}" if item.account_username else "@unknown"
+            lines.append(
+                f"**{index}.** {discord.utils.escape_markdown(item.username)} · "
+                f"`{account}` · **{item.tickets}/3** · `{item.user_id}`"
+            )
+        await safe_reply(
+            message,
+            "I found multiple current ticket entries:\n\n"
+            + "\n".join(lines)
+            + "\n\nUse more of the name, a mention, or the exact user ID.",
+            mention_author=False,
+        )
+
     async def send_ticket_list(self, message: discord.Message) -> None:
         if message.guild is None:
             return
         config = await self.store.get_config(message.guild.id)
         statuses = await self.get_board_statuses(message.guild.id)
         page_count = self.board_page_count(statuses)
-        await message.reply(
+        await safe_reply(
+            message,
             embed=self.build_board_embed(statuses, 0),
             view=TicketBoardView(self, page=0, page_count=page_count),
             mention_author=False,
@@ -3681,18 +4375,23 @@ class TicketTracker(commands.Cog):
         if message.guild is None:
             return
         if not self.has_management_permission(message.author):
-            await message.reply(
+            await safe_reply(
+                message,
                 "You need **Manage Server** permission to manage ticket users.",
                 mention_author=False,
             )
             return
+        async def send_panel(**kwargs: Any) -> discord.Message:
+            kwargs.setdefault("delete_after", 600)
+            return await safe_reply(
+                message,
+                mention_author=False,
+                **kwargs,
+            )
+
         await self.send_management_panel(
             guild_id=message.guild.id,
-            send=lambda **kwargs: message.reply(
-                mention_author=False,
-                delete_after=600,
-                **kwargs,
-            ),
+            send=send_panel,
         )
         logger.info(
             "Prefix ticket management panel opened by %s in guild %s",
@@ -3808,8 +4507,9 @@ class TicketTracker(commands.Cog):
         )
         embed.set_footer(
             text=(
-                "Pages use cached ticket data for fast switching. My settings controls "
-                "your opt-in nickname marker, board entry, and tracking preference."
+                "Top 10 battle-log hits update tracked members automatically. Members "
+                "outside the Top 10 should still use w boss t. Entries expire after 48 "
+                "hours without a manual check or confirmed hit."
             )
         )
         return embed
@@ -3877,6 +4577,7 @@ class TicketTracker(commands.Cog):
                 reset_at = next_pacific_reset_timestamp()
                 await asyncio.sleep(max(1, reset_at - time.time() + 1))
                 changed_guilds = await self.store.reset_all_for_current_cycle()
+                removed_count = await self.cleanup_stale_once()
                 configured = await self.store.list_configured_guilds()
                 for index, guild_id in enumerate(configured):
                     self.invalidate_board_cache(guild_id)
@@ -3887,8 +4588,9 @@ class TicketTracker(commands.Cog):
                     if await self.store.nickname_markers_enabled(guild_id):
                         self.queue_nickname_job(guild_id, "sync")
                 logger.info(
-                    "Replenished Pacific-midnight boss-ticket entries; %s guild(s) changed",
+                    "Replenished Pacific-midnight boss-ticket entries; %s guild(s) changed, %s stale entries removed",
                     len(changed_guilds),
+                    removed_count,
                 )
         except asyncio.CancelledError:
             return

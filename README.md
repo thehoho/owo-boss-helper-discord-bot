@@ -44,6 +44,7 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Supports Quick replace and Exact reset.
 - Guides users one command at a time and waits for OwO's response before advancing.
 - Alternates animal-add and weapon-equip commands for faster restoration.
+- Equips every saved weapon by the saved animal identifier, such as `ww ALGOB8 snail`, instead of relying on a changeable team position.
 - Supports concurrent guided sessions by server, channel, and user.
 - Handles already-present animals, occupied positions, missing weapons, retries, skips, and cancellations.
 - Can optionally clean completed command messages when the bot has **Manage Messages**.
@@ -75,6 +76,11 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Uses `America/Los_Angeles` so Pacific daylight-saving changes are handled automatically.
 - Supports manual list display and board refresh commands.
 - Reads Components V2 ticket responses from both message-create and message-edit events, with a bounded raw-message fallback only after an explicit ticket request.
+- Watches the public Top 10 section of the active OwO guild-boss card and subtracts one ticket for every newly observed public battle-log UUID, but only for members already on that server's ticket list.
+- Deduplicates public battle logs permanently during their short retention window, supports two or three hits by the same member, and never allows a count below `0/3`.
+- Keeps manual `w boss t` / `owo boss t` results authoritative and reminds members outside the visible Top 10 to update manually.
+- Removes entries after 48 hours without a manual check or confirmed Top 10 hit while preserving block, tracking, and nickname preferences.
+- Adds `HBT <name, username, mention, or ID>` for fast current-ticket lookups without loading server members.
 - Loads the five PNG files under `assets/ui_emojis/` as application-owned Discord emojis on startup. Existing application emoji names are reused and missing names are created automatically.
 
 ### Developer information and operational statistics
@@ -87,6 +93,14 @@ H about
 ```
 
 The public profile identifies Hassaan as the developer, shows the current version, summarizes the bot, and links to the source repository.
+
+Server-manager diagnostics:
+
+```text
+/channel-diagnostics
+```
+
+Run it inside a problem channel or thread to inspect the bot's effective text, history, embed, reaction, thread, message-management, and nickname permissions. Prefix replies now fall back to a normal channel message when Discord rejects a reply reference.
 
 Owner-only commands configured through `BOT_OWNER_ID`:
 
@@ -160,6 +174,7 @@ Required permissions:
 
 Optional permissions:
 
+- Send Messages in Threads — required when prefix commands are used inside threads.
 - Manage Messages — allows guided team setup to remove completed commands and lets nickname action reactions flip cleanly by removing the member's click reaction.
 - Manage Nicknames — allows a server manager to enable optional ticket markers through `HBS`. The bot role must be above members whose nicknames it edits.
 
@@ -212,13 +227,19 @@ Server setup:
 
 This selects the channel for new-boss, defeat, escape, cooldown, and ready alerts.
 
+Channel troubleshooting for server managers:
+
+```text
+/channel-diagnostics
+```
+
 ### Help
 
 ```text
 H help
 ```
 
-`H help` lists only commands currently supported by the bot, including the ticket-management panel, optional nickname markers, and the 100-template workflow.
+`H help` lists only commands currently supported by the bot, including the ticket-management panel, optional nickname markers, and the 100-template workflow. It is recognized at the start of the first non-empty line; any text after `H help` is ignored.
 
 ## Team templates
 
@@ -401,7 +422,19 @@ w boss t
 w boss ticket
 ```
 
-The tracker records only the ticket count OwO actually reports. It does not infer ticket usage from battles or other servers.
+The manual OwO response is authoritative and replaces the saved count. During an active guild boss, the helper also reads the public **Top 10 Damage Dealt** section. Each new public `owobot.com/battle-log?uuid=...` link is one confirmed ticket use, so two scroll links for the same member subtract two tickets and three links subtract three.
+
+Automatic subtraction applies only when that Discord user is already on this server's ticket list, and it is deduplicated by battle-log UUID. Members outside the visible Top 10 must still run `w boss t` or `owo boss t` manually. The first snapshot of an already-running boss is stored as a baseline so restarting or upgrading the helper cannot retroactively subtract old hits.
+
+### Look up one member
+
+```text
+HBT <name or part of name>
+HBT @mention
+HBT <Discord user ID>
+```
+
+A unique match shows the member's current `0/3`–`3/3` count, account username, numeric ID, last confirmed activity, and whether the latest value came from a manual check or a public Top 10 battle log. Multiple matches are listed without guessing.
 
 ### Show and refresh the complete list
 
@@ -440,9 +473,11 @@ Ticket cycles follow midnight in:
 America/Los_Angeles
 ```
 
-At the daily reset, every **previously tracked member** is replenished to `3/3` and remains on the board. A later `w boss t` or `owo boss t` check replaces that reset value with the real count reported by OwO.
+At the daily reset, every still-active tracked member is replenished to `3/3`. A later manual ticket check or confirmed Top 10 hit replaces that reset value. Resetting the visible count does not count as member activity.
 
-Discord timestamps display the corresponding local time for every viewer.
+An entry expires after 48 hours without either a successful manual ticket check or a confirmed Top 10 battle-log event. Removal clears only the current board row and managed nickname; personal tracking, block, and nickname preferences are preserved. Running `w boss t` later adds an eligible member back normally.
+
+When v0.10.4 first migrates an existing database, all current rows receive rollout grace through the **second upcoming Pacific reset**: they remain after the next reset and are removed at the following reset only when no new activity was recorded. Discord timestamps display the corresponding local time for every viewer.
 
 ### Remove an old member
 
@@ -490,7 +525,8 @@ owo-boss-helper-discord-bot/
 │   ├── boss_generator.py
 │   ├── team_templates.py
 │   ├── ticket_tracker.py
-│   └── bot_info.py
+│   ├── bot_info.py
+│   └── message_utils.py
 ├── deploy/
 │   ├── backup.sh
 │   └── owo-boss-helper.service

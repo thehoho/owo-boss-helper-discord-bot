@@ -1,5 +1,21 @@
 # Changelog
 
+## 0.10.4-beta
+
+- Added automatic boss-ticket subtraction from newly observed public OwO Top 10 battle-log UUIDs on the edited guild-boss card.
+- Treats every unique public battle-log UUID as one confirmed hit, supports multiple hits by the same user, floors ticket counts at `0/3`, and never inserts users who are not already tracked in that server.
+- Baselines the first observed snapshot of each boss message so restarts and mid-boss upgrades cannot retroactively subtract older visible hits.
+- Keeps manual `w boss t` and `owo boss t` responses authoritative and documents that fighters outside the visible Top 10 must update manually.
+- Added `HBT <name, username, mention, or user ID>` for fast current-ticket lookup with ambiguity-safe partial matching.
+- Added automatic stale-entry cleanup after 48 hours without a manual check or confirmed Top 10 hit while preserving block, tracking, and nickname preferences.
+- Added a one-time migration grace period for existing rows through the second upcoming Pacific reset.
+- Changed guided weapon commands to target the saved animal identifier, such as `ww ALGOB8 snail`, rather than a team position.
+- Added a shared prefix-response helper that falls back from a rejected Discord reply to a normal channel message.
+- Added manager-only `/channel-diagnostics` for effective channel, history, embed, reaction, thread, message-management, and nickname permission checks.
+- Changed only `H help` parsing so it is recognized at the start of the first non-empty line and ignores any following text.
+- Added automatic SQLite tables for boss-message observations and battle-log UUID deduplication; no manual migration is required.
+- Updated the public bot version to `0.10.4-beta`.
+
 ## 0.10.3-beta
 
 - Kept the persistent ticket board sticky by continuing to send the replacement first and delete the previous message afterward.

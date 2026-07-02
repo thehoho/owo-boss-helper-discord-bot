@@ -33,6 +33,7 @@ from PIL import Image
 from discord import app_commands
 from discord.ext import commands
 
+from .message_utils import safe_reply
 from .ui_emojis import ensure_ui_emojis, ui_emoji_text
 
 
@@ -82,9 +83,12 @@ def is_prefix_cooldown_trigger(content: str) -> bool:
 
 
 def is_prefix_help_trigger(content: str) -> bool:
-    """Accept `H help`, case-insensitively and with flexible whitespace."""
-    normalized = re.sub(r"\s+", "", content or "").lower()
-    return normalized in PREFIX_HELP_TRIGGERS
+    """Accept `H help` at the start and ignore any following text."""
+    first_line = next(
+        (line.strip() for line in (content or "").splitlines() if line.strip()),
+        "",
+    )
+    return re.match(r"^h\s*help\b", first_line, re.IGNORECASE) is not None
 
 
 def load_cooldown_config() -> dict[str, dict[str, Any]]:
@@ -1292,7 +1296,7 @@ class BossGenerator(commands.Cog):
 
         config = self.cooldown_config.get(str(guild.id), {})
         if not config.get("channel_id"):
-            await message.reply(
+            await safe_reply(message,
                 "⚠️ Boss tracking has not been configured in this server yet. "
                 "A server manager can use `/boss-cooldown-channel`.",
                 mention_author=False,
@@ -1301,7 +1305,7 @@ class BossGenerator(commands.Cog):
 
         await self.refresh_tracked_guild_boss_status(guild.id)
         config = self.cooldown_config.get(str(guild.id), {})
-        await message.reply(
+        await safe_reply(message,
             embed=self.build_cooldown_embed(config),
             mention_author=False,
         )
@@ -1343,8 +1347,12 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="🎟️ Boss tickets",
             value=(
-                "Update with `owo boss t` / `w boss t`; view with `H boss t`, "
-                "`H boss list`, `HBL`, or `/boss-ticket-list`. Ticket boards include "
+                "Update manually with `owo boss t` / `w boss t`; view with `H boss t`, "
+                "`H boss list`, `HBL`, or `/boss-ticket-list`, and look up one "
+                "tracked member with `HBT <name/mention/ID>`. Public Top 10 battle "
+                "logs automatically subtract confirmed hits for already-tracked "
+                "members; fighters outside the Top 10 should update manually. "
+                "Inactive entries expire after 48 hours. Ticket boards include "
                 "**Text view** and clickable **Ping view** controls. Managers use "
                 "`HBS` / `H boss settings` / `/boss-ticket-manage` to remove or "
                 "block users and optionally enable nickname markers. Members control "
@@ -1367,12 +1375,16 @@ class BossGenerator(commands.Cog):
         )
         embed.add_field(
             name="ℹ️ Project",
-            value="Use `H about` or `/about` for developer and project information.",
+            value=(
+                "Use `H about` or `/about` for developer and project information. "
+                "Server managers can run `/channel-diagnostics` inside a problem "
+                "channel or thread."
+            ),
             inline=False,
         )
         embed.set_footer(text="Use H help anytime to show this current command guide.")
 
-        await message.reply(embed=embed, mention_author=False)
+        await safe_reply(message,embed=embed, mention_author=False)
         logger.info(
             "Prefix help requested by %s in guild %s",
             message.author,
@@ -1601,6 +1613,11 @@ class BossGenerator(commands.Cog):
     async def track_latest_guild_boss_message(self, guild_id: int, channel_id: int, message_id: int, data: dict[str, Any]) -> None:
         if not self.is_cooldown_configured(guild_id) or not is_guild_boss_status(data):
             return
+
+        ticket_tracker = self.bot.get_cog("TicketTracker")
+        queue_snapshot_data = getattr(ticket_tracker, "queue_boss_snapshot_data", None)
+        if callable(queue_snapshot_data):
+            queue_snapshot_data(guild_id, channel_id, message_id, data)
 
         config = self.cooldown_config.setdefault(str(guild_id), {})
         old_id = int(config.get("active_boss_message_id") or 0)
