@@ -42,3 +42,9 @@ desktop.ini
 *.zip
 build/
 dist/
+
+# Runtime SQLite databases
+*.db
+*.db-wal
+*.db-shm
+
