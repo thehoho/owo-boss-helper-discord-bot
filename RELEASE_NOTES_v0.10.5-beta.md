@@ -68,3 +68,11 @@ A new local SQLite file, `neon_weapons.db`, stores scanned Neon weapon queue dat
 ```text
 0.10.5-beta
 ```
+
+
+### Guided dex sessions
+
+- Added a **Start dexing session** button to the Neon weapon dex queue.
+- The bot now posts one `ww <weapon_id>` command at a time, advances after the user sends the command, and waits about five seconds before showing the next prompt.
+- Added `H stop` to pause an active dex session.
+- Clarified `HW stats` so scanned, need-dex, saved/exact/dexed, and no-action counts are easier to understand.

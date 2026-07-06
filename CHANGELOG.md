@@ -1,3 +1,10 @@
+## v0.10.5-beta hotfix 2
+
+- Added guided Neon weapon dex sessions from `HWD` / `H dex` with a **Start dexing session** button.
+- Added `H stop` to pause an active weapon dex session and continue later.
+- Clarified Neon weapon stats with a scanned/no-action bucket so counts add up cleanly.
+- Updated `H help` copy for the guided dex flow.
+
 # Changelog
 
 ## 0.10.5-beta

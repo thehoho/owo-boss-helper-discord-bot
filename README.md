@@ -609,3 +609,8 @@ For a 24/7 Linux VPS deployment with automatic restarts and protected local stor
 ## License
 
 MIT License. See [LICENSE](LICENSE).
+
+
+### Guided Neon weapon dex sessions
+
+`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued `ww <weapon_id>` commands from scanned Neon weapon pages. Click **Start dexing session** to receive one command at a time. After the member sends the shown `ww <weapon_id>` command, the helper waits about five seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.

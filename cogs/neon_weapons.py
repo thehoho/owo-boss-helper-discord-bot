@@ -13,7 +13,7 @@ import logging
 import re
 import sqlite3
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -31,6 +31,7 @@ SCAN_REACTION = "🧾"
 PENDING_WW_SECONDS = 90
 DEX_STEP_SECONDS = 5
 DEX_PAGE_SIZE = 20
+DEX_SESSION_MAX_SECONDS = 30 * 60
 WEAPON_ID_RE = re.compile(r"\b([A-Z0-9]{6})\b", re.IGNORECASE)
 CUSTOM_EMOJI_RE = re.compile(r"<a?:([A-Za-z0-9_]+):(\d{15,22})>")
 NEON_HEADER_RE = re.compile(
@@ -573,6 +574,9 @@ def parse_neon_command(content: str) -> tuple[str, str] | None:
     for prefix in ("h weapon clear", "h dex clear", "hw clear", "hwd clear"):
         if compact == prefix:
             return "clear", ""
+    for prefix in ("h stop", "h dex stop", "hwd stop", "h weapon stop", "h weapon dex stop"):
+        if compact == prefix:
+            return "stop", ""
     return None
 
 
@@ -953,81 +957,57 @@ class NeonWeaponStore:
         )
 
 
+@dataclass
+class ActiveDexSession:
+    user_id: int
+    channel_id: int
+    entries: list[NeonWeaponEntry]
+    index: int = 0
+    guide_message_id: int = 0
+    started_at: float = field(default_factory=time.monotonic)
+    advancing: bool = False
+
+
 class WeaponDexView(discord.ui.View):
     def __init__(self, cog: "NeonWeapons", user_id: int, entries: list[NeonWeaponEntry]) -> None:
         super().__init__(timeout=15 * 60)
         self.cog = cog
         self.user_id = user_id
         self.entries = entries
-        self.index = 0
-        self.last_step_at = 0.0
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.user_id:
             await interaction.response.send_message(
-                "This dex guide belongs to another member.", ephemeral=True
+                "This dex queue belongs to another member.", ephemeral=True
             )
             return False
         return True
 
-    def current_entry(self) -> NeonWeaponEntry | None:
-        if 0 <= self.index < len(self.entries):
-            return self.entries[self.index]
-        return None
-
-    def build_embed(self) -> discord.Embed:
-        entry = self.current_entry()
-        if entry is None:
-            return discord.Embed(
-                title="🧾 Weapon dex guide complete",
-                description="No more queued weapons in this guide.",
-                color=0x57F287,
-            )
-        details = self.cog.describe_entry(entry)
-        return discord.Embed(
-            title=f"🧾 Weapon dex {self.index + 1}/{len(self.entries)}",
-            description=(
-                f"Send this OwO command:\n\n`ww {entry.weapon_id}`\n\n"
-                f"{details}\n\nWait about **5 seconds** between dex commands so Neon/OwO can respond cleanly."
-            ),
-            color=0xFEE75C,
-        )
-
-    async def refresh(self, interaction: discord.Interaction) -> None:
-        for child in self.children:
-            if isinstance(child, discord.ui.Button):
-                child.disabled = self.current_entry() is None
-        await interaction.response.edit_message(embed=self.build_embed(), view=self)
-
-    @discord.ui.button(label="Next", style=discord.ButtonStyle.primary)
-    async def next_button(
+    @discord.ui.button(label="Start dexing session", style=discord.ButtonStyle.success)
+    async def start_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
-        now = time.monotonic()
-        remaining = DEX_STEP_SECONDS - (now - self.last_step_at)
-        if remaining > 0:
+        channel = interaction.channel
+        if channel is None or not hasattr(channel, "send"):
             await interaction.response.send_message(
-                f"Wait **{remaining:.1f}s** before moving to the next dex command.",
-                ephemeral=True,
+                "I cannot start a dexing session in this channel.", ephemeral=True
             )
             return
-        self.last_step_at = now
-        self.index += 1
-        await self.refresh(interaction)
+        await interaction.response.defer(ephemeral=True)
+        await self.cog.start_dex_session(
+            user=interaction.user,
+            channel=channel,
+            entries=self.entries,
+        )
+        await interaction.followup.send(
+            "Started your dexing session. I will post one `ww <weapon_id>` command at a time. "
+            "Send that command, then I will wait about 5 seconds and move to the next one. "
+            "Use `H stop` to pause and continue later.",
+            ephemeral=True,
+        )
 
-    @discord.ui.button(label="Mark done", style=discord.ButtonStyle.success)
-    async def done_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ) -> None:
-        entry = self.current_entry()
-        if entry is not None:
-            await self.cog.store.mark_done(self.user_id, entry.weapon_id)
-        self.last_step_at = time.monotonic()
-        self.index += 1
-        await self.refresh(interaction)
-
-    @discord.ui.button(label="Stop", style=discord.ButtonStyle.secondary)
-    async def stop_button(
+    @discord.ui.button(label="Close", style=discord.ButtonStyle.secondary)
+    async def close_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
     ) -> None:
         for child in self.children:
@@ -1042,6 +1022,7 @@ class NeonWeapons(commands.Cog):
         self.bot = bot
         self.store = NeonWeaponStore(DATABASE_FILE)
         self.pending_commands: dict[tuple[int, int], PendingWeaponCommand] = {}
+        self.active_dex_sessions: dict[tuple[int, int], ActiveDexSession] = {}
         self._ready = False
 
     @commands.Cog.listener()
@@ -1071,6 +1052,8 @@ class NeonWeapons(commands.Cog):
                 await self.send_stats(message)
             elif action == "clear":
                 await self.clear_queue(message)
+            elif action == "stop":
+                await self.stop_dex_session(message)
             return
         weapon_id = parse_ww_weapon_command(message.content or "")
         if weapon_id:
@@ -1080,6 +1063,7 @@ class NeonWeapons(commands.Cog):
                 weapon_id=weapon_id,
                 created_at=time.monotonic(),
             )
+            await self.maybe_advance_dex_session(message, weapon_id)
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
@@ -1282,7 +1266,7 @@ class NeonWeapons(commands.Cog):
                 message,
                 "I did not recognize this dex filter: "
                 + ", ".join(f"`{item}`" for item in unknown)
-                + ". Try `HW` or `H weapons` for supported aliases.",
+                + ". Try `HW` or `H weapons` for supported aliases, or `H stop` to pause a dexing session.",
                 mention_author=False,
             )
             return
@@ -1314,7 +1298,7 @@ class NeonWeapons(commands.Cog):
         embed = discord.Embed(
             title="🧾 Weapons needing Neon dex",
             description=(
-                "Send each command to OwO. Neon should answer with a blueprint, and I will mark that weapon saved.\n\n"
+                "These are the next queued weapons. Click **Start dexing session** below for one-at-a-time prompts, or copy commands manually. Neon should answer with a blueprint, and I will mark that weapon saved.\n\n"
                 + "\n".join(lines)
             ),
             color=0xFEE75C,
@@ -1330,13 +1314,133 @@ class NeonWeapons(commands.Cog):
             mention_author=False,
         )
 
+
+    def dex_session_key(self, channel_id: int, user_id: int) -> tuple[int, int]:
+        return (channel_id, user_id)
+
+    def build_session_embed(self, session: ActiveDexSession) -> discord.Embed:
+        if session.index >= len(session.entries):
+            return discord.Embed(
+                title="🧾 Weapon dex session complete",
+                description="All queued weapons in this session have been shown. Run `HWD` anytime to continue with any remaining queue.",
+                color=0x57F287,
+            )
+        entry = session.entries[session.index]
+        details = self.describe_entry(entry)
+        return discord.Embed(
+            title=f"🧾 Weapon dex session {session.index + 1}/{len(session.entries)}",
+            description=(
+                "Send this OwO command now:\n\n"
+                f"`ww {entry.weapon_id}`\n\n"
+                f"{details}\n\n"
+                "After you send it, I will wait about **5 seconds**, remove this prompt, and show the next one. "
+                "Use `H stop` to pause the session."
+            ),
+            color=0xFEE75C,
+        )
+
+    async def delete_session_prompt(self, channel: discord.abc.Messageable, session: ActiveDexSession) -> None:
+        if not session.guide_message_id:
+            return
+        fetch_message = getattr(channel, "fetch_message", None)
+        if not callable(fetch_message):
+            return
+        try:
+            old_message = await fetch_message(session.guide_message_id)
+            await old_message.delete()
+        except (discord.Forbidden, discord.HTTPException, discord.NotFound, AttributeError):
+            pass
+        finally:
+            session.guide_message_id = 0
+
+    async def send_session_prompt(self, channel: discord.abc.Messageable, session: ActiveDexSession) -> None:
+        await self.delete_session_prompt(channel, session)
+        sent = await channel.send(embed=self.build_session_embed(session))
+        session.guide_message_id = sent.id
+
+    async def start_dex_session(
+        self,
+        *,
+        user: discord.abc.User,
+        channel: discord.abc.Messageable,
+        entries: list[NeonWeaponEntry],
+    ) -> None:
+        if not entries:
+            return
+        key = self.dex_session_key(getattr(channel, "id", 0), user.id)
+        old_session = self.active_dex_sessions.pop(key, None)
+        if old_session is not None:
+            await self.delete_session_prompt(channel, old_session)
+        session = ActiveDexSession(
+            user_id=user.id,
+            channel_id=getattr(channel, "id", 0),
+            entries=list(entries),
+        )
+        self.active_dex_sessions[key] = session
+        await self.send_session_prompt(channel, session)
+
+    async def maybe_advance_dex_session(self, message: discord.Message, weapon_id: str) -> None:
+        key = self.dex_session_key(message.channel.id, message.author.id)
+        session = self.active_dex_sessions.get(key)
+        if session is None:
+            return
+        if time.monotonic() - session.started_at > DEX_SESSION_MAX_SECONDS:
+            self.active_dex_sessions.pop(key, None)
+            await self.delete_session_prompt(message.channel, session)
+            await safe_reply(
+                message,
+                "Your weapon dex session expired. Run `HWD` to start a fresh session.",
+                mention_author=False,
+            )
+            return
+        if session.advancing or session.index >= len(session.entries):
+            return
+        current = session.entries[session.index]
+        if current.weapon_id.upper() != weapon_id.upper():
+            return
+        session.advancing = True
+        try:
+            await asyncio.sleep(DEX_STEP_SECONDS)
+            session.index += 1
+            if session.index >= len(session.entries):
+                await self.delete_session_prompt(message.channel, session)
+                self.active_dex_sessions.pop(key, None)
+                await safe_reply(
+                    message,
+                    "✅ Weapon dex session complete. Run `HWD` again if more weapons remain queued.",
+                    mention_author=False,
+                )
+                return
+            await self.send_session_prompt(message.channel, session)
+        finally:
+            session.advancing = False
+
+    async def stop_dex_session(self, message: discord.Message) -> None:
+        key = self.dex_session_key(message.channel.id, message.author.id)
+        session = self.active_dex_sessions.pop(key, None)
+        if session is None:
+            await safe_reply(
+                message,
+                "You do not have an active weapon dex session in this channel.",
+                mention_author=False,
+            )
+            return
+        await self.delete_session_prompt(message.channel, session)
+        await safe_reply(
+            message,
+            "Stopped your weapon dex session. Run `HWD` to continue later from the remaining queue.",
+            mention_author=False,
+        )
+
     async def send_stats(self, message: discord.Message) -> None:
         stats = await self.store.stats(message.author.id)
         last_seen = stats["last_seen"]
+        other = max(0, stats['total'] - stats['need'] - stats['saved'])
         description = (
             f"**Scanned weapons:** {stats['total']:,}\n"
             f"**Need dex:** {stats['need']:,}\n"
-            f"**Saved/exact/dexed:** {stats['saved']:,}"
+            f"**Already saved/exact/dexed:** {stats['saved']:,}\n"
+            f"**Scanned / no action needed:** {other:,}"
         )
         if last_seen:
             description += f"\n**Last scan:** <t:{last_seen}:R>"
