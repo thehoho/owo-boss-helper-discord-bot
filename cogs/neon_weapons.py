@@ -326,10 +326,64 @@ def format_float(value: float | None) -> str:
     return f"{text}%"
 
 
+def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
+    if value is None:
+        return
+    if isinstance(value, str):
+        if value.strip():
+            chunks.append(value)
+        return
+    if isinstance(value, (int, float, bool, bytes)):
+        return
+
+    object_id = id(value)
+    if object_id in seen:
+        return
+    seen.add(object_id)
+
+    if isinstance(value, dict):
+        for child in value.values():
+            _walk_text(child, chunks, seen)
+        return
+
+    if isinstance(value, (list, tuple, set)):
+        for child in value:
+            _walk_text(child, chunks, seen)
+        return
+
+    for attribute in (
+        "content",
+        "title",
+        "description",
+        "label",
+        "value",
+        "name",
+        "components",
+        "children",
+        "accessory",
+    ):
+        try:
+            child = getattr(value, attribute, None)
+        except Exception:
+            continue
+        if child is not None:
+            _walk_text(child, chunks, seen)
+
+    to_dict = getattr(value, "to_dict", None)
+    if callable(to_dict):
+        try:
+            _walk_text(to_dict(), chunks, seen)
+        except Exception:
+            pass
+
+
 def extract_message_text(message: discord.Message) -> str:
     chunks: list[str] = []
     if message.content:
         chunks.append(message.content)
+    system_content = getattr(message, "system_content", "")
+    if system_content and system_content != message.content:
+        chunks.append(system_content)
     for embed in message.embeds:
         if embed.title:
             chunks.append(embed.title)
@@ -339,14 +393,41 @@ def extract_message_text(message: discord.Message) -> str:
             chunks.append(embed.author.name)
         for field in embed.fields:
             chunks.extend((field.name, field.value))
-    for component in getattr(message, "components", []) or []:
-        to_dict = getattr(component, "to_dict", None)
-        if callable(to_dict):
-            try:
-                chunks.append(json.dumps(to_dict(), ensure_ascii=False))
-            except Exception:
-                pass
+    _walk_text(getattr(message, "components", []), chunks, set())
     return "\n".join(chunk.strip() for chunk in chunks if chunk and chunk.strip())
+
+
+def extract_raw_text(data: dict[str, Any]) -> str:
+    chunks: list[str] = []
+    _walk_text(data, chunks, set())
+    return "\n".join(chunk.strip() for chunk in chunks if chunk and chunk.strip())
+
+
+async def fetch_raw_message(
+    bot: commands.Bot, channel_id: int, message_id: int
+) -> dict[str, Any] | None:
+    try:
+        route = discord.http.Route(
+            "GET",
+            "/channels/{channel_id}/messages/{message_id}",
+            channel_id=channel_id,
+            message_id=message_id,
+        )
+        data = await bot.http.request(route)
+        return data if isinstance(data, dict) else None
+    except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+        logger.warning("Could not fetch Neon weapon message %s: %s", message_id, exc)
+        return None
+
+
+def is_neon_author(user: Any) -> bool:
+    if int(getattr(user, "id", 0) or 0) == NEON_BOT_ID:
+        return True
+    names = " ".join(
+        str(getattr(user, attr, "") or "")
+        for attr in ("name", "display_name", "global_name")
+    ).casefold()
+    return "neonutil" in names or "neon util" in names or "[neon]" in names
 
 
 def parse_filters(text: str) -> tuple[str, tuple[str, ...]]:
@@ -377,7 +458,7 @@ def parse_weapon_row(line: str, *, saved_inventory: bool) -> ParsedWeaponRow | N
     max_numbers = BACKTICK_NUMBER_RE.findall(body)
     max_quality = float(max_numbers[-1]) if max_numbers else None
     emojis = tuple(emoji_id for _name, emoji_id in CUSTOM_EMOJI_RE.findall(body))
-    max_possible = f":{STATUS_EMOJIS['max_possible']}>" in body or "max_possible" in body
+    max_possible = STATUS_EMOJIS["max_possible"] in body or "max_possible" in body
     exact = "<:exact:" in body
     saved = saved_inventory or "<:saved:" in body
     return ParsedWeaponRow(
@@ -976,7 +1057,7 @@ class NeonWeapons(commands.Cog):
         if message.guild is None:
             return
         if message.author.bot:
-            if message.author.id == NEON_BOT_ID:
+            if is_neon_author(message.author):
                 await self.handle_neon_message(message)
             return
         parsed_command = parse_neon_command(message.content or "")
@@ -1002,28 +1083,123 @@ class NeonWeapons(commands.Cog):
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
-        if after.guild is None or after.author.id != NEON_BOT_ID:
+        if after.guild is None or not is_neon_author(after.author):
             return
         await self.handle_neon_message(after)
+
+    @commands.Cog.listener()
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
+        if payload.guild_id is None:
+            return
+        data = dict(payload.data or {})
+        raw_text = extract_raw_text(data)
+        author = data.get("author") or {}
+        try:
+            author_id = int(author.get("id") or 0)
+        except (TypeError, ValueError):
+            author_id = 0
+        try:
+            application_id = int(data.get("application_id") or 0)
+        except (TypeError, ValueError):
+            application_id = 0
+
+        author_name = " ".join(
+            str(author.get(key) or "")
+            for key in ("username", "global_name", "name")
+        ).casefold()
+        looks_like_neon = (
+            author_id == NEON_BOT_ID
+            or application_id == NEON_BOT_ID
+            or "neonutil" in author_name
+            or parse_neon_weapon_page(raw_text) is not None
+            or parse_blueprint(raw_text) is not None
+        )
+        if not looks_like_neon:
+            return
+        await self.handle_neon_raw(
+            payload.guild_id,
+            payload.channel_id,
+            payload.message_id,
+            data,
+        )
 
     async def handle_neon_message(self, message: discord.Message) -> None:
         await self.store.initialize()
         text = extract_message_text(message)
         page = parse_neon_weapon_page(text)
+        blueprint = parse_blueprint(text) if page is None else None
+
+        if page is None and blueprint is None:
+            raw = await fetch_raw_message(self.bot, message.channel.id, message.id)
+            if raw:
+                return await self.handle_neon_raw(
+                    message.guild.id if message.guild else 0,
+                    message.channel.id,
+                    message.id,
+                    raw,
+                    reaction_message=message,
+                )
+
+        await self.process_neon_text(
+            text,
+            guild_id=message.guild.id if message.guild else 0,
+            channel_id=message.channel.id,
+            message_id=message.id,
+            reaction_message=message,
+        )
+
+    async def handle_neon_raw(
+        self,
+        guild_id: int,
+        channel_id: int,
+        message_id: int,
+        data: dict[str, Any],
+        *,
+        reaction_message: discord.Message | None = None,
+    ) -> None:
+        await self.store.initialize()
+        text = extract_raw_text(data)
+        if reaction_message is None:
+            try:
+                channel = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
+                fetch_message = getattr(channel, "fetch_message", None)
+                if callable(fetch_message):
+                    reaction_message = await fetch_message(message_id)
+            except (discord.Forbidden, discord.HTTPException, discord.NotFound, AttributeError):
+                reaction_message = None
+        await self.process_neon_text(
+            text,
+            guild_id=guild_id,
+            channel_id=channel_id,
+            message_id=message_id,
+            reaction_message=reaction_message,
+        )
+
+    async def process_neon_text(
+        self,
+        text: str,
+        *,
+        guild_id: int,
+        channel_id: int,
+        message_id: int,
+        reaction_message: discord.Message | None = None,
+    ) -> None:
+        page = parse_neon_weapon_page(text)
         if page is not None:
             parsed, needs = await self.store.upsert_page(
                 page,
-                guild_id=message.guild.id if message.guild else 0,
-                channel_id=message.channel.id,
-                message_id=message.id,
+                guild_id=guild_id,
+                channel_id=channel_id,
+                message_id=message_id,
             )
-            try:
-                await message.add_reaction(SCAN_REACTION)
-            except (discord.Forbidden, discord.HTTPException, discord.NotFound):
-                pass
+            if reaction_message is not None:
+                try:
+                    await reaction_message.add_reaction(SCAN_REACTION)
+                except (discord.Forbidden, discord.HTTPException, discord.NotFound):
+                    pass
             logger.info(
                 "Scanned Neon weapons page %s for owner %s: %s rows, %s need dex",
-                message.id,
+                message_id,
                 page.owner_user_id,
                 parsed,
                 needs,
@@ -1033,7 +1209,7 @@ class NeonWeapons(commands.Cog):
         blueprint = parse_blueprint(text)
         if blueprint is None:
             return
-        pending = self.find_recent_pending(message.channel.id)
+        pending = self.find_recent_pending(channel_id)
         if pending is None:
             return
         weapon_type, passive_types = classify_blueprint(blueprint)
