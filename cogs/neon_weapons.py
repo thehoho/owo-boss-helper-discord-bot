@@ -21,10 +21,12 @@ import discord
 from discord.ext import commands
 
 from .message_utils import safe_reply
+from .ui_emojis import ui_emoji_text
 
 logger = logging.getLogger(__name__)
 
 NEON_BOT_ID = 851436490415931422
+OWO_BOT_ID = 408785106942164992
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "neon_weapons.db"
 SCAN_REACTION = "🧾"
@@ -843,6 +845,58 @@ class NeonWeaponStore:
             )
         return cursor.rowcount > 0
 
+    async def mark_dexed_weapon_any_owner(
+        self,
+        weapon_id: str,
+        blueprint: str,
+        weapon_type: str,
+        passive_types: tuple[str, ...],
+    ) -> int:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._mark_dexed_weapon_any_owner_sync,
+                weapon_id,
+                blueprint,
+                weapon_type,
+                passive_types,
+            )
+
+    def _mark_dexed_weapon_any_owner_sync(
+        self,
+        weapon_id: str,
+        blueprint: str,
+        weapon_type: str,
+        passive_types: tuple[str, ...],
+    ) -> int:
+        now = int(time.time())
+        passive_json = json.dumps(list(passive_types))
+        with self._connect() as connection:
+            cursor = connection.execute(
+                """
+                UPDATE neon_weapon_entries
+                SET needs_dex = 0,
+                    saved = 1,
+                    exact = 1,
+                    blueprint = ?,
+                    weapon_type = CASE WHEN ? <> '' THEN ? ELSE weapon_type END,
+                    passive_types_json = CASE WHEN ? <> '[]' THEN ? ELSE passive_types_json END,
+                    dexed_at = ?,
+                    last_seen_at = ?
+                WHERE weapon_id = ?
+                """,
+                (
+                    blueprint[:300],
+                    weapon_type,
+                    weapon_type,
+                    passive_json,
+                    passive_json,
+                    now,
+                    now,
+                    weapon_id.upper(),
+                ),
+            )
+        return cursor.rowcount
+
     async def list_dex_queue(
         self,
         owner_user_id: int,
@@ -967,9 +1021,12 @@ class NeonWeaponStore:
 
 @dataclass
 class ActiveDexSession:
-    user_id: int
+    runner_user_id: int
+    owner_user_id: int
     channel_id: int
     entries: list[NeonWeaponEntry]
+    owner_display_name: str
+    runner_display_name: str
     index: int = 0
     guide_message_id: int = 0
     started_at: float = field(default_factory=time.monotonic)
@@ -977,16 +1034,27 @@ class ActiveDexSession:
 
 
 class WeaponDexView(discord.ui.View):
-    def __init__(self, cog: "NeonWeapons", user_id: int, entries: list[NeonWeaponEntry]) -> None:
+    def __init__(
+        self,
+        cog: "NeonWeapons",
+        runner_user_id: int,
+        owner_user_id: int,
+        owner_display_name: str,
+        runner_display_name: str,
+        entries: list[NeonWeaponEntry],
+    ) -> None:
         super().__init__(timeout=15 * 60)
         self.cog = cog
-        self.user_id = user_id
+        self.runner_user_id = runner_user_id
+        self.owner_user_id = owner_user_id
+        self.owner_display_name = owner_display_name
+        self.runner_display_name = runner_display_name
         self.entries = entries
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
-        if interaction.user.id != self.user_id:
+        if interaction.user.id != self.runner_user_id:
             await interaction.response.send_message(
-                "This dex queue belongs to another member.", ephemeral=True
+                "This dex-session button belongs to another helper.", ephemeral=True
             )
             return False
         return True
@@ -1005,10 +1073,13 @@ class WeaponDexView(discord.ui.View):
         await self.cog.start_dex_session(
             user=interaction.user,
             channel=channel,
+            owner_user_id=self.owner_user_id,
+            owner_display_name=self.owner_display_name,
+            runner_display_name=self.runner_display_name,
             entries=self.entries,
         )
         await interaction.followup.send(
-            "Started your dexing session. I will post one `ww <weapon_id>` command at a time. "
+            f"Started a dexing session for **{self.owner_display_name}**. I will post one `ww <weapon_id>` command at a time. "
             "Send that command, then I will wait about 5 seconds and move to the next one. "
             "Use `H stop`, `Hstop`, or `HS` to pause and continue later.",
             ephemeral=True,
@@ -1030,6 +1101,8 @@ class NeonWeapons(commands.Cog):
         self.bot = bot
         self.store = NeonWeaponStore(DATABASE_FILE)
         self.pending_commands: dict[tuple[int, int], PendingWeaponCommand] = {}
+        self.pending_command_messages: dict[int, PendingWeaponCommand] = {}
+        self.pending_owo_replies: dict[int, PendingWeaponCommand] = {}
         self.active_dex_sessions: dict[tuple[int, int], ActiveDexSession] = {}
         self._ready = False
 
@@ -1048,6 +1121,8 @@ class NeonWeapons(commands.Cog):
         if message.author.bot:
             if is_neon_author(message.author):
                 await self.handle_neon_message(message)
+            elif message.author.id == OWO_BOT_ID:
+                await self.handle_owo_message(message)
             return
         parsed_command = parse_neon_command(message.content or "")
         if parsed_command is not None:
@@ -1065,13 +1140,32 @@ class NeonWeapons(commands.Cog):
             return
         weapon_id = parse_ww_weapon_command(message.content or "")
         if weapon_id:
-            self.pending_commands[(message.channel.id, message.author.id)] = PendingWeaponCommand(
+            pending = PendingWeaponCommand(
                 user_id=message.author.id,
                 channel_id=message.channel.id,
                 weapon_id=weapon_id,
                 created_at=time.monotonic(),
             )
+            self.pending_commands[(message.channel.id, message.author.id)] = pending
+            self.pending_command_messages[message.id] = pending
             await self.maybe_advance_dex_session(message, weapon_id)
+
+    async def handle_owo_message(self, message: discord.Message) -> None:
+        reference = getattr(message, "reference", None)
+        command_message_id = int(getattr(reference, "message_id", 0) or 0)
+        if not command_message_id:
+            return
+        self.cleanup_pending_weapon_commands()
+        pending = self.pending_command_messages.get(command_message_id)
+        if pending is None:
+            return
+        self.pending_owo_replies[message.id] = pending
+        logger.debug(
+            "Linked OwO weapon reply %s to pending weapon %s from runner %s",
+            message.id,
+            pending.weapon_id,
+            pending.user_id,
+        )
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
@@ -1132,12 +1226,15 @@ class NeonWeapons(commands.Cog):
                     reaction_message=message,
                 )
 
+        reference = getattr(message, "reference", None)
+        reply_reference_id = int(getattr(reference, "message_id", 0) or 0)
         await self.process_neon_text(
             text,
             guild_id=message.guild.id if message.guild else 0,
             channel_id=message.channel.id,
             message_id=message.id,
             reaction_message=message,
+            reply_reference_id=reply_reference_id,
         )
 
     async def handle_neon_raw(
@@ -1159,12 +1256,18 @@ class NeonWeapons(commands.Cog):
                     reaction_message = await fetch_message(message_id)
             except (discord.Forbidden, discord.HTTPException, discord.NotFound, AttributeError):
                 reaction_message = None
+        message_reference = data.get("message_reference") or {}
+        try:
+            reply_reference_id = int(message_reference.get("message_id") or 0)
+        except (TypeError, ValueError):
+            reply_reference_id = 0
         await self.process_neon_text(
             text,
             guild_id=guild_id,
             channel_id=channel_id,
             message_id=message_id,
             reaction_message=reaction_message,
+            reply_reference_id=reply_reference_id,
         )
 
     async def process_neon_text(
@@ -1175,6 +1278,7 @@ class NeonWeapons(commands.Cog):
         channel_id: int,
         message_id: int,
         reaction_message: discord.Message | None = None,
+        reply_reference_id: int = 0,
     ) -> None:
         page = parse_neon_weapon_page(text)
         if page is not None:
@@ -1201,34 +1305,62 @@ class NeonWeapons(commands.Cog):
         blueprint = parse_blueprint(text)
         if blueprint is None:
             return
-        pending = self.find_recent_pending(channel_id)
+        pending = self.find_pending_for_neon_reply(channel_id, reply_reference_id)
         if pending is None:
             return
         weapon_type, passive_types = classify_blueprint(blueprint)
-        updated = await self.store.mark_dexed(
-            pending.user_id,
+        updated_count = await self.store.mark_dexed_weapon_any_owner(
             pending.weapon_id,
             blueprint,
             weapon_type,
             passive_types,
         )
-        if updated:
+        if updated_count:
             logger.info(
-                "Marked weapon %s dexed for user %s from Neon blueprint %s",
+                "Marked weapon %s dexed in %s owner queue(s) from Neon blueprint %s; runner user %s",
                 pending.weapon_id,
-                pending.user_id,
+                updated_count,
                 blueprint,
+                pending.user_id,
             )
 
-    def find_recent_pending(self, channel_id: int) -> PendingWeaponCommand | None:
+    def cleanup_pending_weapon_commands(self) -> None:
         now = time.monotonic()
-        stale = [
+        stale_command_keys = [
             key
             for key, pending in self.pending_commands.items()
             if now - pending.created_at > PENDING_WW_SECONDS
         ]
-        for key in stale:
+        for key in stale_command_keys:
             self.pending_commands.pop(key, None)
+
+        stale_message_ids = [
+            message_id
+            for message_id, pending in self.pending_command_messages.items()
+            if now - pending.created_at > PENDING_WW_SECONDS
+        ]
+        for message_id in stale_message_ids:
+            self.pending_command_messages.pop(message_id, None)
+
+        stale_reply_ids = [
+            message_id
+            for message_id, pending in self.pending_owo_replies.items()
+            if now - pending.created_at > PENDING_WW_SECONDS
+        ]
+        for message_id in stale_reply_ids:
+            self.pending_owo_replies.pop(message_id, None)
+
+    def find_pending_for_neon_reply(
+        self, channel_id: int, reply_reference_id: int = 0
+    ) -> PendingWeaponCommand | None:
+        self.cleanup_pending_weapon_commands()
+        if reply_reference_id:
+            pending = self.pending_owo_replies.get(reply_reference_id)
+            if pending is not None:
+                return pending
+            pending = self.pending_command_messages.get(reply_reference_id)
+            if pending is not None:
+                return pending
         candidates = [
             pending
             for (pending_channel_id, _user_id), pending in self.pending_commands.items()
@@ -1239,22 +1371,46 @@ class NeonWeapons(commands.Cog):
         return max(candidates, key=lambda item: item.created_at)
 
     async def send_guide(self, message: discord.Message) -> None:
+        calculate_emoji = ui_emoji_text(self.bot, "neon_calculate", "🧮")
         embed = discord.Embed(
             title="🧾 Neon weapon dex helper",
             description=(
                 "To upload and clean up your weapon data for Neon:\n\n"
                 "1. Run `nw inv public`.\n"
                 "2. Run `ww`.\n"
-                "3. Click Neon's name/setup reaction on the `ww` message.\n"
+                f"3. Click Neon's name/setup reaction {calculate_emoji} on the `ww` message.\n"
                 "4. Click through your weapon pages.\n\n"
                 "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible**. "
                 "Then run `HWD`, `H dex`, or `H weapon dex` to get guided `ww <weapon_id>` commands.\n\n"
-                "Battle helpers can scan another member's Neon filtered pages; the queue is saved under the member shown in Neon's title, so that member can later run `H dex`."
+                "Battle helpers can scan another member's Neon filtered pages; the queue is saved under the member shown in Neon's title. Helpers can run `HWD @member` to dex that member's queue, and any confirmed Neon blueprint removes the weapon from every matching owner's queue across all servers the helper can see."
             ),
             color=0xFEE75C,
         )
-        embed.set_footer(text="Guide based on Pencilvester's Neon weapon setup notes.")
+        embed.set_footer(text="Guide based on Pen Sylvester's Neon weapon setup notes.")
         await safe_reply(message, embed=embed, mention_author=False)
+
+    @staticmethod
+    def user_display_name(user: discord.abc.User) -> str:
+        return discord.utils.escape_markdown(
+            str(getattr(user, "display_name", None) or getattr(user, "name", None) or user.id)
+        )
+
+    def resolve_dex_target(self, message: discord.Message, query: str) -> tuple[int, str, str]:
+        clean_query = query or ""
+        for mentioned in message.mentions:
+            mention_tokens = (f"<@{mentioned.id}>", f"<@!{mentioned.id}>")
+            if any(token in clean_query for token in mention_tokens):
+                for token in mention_tokens:
+                    clean_query = clean_query.replace(token, " ")
+                return mentioned.id, self.user_display_name(mentioned), re.sub(r"\s+", " ", clean_query).strip()
+
+        id_match = re.search(r"\b(\d{15,22})\b", clean_query)
+        if id_match:
+            target_id = int(id_match.group(1))
+            clean_query = (clean_query[: id_match.start()] + " " + clean_query[id_match.end() :]).strip()
+            return target_id, f"user {target_id}", re.sub(r"\s+", " ", clean_query).strip()
+
+        return message.author.id, self.user_display_name(message.author), clean_query.strip()
 
     def describe_entry(self, entry: NeonWeaponEntry) -> str:
         weapon = WEAPON_LABELS.get(entry.weapon_type, entry.weapon_type or "unknown weapon")
@@ -1268,7 +1424,9 @@ class NeonWeapons(commands.Cog):
         )
 
     async def send_dex(self, message: discord.Message, query: str) -> None:
-        weapon_type, passive_types, unknown = parse_filter_terms(query)
+        target_user_id, target_display_name, clean_query = self.resolve_dex_target(message, query)
+        runner_display_name = self.user_display_name(message.author)
+        weapon_type, passive_types, unknown = parse_filter_terms(clean_query)
         if unknown:
             await safe_reply(
                 message,
@@ -1279,16 +1437,16 @@ class NeonWeapons(commands.Cog):
             )
             return
         entries = await self.store.list_dex_queue(
-            message.author.id,
+            target_user_id,
             weapon_type=weapon_type,
             passive_types=passive_types,
             limit=DEX_PAGE_SIZE,
         )
         if not entries:
-            suffix = f" for `{query}`" if query else ""
+            suffix = f" for `{clean_query}`" if clean_query else ""
             await safe_reply(
                 message,
-                f"I do not have any queued Neon weapon dex commands for you{suffix}. Scan Neon weapon pages first with `ww` / `nw`, then run `HWD` or `H dex`.",
+                f"I do not have any queued Neon weapon dex commands for **{target_display_name}**{suffix}. Scan Neon weapon pages first with `ww` / `nw`, then run `HWD` or `H dex`.",
                 mention_author=False,
             )
             return
@@ -1304,21 +1462,28 @@ class NeonWeapons(commands.Cog):
                 f"{format_float(entry.current_quality)} → {format_float(entry.max_quality)}"
             )
         embed = discord.Embed(
-            title="🧾 Weapons needing Neon dex",
+            title=f"🧾 Weapons needing Neon dex for {target_display_name}",
             description=(
                 "These are the next queued weapons. Click **Start dexing session** below for one-at-a-time prompts, or copy commands manually. Neon should answer with a blueprint, and I will mark that weapon saved.\n\n"
                 + "\n".join(lines)
             ),
             color=0xFEE75C,
         )
-        if query:
-            embed.add_field(name="Filter", value=f"`{query}`", inline=False)
+        if clean_query:
+            embed.add_field(name="Filter", value=f"`{clean_query}`", inline=False)
         if len(entries) > 10:
             embed.set_footer(text=f"Showing a guided batch from {len(entries)} matching queued weapons.")
         await safe_reply(
             message,
             embed=embed,
-            view=WeaponDexView(self, message.author.id, entries),
+            view=WeaponDexView(
+                self,
+                runner_user_id=message.author.id,
+                owner_user_id=target_user_id,
+                owner_display_name=target_display_name,
+                runner_display_name=runner_display_name,
+                entries=entries,
+            ),
             mention_author=False,
         )
 
@@ -1328,9 +1493,13 @@ class NeonWeapons(commands.Cog):
 
     def build_session_message(self, session: ActiveDexSession) -> str:
         if session.index >= len(session.entries):
-            return "✅ Weapon dex session complete. Run `HWD` anytime to continue with any remaining queue."
+            return f"✅ **{session.owner_display_name}**'s weapon dex session is complete. Run `HWD` anytime to continue with any remaining queue."
         entry = session.entries[session.index]
+        runner_note = ""
+        if session.runner_user_id != session.owner_user_id:
+            runner_note = f"\nRunner: **{session.runner_display_name}** (<@{session.runner_user_id}>)"
         return (
+            f"**{session.owner_display_name}** (<@{session.owner_user_id}>) — Neon weapon dex{runner_note}\n"
             f"`ww {entry.weapon_id}`\n\n"
             "Send this command to OwO. After you send it, I will wait about **5 seconds**, "
             "remove this prompt, and show the next one. Use `H stop`, `Hstop`, or `HS` to pause the session."
@@ -1352,7 +1521,10 @@ class NeonWeapons(commands.Cog):
 
     async def send_session_prompt(self, channel: discord.abc.Messageable, session: ActiveDexSession) -> None:
         await self.delete_session_prompt(channel, session)
-        sent = await channel.send(self.build_session_message(session))
+        sent = await channel.send(
+            self.build_session_message(session),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
         session.guide_message_id = sent.id
 
     async def start_dex_session(
@@ -1360,6 +1532,9 @@ class NeonWeapons(commands.Cog):
         *,
         user: discord.abc.User,
         channel: discord.abc.Messageable,
+        owner_user_id: int,
+        owner_display_name: str,
+        runner_display_name: str,
         entries: list[NeonWeaponEntry],
     ) -> None:
         if not entries:
@@ -1369,9 +1544,12 @@ class NeonWeapons(commands.Cog):
         if old_session is not None:
             await self.delete_session_prompt(channel, old_session)
         session = ActiveDexSession(
-            user_id=user.id,
+            runner_user_id=user.id,
+            owner_user_id=owner_user_id,
             channel_id=getattr(channel, "id", 0),
             entries=list(entries),
+            owner_display_name=owner_display_name,
+            runner_display_name=runner_display_name,
         )
         self.active_dex_sessions[key] = session
         await self.send_session_prompt(channel, session)

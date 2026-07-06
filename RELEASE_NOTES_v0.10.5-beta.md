@@ -32,7 +32,7 @@ H weapon stats
 H weapon clear
 ```
 
-`H weapons / HW` explains the Neon setup flow based on Pencilvester's notes: run `nw inv public`, run `ww`, click Neon's reaction, then page through the inventory.
+`H weapons / HW` explains the Neon setup flow based on Pen Sylvester's notes: run `nw inv public`, run `ww`, click Neon's reaction, then page through the inventory.
 
 `HWD` / `H dex` shows guided `ww <weapon_id>` commands for queued weapons. The guide includes a five-second step guard so users do not advance too quickly while waiting for OwO and Neon responses.
 
@@ -83,3 +83,9 @@ A new local SQLite file, `neon_weapons.db`, stores scanned Neon weapon queue dat
 - Added `HS` and `Hstop` aliases for pausing a guided dex session.
 - `H help` now includes the Neon weapon dex section with the guided-session commands and stop aliases.
 - The Neon setup guide now refers to Neon's name/setup reaction when explaining the initial weapon upload flow.
+
+### Cross-user dexing support
+
+- Guided dex prompts now display the weapon owner's name in bold, reducing confusion when multiple sessions run in one channel.
+- Battle helpers can use `HWD @member` or `HWD @member <filters>` to work through another member's scanned queue.
+- Neon blueprint confirmations now mark the weapon dexed across all matching owner queues, so a weapon only needs to be dexed once even if another helper sent the `ww <weapon_id>` command.

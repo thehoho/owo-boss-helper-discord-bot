@@ -30,6 +30,7 @@ EMOJI_FILES: dict[str, str] = {
     "boss_appeared": "boss_appeared.png",
     "boss_escaped": "boss_escaped.png",
     "boss_defeated": "boss_defeated.png",
+    "neon_calculate": "neon_calculate.png",
 }
 
 

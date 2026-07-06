@@ -1,3 +1,10 @@
+## v0.10.5-beta hotfix 4
+
+- Added owner labels to guided Neon dex prompts so multiple users can run dex sessions in the same channel without confusion.
+- Added `HWD @member` and `HWD @member <filters>` so battle helpers can dex another member's scanned weapon queue.
+- Linked OwO weapon replies to Neon blueprint replies where possible, so confirmed blueprints update every matching owner queue instead of only the runner's queue.
+- Confirmed Neon blueprints now remove the weapon from all matching scanned queues, even when another helper sent the `ww <weapon_id>` command.
+
 ## v0.10.5-beta hotfix 3
 
 - Changed guided Neon weapon dex sessions to post plain text `ww <weapon_id>` prompts instead of embeds for easier mobile copying.
@@ -19,7 +26,7 @@
 - Added a Neon weapon scanner for public NeonUtil weapon inventory pages from bot ID `851436490415931422`.
 - Added per-user Neon weapon queues for rows where Neon shows `M` / max possible quality, deduped by owner user ID and weapon ID.
 - Added a visible `🧾` reaction after a Neon weapon page is scanned successfully.
-- Added `H weapons / HW` with Pencilvester's Neon setup guide.
+- Added `H weapons / HW` with Pen Sylvester's Neon setup guide.
 - Added `HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` to guide members through `ww <weapon_id>` dex commands, with optional weapon/passive filters such as `HWD dagger mtap sg`.
 - Learns weapon/passive context from Neon filters and blueprint replies, without depending on one stable emoji ID per weapon or passive.
 - Marks queued weapons saved when a member sends `ww <weapon_id>` and Neon replies with a blueprint.
@@ -189,7 +196,7 @@
 - Treated already-equipped weapon responses as successful steps.
 - Added optional cleanup of completed user command messages after OwO responds.
 - Preserved concurrent guided sessions by server, channel, and user.
-- Expanded the project credits to recognize Pencilvester's original saved team-template with weapon-ID idea.
+- Expanded the project credits to recognize Pen Sylvester's original saved team-template with weapon-ID idea.
 
 ## 0.6.1-beta
 
