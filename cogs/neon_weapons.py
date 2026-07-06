@@ -574,9 +574,17 @@ def parse_neon_command(content: str) -> tuple[str, str] | None:
     for prefix in ("h weapon clear", "h dex clear", "hw clear", "hwd clear"):
         if compact == prefix:
             return "clear", ""
-    for prefix in ("h stop", "h dex stop", "hwd stop", "h weapon stop", "h weapon dex stop"):
-        if compact == prefix:
-            return "stop", ""
+    stop_commands = {
+        "h stop",
+        "hstop",
+        "hs",
+        "h dex stop",
+        "hwd stop",
+        "h weapon stop",
+        "h weapon dex stop",
+    }
+    if compact in stop_commands or compact_no_space in {"hstop", "hs"}:
+        return "stop", ""
     return None
 
 
@@ -1002,7 +1010,7 @@ class WeaponDexView(discord.ui.View):
         await interaction.followup.send(
             "Started your dexing session. I will post one `ww <weapon_id>` command at a time. "
             "Send that command, then I will wait about 5 seconds and move to the next one. "
-            "Use `H stop` to pause and continue later.",
+            "Use `H stop`, `Hstop`, or `HS` to pause and continue later.",
             ephemeral=True,
         )
 
@@ -1237,7 +1245,7 @@ class NeonWeapons(commands.Cog):
                 "To upload and clean up your weapon data for Neon:\n\n"
                 "1. Run `nw inv public`.\n"
                 "2. Run `ww`.\n"
-                "3. Click Neon's reaction.\n"
+                "3. Click Neon's name/setup reaction on the `ww` message.\n"
                 "4. Click through your weapon pages.\n\n"
                 "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible**. "
                 "Then run `HWD`, `H dex`, or `H weapon dex` to get guided `ww <weapon_id>` commands.\n\n"
@@ -1318,25 +1326,14 @@ class NeonWeapons(commands.Cog):
     def dex_session_key(self, channel_id: int, user_id: int) -> tuple[int, int]:
         return (channel_id, user_id)
 
-    def build_session_embed(self, session: ActiveDexSession) -> discord.Embed:
+    def build_session_message(self, session: ActiveDexSession) -> str:
         if session.index >= len(session.entries):
-            return discord.Embed(
-                title="🧾 Weapon dex session complete",
-                description="All queued weapons in this session have been shown. Run `HWD` anytime to continue with any remaining queue.",
-                color=0x57F287,
-            )
+            return "✅ Weapon dex session complete. Run `HWD` anytime to continue with any remaining queue."
         entry = session.entries[session.index]
-        details = self.describe_entry(entry)
-        return discord.Embed(
-            title=f"🧾 Weapon dex session {session.index + 1}/{len(session.entries)}",
-            description=(
-                "Send this OwO command now:\n\n"
-                f"`ww {entry.weapon_id}`\n\n"
-                f"{details}\n\n"
-                "After you send it, I will wait about **5 seconds**, remove this prompt, and show the next one. "
-                "Use `H stop` to pause the session."
-            ),
-            color=0xFEE75C,
+        return (
+            f"`ww {entry.weapon_id}`\n\n"
+            "Send this command to OwO. After you send it, I will wait about **5 seconds**, "
+            "remove this prompt, and show the next one. Use `H stop`, `Hstop`, or `HS` to pause the session."
         )
 
     async def delete_session_prompt(self, channel: discord.abc.Messageable, session: ActiveDexSession) -> None:
@@ -1355,7 +1352,7 @@ class NeonWeapons(commands.Cog):
 
     async def send_session_prompt(self, channel: discord.abc.Messageable, session: ActiveDexSession) -> None:
         await self.delete_session_prompt(channel, session)
-        sent = await channel.send(embed=self.build_session_embed(session))
+        sent = await channel.send(self.build_session_message(session))
         session.guide_message_id = sent.id
 
     async def start_dex_session(

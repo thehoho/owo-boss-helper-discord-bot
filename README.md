@@ -614,3 +614,7 @@ MIT License. See [LICENSE](LICENSE).
 ### Guided Neon weapon dex sessions
 
 `HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued `ww <weapon_id>` commands from scanned Neon weapon pages. Click **Start dexing session** to receive one command at a time. After the member sends the shown `ww <weapon_id>` command, the helper waits about five seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
+
+### Mobile-friendly dex prompts
+
+Guided Neon dex sessions post one plain-text inline-code command at a time, such as `ww CX9974`, so mobile users can tap/copy it easily. The helper advances after the user sends the shown command, waits about five seconds, removes the old prompt, and posts the next one. Use `H stop`, `Hstop`, or `HS` to pause the session.

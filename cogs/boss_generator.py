@@ -1379,11 +1379,12 @@ class BossGenerator(commands.Cog):
                 "Use `HW` or `H weapons` for Pencilvester's Neon setup guide. "
                 "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` to show queued "
                 "`ww <weapon_id>` commands from scanned Neon pages. Click **Start dexing session** "
-                "for one-at-a-time prompts that advance after you send each `ww` command. "
-                "Use `H stop` to pause a session and continue later. Filters like "
-                "`HWD dagger mtap sg` or `H dex sword` work when Neon filters or "
-                "blueprints provide the weapon/passive context. `HW stats` / `H weapon stats` "
-                "shows scanned, queued, saved, and no-action counts; `H weapon clear` clears your queue."
+                "for mobile-friendly one-command prompts. The helper advances after you send the shown "
+                "`ww` command, waits about five seconds, removes the old prompt, and posts the next one. "
+                "Use `H stop`, `Hstop`, or `HS` to pause and continue later. Filters like "
+                "`HWD dagger mtap sg` or `H dex sword` work when Neon filters or blueprints provide context. "
+                "`HW stats` / `H weapon stats` shows scanned, queued, saved, and no-action counts; "
+                "`H weapon clear` clears your queue."
             ),
             inline=False,
         )

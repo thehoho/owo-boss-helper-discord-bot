@@ -1,3 +1,10 @@
+## v0.10.5-beta hotfix 3
+
+- Changed guided Neon weapon dex sessions to post plain text `ww <weapon_id>` prompts instead of embeds for easier mobile copying.
+- Added `HS` and `Hstop` as quick aliases for `H stop`.
+- Forced the `H help` Neon weapon dex section to include the guided session commands and stop aliases.
+- Updated the Neon setup guide copy to mention Neon's name/setup reaction.
+
 ## v0.10.5-beta hotfix 2
 
 - Added guided Neon weapon dex sessions from `HWD` / `H dex` with a **Start dexing session** button.

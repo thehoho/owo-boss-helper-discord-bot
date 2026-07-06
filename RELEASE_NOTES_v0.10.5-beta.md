@@ -76,3 +76,10 @@ A new local SQLite file, `neon_weapons.db`, stores scanned Neon weapon queue dat
 - The bot now posts one `ww <weapon_id>` command at a time, advances after the user sends the command, and waits about five seconds before showing the next prompt.
 - Added `H stop` to pause an active dex session.
 - Clarified `HW stats` so scanned, need-dex, saved/exact/dexed, and no-action counts are easier to understand.
+
+### Mobile-friendly guided dex prompts
+
+- Guided Neon weapon dex sessions now use plain text prompts instead of embed prompts.
+- Added `HS` and `Hstop` aliases for pausing a guided dex session.
+- `H help` now includes the Neon weapon dex section with the guided-session commands and stop aliases.
+- The Neon setup guide now refers to Neon's name/setup reaction when explaining the initial weapon upload flow.
