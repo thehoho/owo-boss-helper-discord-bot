@@ -1,5 +1,18 @@
 # Changelog
 
+## 0.10.5-beta
+
+- Added a Neon weapon scanner for public NeonUtil weapon inventory pages from bot ID `851436490415931422`.
+- Added per-user Neon weapon queues for rows where Neon shows `M` / max possible quality, deduped by owner user ID and weapon ID.
+- Added a visible `🧾` reaction after a Neon weapon page is scanned successfully.
+- Added `H weapons / HW` with Pencilvester's Neon setup guide.
+- Added `HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` to guide members through `ww <weapon_id>` dex commands, with optional weapon/passive filters such as `HWD dagger mtap sg`.
+- Learns weapon/passive context from Neon filters and blueprint replies, without depending on one stable emoji ID per weapon or passive.
+- Marks queued weapons saved when a member sends `ww <weapon_id>` and Neon replies with a blueprint.
+- Added `H weapon stats` and `H weapon clear` for personal Neon weapon queue management.
+- Expanded `HBT` so one message can look up multiple tracked members at once.
+- Updated the public bot version to `0.10.5-beta`.
+
 ## 0.10.4-beta
 
 - Added automatic boss-ticket subtraction from newly observed public OwO Top 10 battle-log UUIDs on the edited guild-boss card.

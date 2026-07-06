@@ -1,6 +1,6 @@
 # OwO Boss Helper
 
-A community Discord bot for OwO guild-boss fights. It generates Neon battle commands, tracks guild-boss timing, saves reusable teams with exact weapon IDs, and maintains a per-server boss-ticket board.
+A community Discord bot for OwO guild-boss fights. It generates Neon battle commands, tracks guild-boss timing, saves reusable teams with exact weapon IDs, scans Neon weapon pages for dex queues, and maintains a per-server boss-ticket board.
 
 Developed and maintained by **Hassaan**.
 
@@ -82,6 +82,37 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Removes entries after 48 hours without a manual check or confirmed Top 10 hit while preserving block, tracking, and nickname preferences.
 - Adds `HBT <name, username, mention, or ID>` for fast current-ticket lookups without loading server members.
 - Loads the five PNG files under `assets/ui_emojis/` as application-owned Discord emojis on startup. Existing application emoji names are reused and missing names are created automatically.
+
+### Neon weapon dex helper
+
+The helper can watch public NeonUtil weapon inventory pages from Neon bot ID `851436490415931422`. When Neon shows **M** / max possible quality on a weapon row, the helper stores that weapon under the owner shown in Neon's title. The scan is deduped by Discord owner ID and weapon ID, so paging backward and forward does not create duplicates.
+
+A successful scan adds a visible `🧾` reaction to the Neon page. Battle helpers can scan another member's filtered Neon pages; the resulting queue belongs to the member shown in Neon's title, so that member can later dex their own weapons.
+
+Setup guide:
+
+```text
+H weapons / HW
+```
+
+Dex queue commands:
+
+```text
+HWD
+H dex
+H weapon dex
+H weapondex
+HW dex
+HWD dagger
+H dex dagger
+HWD dagger mtap sg
+H weapon stats
+H weapon clear
+```
+
+`HWD` / `H dex` returns guided `ww <weapon_id>` commands with a five-second step guard. When the member sends `ww <weapon_id>` and Neon replies with a blueprint such as `sword 31,7 mtap 77`, the helper marks that weapon saved and learns any available weapon/passive context.
+
+The scanner does not assume one stable emoji ID per weapon or passive. It tags weapon/passive context from Neon filter headers, command context, learned blueprint replies, and known aliases. Unknown rows still remain in the unfiltered dex queue.
 
 ### Developer information and operational statistics
 
@@ -434,7 +465,7 @@ HBT @mention
 HBT <Discord user ID>
 ```
 
-A unique match shows the member's current `0/3`–`3/3` count, account username, numeric ID, last confirmed activity, and whether the latest value came from a manual check or a public Top 10 battle log. Multiple matches are listed without guessing.
+A unique match shows the member's current `0/3`–`3/3` count, account username, numeric ID, last confirmed activity, and whether the latest value came from a manual check or a public Top 10 battle log. Multiple names can be checked in one message, and ambiguous matches are listed without guessing.
 
 ### Show and refresh the complete list
 
@@ -526,7 +557,8 @@ owo-boss-helper-discord-bot/
 │   ├── team_templates.py
 │   ├── ticket_tracker.py
 │   ├── bot_info.py
-│   └── message_utils.py
+│   ├── message_utils.py
+│   └── neon_weapons.py
 ├── deploy/
 │   ├── backup.sh
 │   └── owo-boss-helper.service

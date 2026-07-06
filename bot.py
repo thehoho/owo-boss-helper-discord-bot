@@ -15,7 +15,7 @@ LOG_DIR = PROJECT_ROOT / "logs"
 LOG_FILE = LOG_DIR / "bot.log"
 BOT_DESCRIPTION = (
     "OwO Boss Helper generates ordered Neon boss commands, tracks guild-boss "
-    "cooldowns and tickets, and saves guided team templates with exact weapon IDs."
+    "cooldowns, tickets, Neon weapon dex queues, and guided team templates."
 )
 
 
@@ -107,6 +107,8 @@ async def main() -> None:
         logger.info("Team template manager loaded")
         await bot.load_extension("cogs.ticket_tracker")
         logger.info("Boss ticket tracker loaded")
+        await bot.load_extension("cogs.neon_weapons")
+        logger.info("Neon weapon scanner loaded")
         await bot.load_extension("cogs.bot_info")
         logger.info("Bot information and developer statistics loaded")
         await bot.start(TOKEN)

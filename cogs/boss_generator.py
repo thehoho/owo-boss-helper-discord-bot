@@ -1374,6 +1374,18 @@ class BossGenerator(commands.Cog):
             inline=False,
         )
         embed.add_field(
+            name="🧾 Neon weapon dex",
+            value=(
+                "Use `HW` or `H weapons` for Pencilvester's Neon setup guide. "
+                "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` to show queued "
+                "`ww <weapon_id>` commands from scanned Neon pages. Filters like "
+                "`HWD dagger mtap sg` or `H dex sword` work when Neon filters or "
+                "blueprints provide the weapon/passive context. `H weapon stats` "
+                "shows your scan counts and `H weapon clear` clears your queue."
+            ),
+            inline=False,
+        )
+        embed.add_field(
             name="ℹ️ Project",
             value=(
                 "Use `H about` or `/about` for developer and project information. "

@@ -13,6 +13,7 @@ import json
 import logging
 import os
 import re
+import shlex
 import sqlite3
 import time
 import unicodedata
@@ -261,6 +262,32 @@ def parse_ticket_lookup_query(content: str) -> str | None:
     if match is None:
         return None
     return (match.group(1) or "").strip()
+
+
+def split_ticket_lookup_terms(query: str) -> list[str]:
+    """Split an HBT lookup into one or more safe name/mention/ID queries."""
+    cleaned = (query or "").strip()
+    if not cleaned:
+        return []
+    if "," in cleaned or "\n" in cleaned:
+        raw_parts = re.split(r"[,\n]+", cleaned)
+    else:
+        try:
+            raw_parts = shlex.split(cleaned)
+        except ValueError:
+            raw_parts = cleaned.split()
+    terms: list[str] = []
+    seen: set[str] = set()
+    for part in raw_parts:
+        term = part.strip()
+        if not term:
+            continue
+        key = term.casefold()
+        if key in seen:
+            continue
+        seen.add(key)
+        terms.append(term)
+    return terms[:20]
 
 
 def looks_like_guild_boss_card(text: str) -> bool:
@@ -4293,13 +4320,54 @@ class TicketTracker(commands.Cog):
     async def send_ticket_lookup(
         self, message: discord.Message, query: str
     ) -> None:
-        if not query:
+        terms = split_ticket_lookup_terms(query)
+        if not terms:
             await safe_reply(
                 message,
-                "Use `HBT <name, username, mention, or user ID>`, for example `HBT hassaan`.",
+                "Use `HBT <name, username, mention, or user ID>`. You can check multiple people with `HBT name1 name2 name3`, commas, or quoted names.",
                 mention_author=False,
             )
             return
+
+        if len(terms) == 1:
+            await self.send_single_ticket_lookup(message, terms[0])
+            return
+
+        lines: list[str] = []
+        for term in terms:
+            matches = await self.store.search_status(message.guild.id, term, limit=4)
+            safe_term = discord.utils.escape_markdown(term)
+            if not matches:
+                lines.append(f"**{safe_term}:** not found")
+                continue
+            if len(matches) == 1:
+                item = matches[0]
+                activity = item.last_activity_at or item.updated_at
+                account = f"@{item.account_username}" if item.account_username else "@unknown"
+                lines.append(
+                    f"**{discord.utils.escape_markdown(item.username)}** "
+                    f"`{account}` — {self.ticket_icons(item.tickets)} **{item.tickets}/3** "
+                    f"· <t:{activity}:R>"
+                )
+                continue
+            choices = "; ".join(
+                f"{discord.utils.escape_markdown(match.username)} `{match.account_username or match.user_id}` {match.tickets}/3"
+                for match in matches[:4]
+            )
+            lines.append(f"**{safe_term}:** multiple matches — {choices}")
+
+        embed = discord.Embed(
+            title="🎟️ Boss-ticket lookup",
+            description="\n".join(lines)[:3900],
+            color=0x5865F2,
+        )
+        if len(terms) >= 20:
+            embed.set_footer(text="Showing the first 20 lookup terms only.")
+        await safe_reply(message, embed=embed, mention_author=False)
+
+    async def send_single_ticket_lookup(
+        self, message: discord.Message, query: str
+    ) -> None:
         matches = await self.store.search_status(message.guild.id, query)
         if not matches:
             await safe_reply(

@@ -32,12 +32,12 @@ TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.10.4-beta"
+BOT_VERSION = "0.10.5-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
     "OwO Boss Helper makes guild-boss fights easier by generating ordered Neon "
-    "commands with live HP, tracking boss cooldowns and tickets, and saving guided "
+    "commands with live HP, tracking boss cooldowns and tickets, scanning Neon weapon pages, and saving guided "
     "team templates with exact weapon IDs."
 )
 ABOUT_COMMANDS = {"habout"}
