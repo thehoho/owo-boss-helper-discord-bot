@@ -10,7 +10,7 @@
 - Changed guided Neon weapon dex sessions to post plain text `ww <weapon_id>` prompts instead of embeds for easier mobile copying.
 - Added `HS` and `Hstop` as quick aliases for `H stop`.
 - Forced the `H help` Neon weapon dex section to include the guided session commands and stop aliases.
-- Updated the Neon setup guide copy to mention Neon's name/setup reaction.
+- Updated the Neon setup guide copy to mention Neon's reaction.
 
 ## v0.10.5-beta hotfix 2
 
@@ -26,7 +26,7 @@
 - Added a Neon weapon scanner for public NeonUtil weapon inventory pages from bot ID `851436490415931422`.
 - Added per-user Neon weapon queues for rows where Neon shows `M` / max possible quality, deduped by owner user ID and weapon ID.
 - Added a visible `🧾` reaction after a Neon weapon page is scanned successfully.
-- Added `H weapons / HW` with Pen Sylvester's Neon setup guide.
+- Added `H weapons / HW` with Pencilvester's Neon setup guide.
 - Added `HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` to guide members through `ww <weapon_id>` dex commands, with optional weapon/passive filters such as `HWD dagger mtap sg`.
 - Learns weapon/passive context from Neon filters and blueprint replies, without depending on one stable emoji ID per weapon or passive.
 - Marks queued weapons saved when a member sends `ww <weapon_id>` and Neon replies with a blueprint.
@@ -196,7 +196,7 @@
 - Treated already-equipped weapon responses as successful steps.
 - Added optional cleanup of completed user command messages after OwO responds.
 - Preserved concurrent guided sessions by server, channel, and user.
-- Expanded the project credits to recognize Pen Sylvester's original saved team-template with weapon-ID idea.
+- Expanded the project credits to recognize Pencilvester's original saved team-template with weapon-ID idea.
 
 ## 0.6.1-beta
 
@@ -270,3 +270,7 @@
 - Preserved cooldown channel and watcher state across restarts.
 - Kept authoritative boss ordering based on the visible `1/3`, `2/3`, and `3/3` counter.
 - Removed the Change HP button from the public workflow.
+### v0.10.5-beta empowered dex polish
+- Queued unsaved empowered weapon rows that Neon lists without an `M / max_possible` marker when they do not have the green saved tick.
+- Updated the combined `H help` override from the team-template cog so the public help embed shows the Neon dex commands.
+- Simplified the `HW` setup wording to “click Neon's reaction” and credited Pencilvester's setup notes.

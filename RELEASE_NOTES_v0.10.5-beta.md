@@ -32,7 +32,7 @@ H weapon stats
 H weapon clear
 ```
 
-`H weapons / HW` explains the Neon setup flow based on Pen Sylvester's notes: run `nw inv public`, run `ww`, click Neon's reaction, then page through the inventory.
+`H weapons / HW` explains the Neon setup flow based on Pencilvester's notes: run `nw inv public`, run `ww`, click Neon's reaction, then page through the inventory.
 
 `HWD` / `H dex` shows guided `ww <weapon_id>` commands for queued weapons. The guide includes a five-second step guard so users do not advance too quickly while waiting for OwO and Neon responses.
 
@@ -82,10 +82,15 @@ A new local SQLite file, `neon_weapons.db`, stores scanned Neon weapon queue dat
 - Guided Neon weapon dex sessions now use plain text prompts instead of embed prompts.
 - Added `HS` and `Hstop` aliases for pausing a guided dex session.
 - `H help` now includes the Neon weapon dex section with the guided-session commands and stop aliases.
-- The Neon setup guide now refers to Neon's name/setup reaction when explaining the initial weapon upload flow.
+- The Neon setup guide now refers to Neon's reaction when explaining the initial weapon upload flow.
 
 ### Cross-user dexing support
 
 - Guided dex prompts now display the weapon owner's name in bold, reducing confusion when multiple sessions run in one channel.
 - Battle helpers can use `HWD @member` or `HWD @member <filters>` to work through another member's scanned queue.
 - Neon blueprint confirmations now mark the weapon dexed across all matching owner queues, so a weapon only needs to be dexed once even if another helper sent the `ww <weapon_id>` command.
+
+### Empowered weapon rows
+- Neon may omit the `M / max_possible` marker on empowered weapon-crate and boss-weapon rows. The scanner now treats unsaved empowered rows without the green saved tick as dex candidates.
+- The combined `H help` embed from the team-template cog now includes the Neon dex section, so `H help` reflects the current commands.
+- The `HW` guide now says to click Neon's reaction on the `ww` message and credits Pencilvester's setup notes.

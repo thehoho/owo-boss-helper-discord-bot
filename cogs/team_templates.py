@@ -21,8 +21,6 @@ from typing import Any, Iterable
 import discord
 from discord.ext import commands
 
-from .message_utils import safe_reply
-
 logger = logging.getLogger(__name__)
 
 OWO_BOT_ID = 408785106942164992
@@ -479,7 +477,7 @@ def interleaved_member_commands(template: TeamTemplate) -> list[str]:
     for member in template.members:
         commands.append(f"wtm a {member.animal} {member.position}")
         if member.weapon_id:
-            commands.append(f"ww {member.weapon_id} {member.animal}")
+            commands.append(f"ww {member.weapon_id} {member.position}")
     return commands
 
 
@@ -1751,13 +1749,13 @@ class TeamTemplates(commands.Cog):
         key = self.guided_key(message.guild.id, message.channel.id, message.author.id)
         session = self.guided_sessions.get(key)
         if session is None:
-            await safe_reply(message,
+            await message.reply(
                 "You do not have an active guided team step in this channel.",
                 mention_author=False,
             )
             return
         if session.waiting_for_owo:
-            await safe_reply(message,
+            await message.reply(
                 "OwO is still responding to the command you sent. Wait for that "
                 "response before using `HS` / `H skip` / `H escape`.",
                 mention_author=False,
@@ -1801,7 +1799,7 @@ class TeamTemplates(commands.Cog):
         key = self.guided_key(message.guild.id, message.channel.id, message.author.id)
         session = self.clear_guided_session(key)
         if session is None:
-            await safe_reply(message,
+            await message.reply(
                 "You do not have an active guided team setup in this channel.",
                 mention_author=False,
             )
@@ -1869,6 +1867,22 @@ class TeamTemplates(commands.Cog):
             inline=False,
         )
         embed.add_field(
+            name="🧾 Neon weapon dex",
+            value=(
+                "Use `HW` or `H weapons` for Pencilvester's Neon setup guide. "
+                "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` "
+                "to show queued `ww <weapon_id>` commands. Helpers can target another "
+                "member with `HWD @member` or `HWD @member dagger mtap sg`. Click "
+                "**Start dexing session** for mobile-friendly one-command prompts labelled "
+                "with the weapon owner's name. The helper advances after the runner sends "
+                "the shown `ww` command, waits about five seconds, removes the old prompt, "
+                "and posts the next one. Any confirmed Neon blueprint marks that weapon "
+                "dexed for every matching owner queue. Unsaved empowered rows without a "
+                "green tick are queued too. Use `H stop`, `Hstop`, or `HS` to pause."
+            ),
+            inline=False,
+        )
+        embed.add_field(
             name="ℹ️ Project information",
             value=(
                 "Use `H about` or `/about`. The developer-only operational commands "
@@ -1877,7 +1891,7 @@ class TeamTemplates(commands.Cog):
             inline=False,
         )
         embed.set_footer(text="Use H help anytime to show this current command guide.")
-        await safe_reply(message,embed=embed, mention_author=False)
+        await message.reply(embed=embed, mention_author=False)
         logger.info(
             "Combined helper help requested by %s in guild %s",
             message.author,
@@ -1926,21 +1940,20 @@ class TeamTemplates(commands.Cog):
             value=(
                 "Choose **Quick replace** or **Exact reset**. The helper shows the full "
                 "packet, then posts one command at a time. Animal adds and weapon equips "
-                "alternate, weapon equips target the saved animal identifier, and the next "
-                "command appears immediately after OwO confirms."
+                "alternate, and the next command appears immediately after OwO confirms."
             ),
             inline=False,
         )
         embed.set_footer(
             text="The final step is always wtm so you can verify the finished team."
         )
-        await safe_reply(message,embed=embed, mention_author=False)
+        await message.reply(embed=embed, mention_author=False)
 
     async def parse_team_reply(
         self, message: discord.Message
     ) -> ParsedTeamMessage | None:
         if message.reference is None or message.reference.message_id is None:
-            await safe_reply(message,
+            await message.reply(
                 "Reply directly to the OwO team message you want to use.",
                 mention_author=False,
             )
@@ -1951,7 +1964,7 @@ class TeamTemplates(commands.Cog):
             self.bot, int(channel_id), int(message.reference.message_id)
         )
         if raw is None:
-            await safe_reply(message,
+            await message.reply(
                 "I could not read that referenced message. Check my **Read Message History** "
                 "permission and try again.",
                 mention_author=False,
@@ -1959,7 +1972,7 @@ class TeamTemplates(commands.Cog):
             return None
         author_id = int((raw.get("author") or {}).get("id", 0) or 0)
         if author_id != OWO_BOT_ID:
-            await safe_reply(message,
+            await message.reply(
                 "That reply is not pointing to an official OwO Bot team message.",
                 mention_author=False,
             )
@@ -1967,7 +1980,7 @@ class TeamTemplates(commands.Cog):
 
         parsed = parse_team_message_detailed(extract_all_text(raw))
         if parsed is None:
-            await safe_reply(message,
+            await message.reply(
                 "I could not read that OwO team page. Make sure you replied to the "
                 "visible `wtm` / `owo team` message.",
                 mention_author=False,
@@ -1976,7 +1989,7 @@ class TeamTemplates(commands.Cog):
 
         if parsed.missing_positions:
             positions = ", ".join(str(position) for position in parsed.missing_positions)
-            await safe_reply(message,
+            await message.reply(
                 f"❌ This team is incomplete. Add an animal to position(s) **{positions}** "
                 "before saving or updating the template.",
                 mention_author=False,
@@ -2016,7 +2029,7 @@ class TeamTemplates(commands.Cog):
     ) -> None:
         if parsed.missing_weapon_positions:
             positions = ", ".join(str(position) for position in parsed.missing_weapon_positions)
-            await safe_reply(message,
+            await message.reply(
                 f"⚠️ Animal position(s) **{positions}** have no equipped weapon. "
                 "You can save the team without those weapon commands, or cancel and equip them first.",
                 view=MissingWeaponConfirmView(
@@ -2035,9 +2048,9 @@ class TeamTemplates(commands.Cog):
             message.author.id, name, parsed.source_title, parsed.members
         )
         if error or template is None:
-            await safe_reply(message,f"⚠️ {error or 'The team could not be saved.'}", mention_author=False)
+            await message.reply(f"⚠️ {error or 'The team could not be saved.'}", mention_author=False)
             return
-        await safe_reply(message,embed=self.build_saved_embed(template), mention_author=False)
+        await message.reply(embed=self.build_saved_embed(template), mention_author=False)
         logger.info(
             "Saved team template %s for user %s with %s member(s)",
             template.template_id,
@@ -2048,10 +2061,10 @@ class TeamTemplates(commands.Cog):
     async def save_from_reply(self, message: discord.Message, requested_name: str) -> None:
         name = re.sub(r"\s+", " ", requested_name).strip()
         if not name:
-            await safe_reply(message,"Use `HT C <name>` or `H team create <name>`.", mention_author=False)
+            await message.reply("Use `HT C <name>` or `H team create <name>`.", mention_author=False)
             return
         if len(name) > MAX_TEMPLATE_NAME_LENGTH:
-            await safe_reply(message,
+            await message.reply(
                 f"Template names can contain at most {MAX_TEMPLATE_NAME_LENGTH} characters.",
                 mention_author=False,
             )
@@ -2066,7 +2079,7 @@ class TeamTemplates(commands.Cog):
     ) -> None:
         value = re.sub(r"\s+", " ", selector or "").strip()
         if not value:
-            await safe_reply(message,
+            await message.reply(
                 "Use `HT U <number or name>`, for example `HTU 3` or `HT U boss team`.",
                 mention_author=False,
             )
@@ -2078,7 +2091,7 @@ class TeamTemplates(commands.Cog):
             else await self.store.get_by_name(message.author.id, value)
         )
         if existing is None:
-            await safe_reply(message,
+            await message.reply(
                 f"I could not find a saved team matching **{value}**.",
                 mention_author=False,
             )
@@ -2090,7 +2103,7 @@ class TeamTemplates(commands.Cog):
 
         if parsed.missing_weapon_positions:
             positions = ", ".join(str(position) for position in parsed.missing_weapon_positions)
-            await safe_reply(message,
+            await message.reply(
                 f"⚠️ Animal position(s) **{positions}** have no equipped weapon. "
                 "You can update the saved team without those weapon commands, or cancel and equip them first.",
                 view=MissingWeaponConfirmView(
@@ -2113,9 +2126,9 @@ class TeamTemplates(commands.Cog):
             parsed.members,
         )
         if updated is None:
-            await safe_reply(message,"That saved team no longer exists.", mention_author=False)
+            await message.reply("That saved team no longer exists.", mention_author=False)
             return
-        await safe_reply(message,
+        await message.reply(
             embed=self.build_updated_embed(existing, updated), mention_author=False
         )
         logger.info(
@@ -2139,7 +2152,7 @@ class TeamTemplates(commands.Cog):
             ),
             color=0x5865F2,
         )
-        await safe_reply(message,
+        await message.reply(
             embed=embed,
             view=TemplateActionView(self, message.author.id, template),
             mention_author=False,
@@ -2177,14 +2190,14 @@ class TeamTemplates(commands.Cog):
     async def show_templates(self, message: discord.Message) -> None:
         templates = await self.store.list_for_user(message.author.id)
         if not templates:
-            await safe_reply(message,
+            await message.reply(
                 "You do not have any saved teams yet. Reply to an OwO `wtm` / "
                 "`owo team` message with `HT C <name>`.",
                 mention_author=False,
             )
             return
 
-        await safe_reply(message,
+        await message.reply(
             embed=self.build_template_list_embed(templates, 0),
             view=TemplateListView(self, message.author.id, templates, page=0),
             mention_author=False,
@@ -2193,14 +2206,14 @@ class TeamTemplates(commands.Cog):
 
     async def show_template_by_slot(self, message: discord.Message, slot: int) -> None:
         if not 1 <= slot <= MAX_TEMPLATES_PER_USER:
-            await safe_reply(message,
+            await message.reply(
                 f"Team numbers are between **1** and **{MAX_TEMPLATES_PER_USER}**.",
                 mention_author=False,
             )
             return
         template = await self.store.get_by_slot(message.author.id, slot)
         if template is None:
-            await safe_reply(message,
+            await message.reply(
                 f"You do not have a saved team in slot **#{slot}**. Use `HT` to see "
                 "your current list.",
                 mention_author=False,
@@ -2211,7 +2224,7 @@ class TeamTemplates(commands.Cog):
     async def delete_template(self, message: discord.Message, selector: str | None) -> None:
         value = re.sub(r"\s+", " ", selector or "").strip()
         if not value:
-            await safe_reply(message,
+            await message.reply(
                 "Use `HT D <number or name>`, for example `HTD 3` or "
                 "`HT D boss team`.",
                 mention_author=False,
@@ -2219,12 +2232,12 @@ class TeamTemplates(commands.Cog):
             return
         deleted = await self.store.delete_by_selector(message.author.id, value)
         if deleted is None:
-            await safe_reply(message,
+            await message.reply(
                 f"I could not find a saved team matching **{value}**.",
                 mention_author=False,
             )
             return
-        await safe_reply(message,
+        await message.reply(
             f"🗑️ Deleted team **#{deleted.slot} — {deleted.name}**.",
             mention_author=False,
         )

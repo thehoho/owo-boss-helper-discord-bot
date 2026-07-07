@@ -150,7 +150,7 @@ They show current and historical server counts, approximate member reach, per-se
 
 ## Credits
 
-Special thanks to **Pen Sylvester** for:
+Special thanks to **Pencilvester** for:
 
 - Sharing the original exact-command parsing logic and weapon/passive rarity ranges that helped form the foundation of the boss command generator.
 - Suggesting the original saved team-template concept that inspired the team-management system.
@@ -620,5 +620,7 @@ MIT License. See [LICENSE](LICENSE).
 Guided Neon dex sessions post one plain-text inline-code command at a time, such as `ww CX9974`, so mobile users can tap/copy it easily. The helper advances after the user sends the shown command, waits about five seconds, removes the old prompt, and posts the next one. Use `H stop`, `Hstop`, or `HS` to pause the session.
 
 ### Cross-user Neon dexing
+
+Unsaved empowered weapon-crate and boss-weapon rows that Neon shows without `M` are queued when they do not have the green saved tick.
 
 Battle helpers can run `HWD @member` or `HWD @member dagger mtap sg` to dex another member's scanned Neon queue. Guided prompts show the weapon owner's name in bold, plus the runner name when someone else is doing the dexing. When Neon confirms a blueprint, the helper marks that weapon dexed for every matching owner queue, so a weapon dexed by a helper is removed from the original owner's queue too.

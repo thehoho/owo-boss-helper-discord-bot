@@ -1376,7 +1376,7 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="🧾 Neon weapon dex",
             value=(
-                "Use `HW` or `H weapons` for Pen Sylvester's Neon setup guide, including the Neon calculate/name reaction step. "
+                "Use `HW` or `H weapons` for Pencilvester's Neon setup guide, including the Neon reaction step. "
                 "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` to show queued "
                 "`ww <weapon_id>` commands from scanned Neon pages. Helpers can target another member with "
                 "`HWD @member` or `HWD @member dagger mtap sg`. Click **Start dexing session** "
@@ -1384,7 +1384,7 @@ class BossGenerator(commands.Cog):
                 "The helper advances after the runner sends the shown `ww` command, waits about five seconds, "
                 "removes the old prompt, and posts the next one. Any confirmed Neon blueprint marks that weapon "
                 "dexed for every matching owner queue. Use `H stop`, `Hstop`, or `HS` to pause. "
-                "`HW stats` / `H weapon stats` shows scanned, queued, saved, and no-action counts."
+                "`HW stats` / `H weapon stats` shows scanned, queued, saved, and no-action counts. Unsaved empowered rows without a green tick are queued too."
             ),
             inline=False,
         )

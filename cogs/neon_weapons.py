@@ -275,6 +275,7 @@ class ParsedWeaponRow:
     exact: bool
     saved: bool
     emoji_ids: tuple[str, ...]
+    empowered_unresolved: bool
 
 
 @dataclass(frozen=True)
@@ -450,6 +451,40 @@ def parse_filters(text: str) -> tuple[str, tuple[str, ...]]:
     return weapon_type, tuple(passives)
 
 
+
+
+def emoji_ids_before_quality(body: str) -> tuple[str, ...]:
+    """Return custom emoji IDs that appear before the visible quality percent.
+
+    Neon's unfiltered empowered rows do not use the M/max_possible marker, but
+    they do show the weapon plus multiple passive emojis before the quality. A
+    non-saved empowered row is therefore still a dex candidate.
+    """
+    quality_match = QUALITY_RE.search(body or "")
+    prefix = body[: quality_match.start()] if quality_match else body
+    return tuple(emoji_id for _name, emoji_id in CUSTOM_EMOJI_RE.findall(prefix))
+
+
+def is_empowered_unresolved_row(body: str, *, saved: bool, exact: bool, max_possible: bool) -> bool:
+    """Detect unsaved empowered weapon rows from unfiltered Neon pages.
+
+    Standard max-quality rows are handled by the M/max_possible marker. Empowered
+    weapon-crate and boss-weapon rows may omit that marker entirely; if they are
+    not saved/exact and they show a weapon plus two or more passives before the
+    quality, they still need a `ww <weapon_id>` dex command.
+    """
+    if saved or exact or max_possible:
+        return False
+    # Rows with a backtick max-quality value are standard estimate rows, not the
+    # empowered no-marker shape we are targeting here.
+    if BACKTICK_NUMBER_RE.search(body or ""):
+        return False
+    # Optional leading source markers such as the blue diamond, distorted, or
+    # fabled icon can appear before the real weapon/passive icons. Counting at
+    # least three custom emojis before quality safely covers weapon+2 passives;
+    # orb-style empowered rows can contain even more.
+    return len(emoji_ids_before_quality(body)) >= 3
+
 def parse_weapon_row(line: str, *, saved_inventory: bool) -> ParsedWeaponRow | None:
     match = WEAPON_ROW_RE.match(line)
     if match is None:
@@ -462,8 +497,14 @@ def parse_weapon_row(line: str, *, saved_inventory: bool) -> ParsedWeaponRow | N
     max_quality = float(max_numbers[-1]) if max_numbers else None
     emojis = tuple(emoji_id for _name, emoji_id in CUSTOM_EMOJI_RE.findall(body))
     max_possible = STATUS_EMOJIS["max_possible"] in body or "max_possible" in body
-    exact = "<:exact:" in body
-    saved = saved_inventory or "<:saved:" in body
+    exact = "<:exact:" in body or STATUS_EMOJIS["exact"] in body and "<:saved:" not in body
+    saved = saved_inventory or "<:saved:" in body or STATUS_EMOJIS["saved"] in body
+    empowered_unresolved = is_empowered_unresolved_row(
+        body,
+        saved=saved,
+        exact=exact,
+        max_possible=max_possible,
+    )
     return ParsedWeaponRow(
         weapon_id=weapon_id,
         raw_line=line.strip(),
@@ -473,6 +514,7 @@ def parse_weapon_row(line: str, *, saved_inventory: bool) -> ParsedWeaponRow | N
         exact=exact,
         saved=saved,
         emoji_ids=emojis,
+        empowered_unresolved=empowered_unresolved,
     )
 
 
@@ -704,7 +746,7 @@ class NeonWeaponStore:
         needs_count = 0
         with self._connect() as connection:
             for row in page.rows:
-                needs_dex = bool(row.max_possible and not row.exact and not row.saved)
+                needs_dex = bool((row.max_possible or row.empowered_unresolved) and not row.exact and not row.saved)
                 if needs_dex:
                     needs_count += 1
                 passive_types_json = json.dumps(list(page.passive_types))
@@ -1378,15 +1420,15 @@ class NeonWeapons(commands.Cog):
                 "To upload and clean up your weapon data for Neon:\n\n"
                 "1. Run `nw inv public`.\n"
                 "2. Run `ww`.\n"
-                f"3. Click Neon's name/setup reaction {calculate_emoji} on the `ww` message.\n"
+                f"3. Click Neon's reaction {calculate_emoji} on the `ww` message.\n"
                 "4. Click through your weapon pages.\n\n"
-                "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible**. "
+                "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible**, plus unsaved empowered rows that Neon shows without a green saved tick. "
                 "Then run `HWD`, `H dex`, or `H weapon dex` to get guided `ww <weapon_id>` commands.\n\n"
                 "Battle helpers can scan another member's Neon filtered pages; the queue is saved under the member shown in Neon's title. Helpers can run `HWD @member` to dex that member's queue, and any confirmed Neon blueprint removes the weapon from every matching owner's queue across all servers the helper can see."
             ),
             color=0xFEE75C,
         )
-        embed.set_footer(text="Guide based on Pen Sylvester's Neon weapon setup notes.")
+        embed.set_footer(text="Guide based on Pencilvester's Neon weapon setup notes.")
         await safe_reply(message, embed=embed, mention_author=False)
 
     @staticmethod
