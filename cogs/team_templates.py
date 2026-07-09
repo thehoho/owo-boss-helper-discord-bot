@@ -3,7 +3,8 @@
 Templates are stored per Discord user in SQLite with stable slots 1-100.
 Animal identity comes from the OwO emoji alias rather than the renameable pet label.
 Guided mode alternates animal/weapon commands, waits for OwO confirmations,
-supports skip controls, and safely handles concurrent users.
+supports skip controls, safely handles concurrent users, and equips saved
+weapons to the animal identity instead of a fragile team position.
 """
 
 from __future__ import annotations
@@ -145,6 +146,7 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
     - H team / HT / HTM
     - H team create name / HT C name / HTC name / HTM C name
     - HT3 / HTM3 / H team 3
+    - HT ddc tank / H team ddc tank
     - H team delete 3 / HT D 3 / HTD team-name
     - H team update 3 / HT U 3 / HTU team-name
     - H team help / HT help
@@ -176,7 +178,7 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
         re.IGNORECASE,
     )
     if not action_match:
-        return None
+        return "open_query", rest
 
     action = action_match.group(1).lower()
     argument = (action_match.group(2) or "").strip() or None
@@ -477,7 +479,7 @@ def interleaved_member_commands(template: TeamTemplate) -> list[str]:
     for member in template.members:
         commands.append(f"wtm a {member.animal} {member.position}")
         if member.weapon_id:
-            commands.append(f"ww {member.weapon_id} {member.position}")
+            commands.append(f"ww {member.weapon_id} {member.animal}")
     return commands
 
 
@@ -501,6 +503,7 @@ def format_command_packet(title: str, commands: Iterable[str], note: str) -> str
             "⚠️ **Guided mode is active.** The helper posts one command at a time. "
             "As soon as OwO confirms a command, the next command appears immediately.",
             "Animal additions and weapon equips alternate to avoid unnecessary same-action cooldowns.",
+            "Saved weapons are equipped to the animal name, not the team position, so position changes are safer.",
             note,
             "Use `HS` / `H skip` or the **Skip step** button when a saved animal or "
             "weapon is already correct. Use `HT cancel` to stop.",
@@ -509,6 +512,29 @@ def format_command_packet(title: str, commands: Iterable[str], note: str) -> str
         )
     )
     return "\n".join(lines)
+
+
+def format_plain_command_list(title: str, commands: Iterable[str]) -> str:
+    command_list = list(commands)
+    lines = [f"**{title}**", ""]
+    lines.extend(f"`{command}`" for command in command_list)
+    return "\n".join(lines)
+
+
+def normalize_template_query(value: str) -> str:
+    return re.sub(r"[^a-z0-9]+", " ", value.casefold()).strip()
+
+
+def template_matches_query(template: TeamTemplate, query: str) -> bool:
+    normalized_query = normalize_template_query(query)
+    if not normalized_query:
+        return False
+    normalized_name = normalize_template_query(template.name)
+    if normalized_name == normalized_query:
+        return True
+    if normalized_name.startswith(normalized_query):
+        return True
+    return normalized_query in normalized_name
 
 
 def normalize_owo_command(value: str) -> str:
@@ -1141,6 +1167,21 @@ class TemplateActionView(OwnedView):
         await interaction.response.send_message(packet, ephemeral=True)
         await self.cog.start_guided_session(
             interaction, self.template, commands, "Exact reset"
+        )
+
+    @discord.ui.button(label="All commands", emoji="📋", style=discord.ButtonStyle.secondary)
+    async def all_commands(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        commands = quick_replace_commands(self.template)
+        packet = format_plain_command_list(
+            f"All commands — #{self.template.slot} {self.template.name}",
+            commands,
+        )
+        await interaction.response.send_message(
+            packet,
+            ephemeral=False,
+            allowed_mentions=discord.AllowedMentions.none(),
         )
 
     @discord.ui.button(label="Delete", emoji="🗑️", style=discord.ButtonStyle.danger)
@@ -1862,7 +1903,7 @@ class TeamTemplates(commands.Cog):
                 f"Save up to **{MAX_TEMPLATES_PER_USER}** teams. Reply to an OwO team "
                 "page with `HT C <name>`. Use `HT`, `HT<number>`, `HT U <slot/name>`, "
                 "or `HT D <slot/name>`. During guided setup use `HS` to skip and "
-                "`HT cancel` to stop. Use `HT help` for the complete team guide."
+                "`HT cancel` to stop. Use `HT help` for the complete team guide. Use **All commands** on a saved team for a clean paste-ready command list."
             ),
             inline=False,
         )
@@ -1871,14 +1912,15 @@ class TeamTemplates(commands.Cog):
             value=(
                 "Use `HW` or `H weapons` for Pencilvester's Neon setup guide. "
                 "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` "
-                "to show queued `ww <weapon_id>` commands. Helpers can target another "
+                "to show queued alternating `ww` / `wuse` commands. Helpers can target another "
                 "member with `HWD @member` or `HWD @member dagger mtap sg`. Click "
                 "**Start dexing session** for mobile-friendly one-command prompts labelled "
-                "with the weapon owner's name. The helper advances after the runner sends "
-                "the shown `ww` command, waits about five seconds, removes the old prompt, "
+                "with the weapon owner's name. The helper advances only after Neon confirms "
+                "the shown weapon, waits about two seconds, removes the old prompt, "
                 "and posts the next one. Any confirmed Neon blueprint marks that weapon "
-                "dexed for every matching owner queue. Unsaved empowered rows without a "
-                "green tick are queued too. Use `H stop`, `Hstop`, or `HS` to pause."
+                "dexed for every matching owner queue. Rows without a green tick are "
+                "queued too, including orb/empowered rows that Neon does not mark with M. "
+                "Use `H stop`, `Hstop`, or `HS` to pause."
             ),
             inline=False,
         )
@@ -1940,7 +1982,8 @@ class TeamTemplates(commands.Cog):
             value=(
                 "Choose **Quick replace** or **Exact reset**. The helper shows the full "
                 "packet, then posts one command at a time. Animal adds and weapon equips "
-                "alternate, and the next command appears immediately after OwO confirms."
+                "alternate, and weapon equips use the animal name instead of the team position. "
+                "Use **All commands** to post a public, clean command list in one message."
             ),
             inline=False,
         )
@@ -2003,7 +2046,7 @@ class TeamTemplates(commands.Cog):
             title=f"✅ Team #{template.slot} saved: {template.name}",
             description=(
                 f"{format_team_members(template.members)}\n\n"
-                f"Use `HT{template.slot}` to open it directly, or `HT` to open the full list."
+                f"Use `HT{template.slot}` or `HT {template.name}` to open it directly, or `HT` to open the full list."
             ),
             color=0x57F287,
         )
@@ -2221,6 +2264,43 @@ class TeamTemplates(commands.Cog):
             return
         await self.send_template_card(message, template)
 
+    async def show_template_by_query(self, message: discord.Message, query: str) -> None:
+        value = re.sub(r"\s+", " ", query or "").strip()
+        if not value:
+            await self.show_templates(message)
+            return
+        templates = await self.store.list_for_user(message.author.id)
+        matches = [template for template in templates if template_matches_query(template, value)]
+        if not matches:
+            await message.reply(
+                f"I could not find a saved team matching **{value}**. Use `HT` to open your full list.",
+                mention_author=False,
+            )
+            return
+        normalized_value = normalize_template_query(value)
+        exact_matches = [
+            template
+            for template in matches
+            if normalize_template_query(template.name) == normalized_value
+        ]
+        if len(exact_matches) == 1:
+            await self.send_template_card(message, exact_matches[0])
+            return
+        if len(matches) == 1:
+            await self.send_template_card(message, matches[0])
+            return
+
+        await message.reply(
+            content=(
+                f"I found **{len(matches)}** saved teams matching **{value}**. "
+                "Choose one below, or open it directly with `HT<number>`."
+            ),
+            embed=self.build_template_list_embed(matches, 0),
+            view=TemplateListView(self, message.author.id, matches, page=0),
+            mention_author=False,
+            delete_after=300,
+        )
+
     async def delete_template(self, message: discord.Message, selector: str | None) -> None:
         value = re.sub(r"\s+", " ", selector or "").strip()
         if not value:
@@ -2300,6 +2380,9 @@ class TeamTemplates(commands.Cog):
                 return
             if action == "open":
                 await self.show_template_by_slot(message, int(argument or 0))
+                return
+            if action == "open_query":
+                await self.show_template_by_query(message, argument or "")
                 return
             await self.show_templates(message)
         except Exception as exc:

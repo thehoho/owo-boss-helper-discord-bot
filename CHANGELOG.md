@@ -1,3 +1,11 @@
+## v0.10.5-beta hotfix 6
+
+- Neon max-quality result messages from clicking Neon's reaction on a `ww` weapon-list message are now scanned and acknowledged with `🧾`.
+- Rows without a green saved/exact tick are treated as dex candidates, covering orb/empowered rows that Neon does not mark with `M`.
+- Guided Neon dex sessions now alternate `ww <weapon_id>` and `wuse <weapon_id>` prompts and only advance after Neon confirms the current weapon.
+- Guided dex prompts were shortened to just the owner/runner label and the copyable command.
+- Saved team views now include an **All commands** button for a paste-ready quick-replace command list.
+
 ## v0.10.5-beta hotfix 4
 
 - Added owner labels to guided Neon dex prompts so multiple users can run dex sessions in the same channel without confusion.
@@ -270,7 +278,10 @@
 - Preserved cooldown channel and watcher state across restarts.
 - Kept authoritative boss ordering based on the visible `1/3`, `2/3`, and `3/3` counter.
 - Removed the Change HP button from the public workflow.
-### v0.10.5-beta empowered dex polish
+### v0.10.5-beta team lookup and confirm polish
+- Team guided setup now equips saved weapons to the animal name instead of the team position.
+- Added direct saved-team lookup by exact or partial name, such as `HT ddc tank boss`.
+- The **All commands** team button now posts the clean command list publicly for easier copying.
 - Queued unsaved empowered weapon rows that Neon lists without an `M / max_possible` marker when they do not have the green saved tick.
 - Updated the combined `H help` override from the team-template cog so the public help embed shows the Neon dex commands.
 - Simplified the `HW` setup wording to “click Neon's reaction” and credited Pencilvester's setup notes.

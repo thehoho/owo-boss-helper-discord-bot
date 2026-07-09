@@ -308,13 +308,17 @@ HTM
 H team
 ```
 
-Open a specific slot directly:
+Open a specific slot or name directly:
 
 ```text
 HT3
 HTM3
 H team 3
+HT ddc tank boss
+H team ddc
 ```
+
+Name lookup supports exact or partial matches. If more than one saved team matches, the helper shows the matching teams so you can choose the right one.
 
 ### Delete templates
 
@@ -336,14 +340,14 @@ Quick replace alternates commands:
 
 ```text
 wtm a hsnake 1
-ww AZWWZV 1
+ww AZWWZV hsnake
 wtm a 2025dec_daisy 2
-ww DYLYU5 2
+ww DYLYU5 2025dec_daisy
 wtm a 2026feb_huba 3
-ww EEK29J 3
+ww EEK29J 2026feb_huba
 ```
 
-The next command appears immediately after OwO confirms the current one.
+The next command appears immediately after OwO confirms the current one. Saved weapons are equipped to the animal name instead of the position, so the weapon still goes to the right pet even if positions change.
 
 Skip the current step:
 
@@ -613,14 +617,21 @@ MIT License. See [LICENSE](LICENSE).
 
 ### Guided Neon weapon dex sessions
 
-`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued `ww <weapon_id>` commands from scanned Neon weapon pages. Click **Start dexing session** to receive one command at a time. After the member sends the shown `ww <weapon_id>` command, the helper waits about five seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
+`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon weapon pages. Click **Start dexing session** to receive one command at a time. After the member sends the shown command, the helper waits for Neon to confirm the weapon, waits about two seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
 
 ### Mobile-friendly dex prompts
 
-Guided Neon dex sessions post one plain-text inline-code command at a time, such as `ww CX9974`, so mobile users can tap/copy it easily. The helper advances after the user sends the shown command, waits about five seconds, removes the old prompt, and posts the next one. Use `H stop`, `Hstop`, or `HS` to pause the session.
+Guided Neon dex sessions post one short plain-text command at a time, such as `ww CX9974` or `wuse CX9974`, so mobile users can tap/copy it easily. The helper advances only after Neon confirms the shown weapon, waits about two seconds, removes the old prompt, and posts the next one. Use `H stop`, `Hstop`, or `HS` to pause the session.
 
 ### Cross-user Neon dexing
 
 Unsaved empowered weapon-crate and boss-weapon rows that Neon shows without `M` are queued when they do not have the green saved tick.
 
 Battle helpers can run `HWD @member` or `HWD @member dagger mtap sg` to dex another member's scanned Neon queue. Guided prompts show the weapon owner's name in bold, plus the runner name when someone else is doing the dexing. When Neon confirms a blueprint, the helper marks that weapon dexed for every matching owner queue, so a weapon dexed by a helper is removed from the original owner's queue too.
+### Neon max-quality reaction scans
+
+When a user clicks Neon's reaction on an OwO `ww` weapon-list message, the helper can read the resulting Neon max-quality report. Exact/green-tick rows clear matching dex queues, and rows without a green saved/exact tick stay queued for dex even when Neon does not show an `M` marker.
+
+### Team command export
+
+Saved team views include an **All commands** button. It posts the clean quick-replace command list publicly in the channel so advanced users can copy only the commands they need.
