@@ -153,7 +153,14 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
     - HS / H skip / H escape / HT skip
     - HT cancel
     """
-    text = re.sub(r"\s+", " ", content or "").strip()
+    first_line = next(
+        (line.strip() for line in (content or "").splitlines() if line.strip()),
+        "",
+    )
+    if re.match(r"^https?://", first_line, re.IGNORECASE):
+        return None
+
+    text = re.sub(r"\s+", " ", first_line).strip()
     lowered = text.lower()
     compact = re.sub(r"\s+", "", lowered)
 
