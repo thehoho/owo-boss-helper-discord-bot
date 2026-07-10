@@ -54,6 +54,44 @@ STATUS_EMOJIS = {
     "saved": "1064746427147890758",
 }
 
+# Neon encodes weapon/passive context in emoji names such as ``raedge``,
+# ``cswarm``, ``mresonance``, and ``eawand``. The leading character is often a
+# rarity/wear/frame marker, not part of the canonical weapon/passive alias.
+NEON_CONTEXT_PREFIXES = (
+    "common",
+    "uncommon",
+    "rare",
+    "epic",
+    "mythic",
+    "mythical",
+    "legendary",
+    "fabled",
+    "hidden",
+    "distorted",
+    "patreon",
+    "gem",
+    "bot",
+    "pristine",
+    "fine",
+    "decent",
+    "worn",
+    "unknown",
+    "empowered",
+    "pr",
+    "c",
+    "u",
+    "r",
+    "e",
+    "m",
+    "l",
+    "f",
+    "d",
+    "p",
+    "g",
+    "b",
+    "h",
+)
+
 WEAPON_ALIASES: dict[str, str] = {
     "sword": "sword",
     "gsword": "sword",
@@ -276,6 +314,8 @@ class ParsedWeaponRow:
     max_possible: bool
     exact: bool
     saved: bool
+    weapon_type: str
+    passive_types: tuple[str, ...]
     emoji_ids: tuple[str, ...]
     empowered_unresolved: bool
 
@@ -297,6 +337,8 @@ class ParsedMaxQualityRow:
     max_quality: float | None
     exact: bool
     max_possible: bool
+    weapon_type: str
+    passive_types: tuple[str, ...]
 
     @property
     def needs_dex(self) -> bool:
@@ -341,6 +383,73 @@ def normalize_weapon(value: str) -> str:
 
 def normalize_passive(value: str) -> str:
     return PASSIVE_ALIASES.get(normalize_alias(value), "")
+
+
+def alias_candidates_from_emoji_name(name: str) -> tuple[str, ...]:
+    """Return safe canonicalization candidates for a Neon emoji name.
+
+    Examples:
+    - ``raedge`` -> ``raedge``, ``aedge``
+    - ``mresonance`` -> ``mresonance``, ``resonance``
+    - ``prlsyth`` -> suffix match ``lsyth``
+    """
+    normalized = normalize_alias(name)
+    if not normalized:
+        return ()
+    candidates: list[str] = [normalized]
+    for prefix in NEON_CONTEXT_PREFIXES:
+        if normalized.startswith(prefix) and len(normalized) > len(prefix) + 1:
+            stripped = normalized[len(prefix) :]
+            if stripped and stripped not in candidates:
+                candidates.append(stripped)
+
+    suffix_aliases = sorted(
+        {
+            alias
+            for alias in (*WEAPON_ALIASES.keys(), *PASSIVE_ALIASES.keys())
+            if len(alias) >= 3
+        },
+        key=len,
+        reverse=True,
+    )
+    for alias in suffix_aliases:
+        if normalized.endswith(alias) and alias not in candidates:
+            candidates.append(alias)
+    return tuple(candidates)
+
+
+def classify_neon_emoji_names(names: tuple[str, ...] | list[str]) -> tuple[str, tuple[str, ...]]:
+    """Infer weapon/passive context from Neon/OwO emoji names.
+
+    The first recognized weapon emoji becomes the weapon type. Any recognized
+    passive emojis are kept in order without duplicates. Unknown or pure rarity
+    emojis are ignored.
+    """
+    weapon_type = ""
+    passive_types: list[str] = []
+    for name in names:
+        candidates = alias_candidates_from_emoji_name(name)
+        if not weapon_type:
+            for candidate in candidates:
+                weapon = normalize_weapon(candidate)
+                if weapon:
+                    weapon_type = weapon
+                    break
+        for candidate in candidates:
+            passive = normalize_passive(candidate)
+            if passive and passive not in passive_types:
+                passive_types.append(passive)
+                break
+    return weapon_type, tuple(passive_types)
+
+
+def merge_passive_context(*groups: tuple[str, ...]) -> tuple[str, ...]:
+    merged: list[str] = []
+    for group in groups:
+        for passive in group:
+            if passive and passive not in merged:
+                merged.append(passive)
+    return tuple(merged)
 
 
 def format_float(value: float | None) -> str:
@@ -473,6 +582,12 @@ def parse_filters(text: str) -> tuple[str, tuple[str, ...]]:
 
 
 
+def emoji_names_before_quality(body: str) -> tuple[str, ...]:
+    quality_match = QUALITY_RE.search(body or "")
+    prefix = body[: quality_match.start()] if quality_match else body
+    return tuple(name for name, _emoji_id in CUSTOM_EMOJI_RE.findall(prefix))
+
+
 def emoji_ids_before_quality(body: str) -> tuple[str, ...]:
     """Return custom emoji IDs that appear before the visible quality percent.
 
@@ -537,6 +652,8 @@ def parse_weapon_row(line: str, *, saved_inventory: bool) -> ParsedWeaponRow | N
     current_quality = float(quality_match.group(1)) if quality_match else None
     max_numbers = BACKTICK_NUMBER_RE.findall(body)
     max_quality = float(max_numbers[-1]) if max_numbers else None
+    emoji_names = emoji_names_before_quality(body)
+    row_weapon_type, row_passive_types = classify_neon_emoji_names(emoji_names)
     emojis = tuple(emoji_id for _name, emoji_id in CUSTOM_EMOJI_RE.findall(body))
     max_possible = has_max_possible_marker(body)
     saved = saved_inventory or has_exact_or_saved_marker(body)
@@ -555,6 +672,8 @@ def parse_weapon_row(line: str, *, saved_inventory: bool) -> ParsedWeaponRow | N
         max_possible=max_possible,
         exact=exact,
         saved=saved,
+        weapon_type=row_weapon_type,
+        passive_types=row_passive_types,
         emoji_ids=emojis,
         empowered_unresolved=empowered_unresolved,
     )
@@ -598,11 +717,25 @@ def parse_neon_max_quality_report(text: str) -> ParsedMaxQualityReport | None:
         if id_match is None:
             continue
         weapon_id = id_match.group(1).upper()
+        emoji_names = tuple(
+            name for name, _emoji_id in CUSTOM_EMOJI_RE.findall(line[: id_match.start()])
+        )
+        row_weapon_type, row_passive_types = classify_neon_emoji_names(emoji_names)
         quality_match = re.findall(r"([0-9]+(?:\.[0-9]+)?)\s*%", line)
         max_quality = float(quality_match[-1]) if quality_match else None
         exact = has_exact_or_saved_marker(line)
         max_possible = has_max_possible_marker(line)
-        rows.append(ParsedMaxQualityRow(weapon_id, line, max_quality, exact, max_possible))
+        rows.append(
+            ParsedMaxQualityRow(
+                weapon_id,
+                line,
+                max_quality,
+                exact,
+                max_possible,
+                row_weapon_type,
+                row_passive_types,
+            )
+        )
     if not rows:
         return None
     return ParsedMaxQualityReport(rows=tuple(rows))
@@ -818,7 +951,9 @@ class NeonWeaponStore:
                 needs_dex = bool(not page.saved_inventory and not row.exact and not row.saved)
                 if needs_dex:
                     needs_count += 1
-                passive_types_json = json.dumps(list(page.passive_types))
+                row_weapon_type = row.weapon_type or page.weapon_type
+                row_passive_types = merge_passive_context(page.passive_types, row.passive_types)
+                passive_types_json = json.dumps(list(row_passive_types))
                 emoji_ids_json = json.dumps(list(row.emoji_ids))
                 connection.execute(
                     """
@@ -865,7 +1000,7 @@ class NeonWeaponStore:
                         int(needs_dex),
                         int(row.saved),
                         int(row.exact),
-                        page.weapon_type,
+                        row_weapon_type,
                         passive_types_json,
                         emoji_ids_json,
                         now,
@@ -1018,6 +1153,7 @@ class NeonWeaponStore:
         need_updates = 0
         with self._connect() as connection:
             for row in report.rows:
+                passive_json = json.dumps(list(row.passive_types))
                 if row.exact:
                     cursor = connection.execute(
                         """
@@ -1026,11 +1162,22 @@ class NeonWeaponStore:
                             saved = 1,
                             exact = 1,
                             max_quality = COALESCE(?, max_quality),
+                            weapon_type = CASE WHEN ? <> '' THEN ? ELSE weapon_type END,
+                            passive_types_json = CASE WHEN ? <> '[]' THEN ? ELSE passive_types_json END,
                             dexed_at = CASE WHEN dexed_at > 0 THEN dexed_at ELSE ? END,
                             last_seen_at = ?
                         WHERE weapon_id = ?
                         """,
-                        (row.max_quality, now, now, row.weapon_id.upper()),
+                        (
+                            row.max_quality,
+                            row.weapon_type,
+                            row.weapon_type,
+                            passive_json,
+                            passive_json,
+                            now,
+                            now,
+                            row.weapon_id.upper(),
+                        ),
                     )
                     exact_updates += cursor.rowcount
                 else:
@@ -1041,10 +1188,20 @@ class NeonWeaponStore:
                             saved = 0,
                             exact = 0,
                             max_quality = COALESCE(?, max_quality),
+                            weapon_type = CASE WHEN ? <> '' THEN ? ELSE weapon_type END,
+                            passive_types_json = CASE WHEN ? <> '[]' THEN ? ELSE passive_types_json END,
                             last_seen_at = ?
                         WHERE weapon_id = ? AND saved = 0 AND exact = 0
                         """,
-                        (row.max_quality, now, row.weapon_id.upper()),
+                        (
+                            row.max_quality,
+                            row.weapon_type,
+                            row.weapon_type,
+                            passive_json,
+                            passive_json,
+                            now,
+                            row.weapon_id.upper(),
+                        ),
                     )
                     need_updates += cursor.rowcount
         return len(report.rows), exact_updates, need_updates
@@ -1083,14 +1240,20 @@ class NeonWeaponStore:
             + " AND ".join(clauses)
             + " ORDER BY COALESCE(max_quality, current_quality, 0) DESC, weapon_id ASC LIMIT ?"
         )
-        params.append(max(1, limit))
+        fetch_limit = max(1, limit)
+        if passive_types:
+            # Passive filtering happens after JSON decoding, so overfetch enough rows
+            # that filters like `HWD mtap` do not miss matching queued weapons that
+            # fall outside the first quality-sorted page.
+            fetch_limit = max(fetch_limit, 1000)
+        params.append(fetch_limit)
         with self._connect() as connection:
             rows = connection.execute(query, params).fetchall()
         entries = [self._entry_from_row(row) for row in rows]
         if passive_types:
             wanted = set(passive_types)
             entries = [entry for entry in entries if wanted.issubset(set(entry.passive_types))]
-        return entries
+        return entries[: max(1, limit)]
 
     async def stats(self, owner_user_id: int) -> dict[str, int]:
         async with self.lock:

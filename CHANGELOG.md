@@ -285,3 +285,9 @@
 - Queued unsaved empowered weapon rows that Neon lists without an `M / max_possible` marker when they do not have the green saved tick.
 - Updated the combined `H help` override from the team-template cog so the public help embed shows the Neon dex commands.
 - Simplified the `HW` setup wording to “click Neon's reaction” and credited Pencilvester's setup notes.
+
+### Neon emoji context enrichment
+
+- Learned weapon and passive context from Neon/OwO emoji names in weapon pages and max-quality reaction reports.
+- Improved filtered dex lookups such as `HWD mtap`, `HWD resonance`, and `HWD dagger mtap` by updating existing queued weapon IDs with inferred context.
+- Fixed passive-filtered queue lookup so matching entries are not missed just because they are outside the first quality-sorted page.

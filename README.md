@@ -635,3 +635,7 @@ When a user clicks Neon's reaction on an OwO `ww` weapon-list message, the helpe
 ### Team command export
 
 Saved team views include an **All commands** button. It posts the clean quick-replace command list publicly in the channel so advanced users can copy only the commands they need.
+
+### Neon emoji context enrichment
+
+Neon max-quality reports and weapon pages include compact emoji names such as `raedge`, `cswarm`, `mresonance`, and `eawand`. OwO Boss Helper normalizes those names by removing rarity/frame prefixes, then stores the inferred weapon and passive context on the matching weapon ID. This makes filters like `HWD mtap`, `HWD resonance`, and `HWD dagger mtap` work even when the original queue entry was scanned as unknown.

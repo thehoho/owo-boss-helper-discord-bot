@@ -106,3 +106,9 @@ A new local SQLite file, `neon_weapons.db`, stores scanned Neon weapon queue dat
 - Guided team setup and team command exports now equip weapons to the saved animal name instead of the team position.
 - Saved teams can be opened by exact or partial name, for example `HT ddc tank boss`, with a choice list when multiple teams match.
 - The **All commands** team button now posts the clean quick-replace command list publicly for easier copying.
+
+## Neon emoji context enrichment
+
+- The Neon dex scanner now learns weapon/passive context from Neon emoji names on weapon pages and max-quality reaction reports.
+- Existing queued weapons are enriched when a later Neon report exposes better context, so passive filters such as `HWD mtap` can find matching queued weapons.
+- Passive-filtered queues now overfetch before filtering, preventing false empty results when matching weapons are deeper in the queue.
