@@ -306,3 +306,10 @@
 - Added previous/next/refresh buttons to `/bot-servers`.
 - Server rows now show the current Discord server owner ID/mention so the developer can better understand where the bot is being used.
 - The server list still avoids creating invite links automatically; it only displays an existing vanity code when Discord exposes one.
+
+### v0.11.0-beta phase 2A - Server insight controls
+- Added per-server command usage breakdowns in `bot_stats.db` for future operational review.
+- Added `/bot-server server_id:<id>` for owner-only server detail views.
+- Added safe invite-trail tracking for future joins when Discord audit logs expose the bot inviter.
+- Kept server invites safe: no automatic invite creation for random servers.
+- Added a daily owner DM report with reach, movement, usage, and low-use server review signals.

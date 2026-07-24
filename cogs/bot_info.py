@@ -8,6 +8,7 @@ files. Server metadata and aggregate usage counters are stored locally in SQLite
 from __future__ import annotations
 
 import asyncio
+import calendar
 import logging
 import os
 import platform
@@ -43,6 +44,10 @@ DEFAULT_DESCRIPTION = (
 ABOUT_COMMANDS = {"habout"}
 PERIODIC_SYNC_SECONDS = 6 * 60 * 60
 SERVERS_PER_PAGE = 10
+DAILY_REPORT_CHECK_SECONDS = 15 * 60
+DAILY_REPORT_DEFAULT_UTC_HOUR = 0
+DAILY_REPORT_DEFAULT_UTC_MINUTE = 5
+DAILY_REPORT_METADATA_KEY = "last_daily_owner_report_utc_date"
 
 
 @dataclass(frozen=True)
@@ -58,6 +63,9 @@ class GuildRecord:
     active: bool
     usage_count: int
     last_used_at: int | None
+    inviter_id: int = 0
+    inviter_name: str = ""
+    inviter_checked_at: int = 0
 
 
 def compact_command(content: str) -> str:
@@ -196,7 +204,40 @@ class StatsStore:
                     left_at INTEGER,
                     active INTEGER NOT NULL DEFAULT 1,
                     usage_count INTEGER NOT NULL DEFAULT 0,
-                    last_used_at INTEGER
+                    last_used_at INTEGER,
+                    inviter_id INTEGER NOT NULL DEFAULT 0,
+                    inviter_name TEXT NOT NULL DEFAULT '',
+                    inviter_checked_at INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+            for _column_name, ddl in (
+                ("inviter_id", "ALTER TABLE guild_registry ADD COLUMN inviter_id INTEGER NOT NULL DEFAULT 0"),
+                ("inviter_name", "ALTER TABLE guild_registry ADD COLUMN inviter_name TEXT NOT NULL DEFAULT ''"),
+                ("inviter_checked_at", "ALTER TABLE guild_registry ADD COLUMN inviter_checked_at INTEGER NOT NULL DEFAULT 0"),
+            ):
+                try:
+                    connection.execute(ddl)
+                except sqlite3.OperationalError as exc:
+                    if "duplicate column name" not in str(exc).casefold():
+                        raise
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS guild_usage_totals (
+                    guild_id INTEGER NOT NULL,
+                    metric TEXT NOT NULL,
+                    count INTEGER NOT NULL DEFAULT 0,
+                    last_used_at INTEGER NOT NULL,
+                    PRIMARY KEY (guild_id, metric)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS bot_metadata (
+                    key TEXT PRIMARY KEY,
+                    value TEXT NOT NULL DEFAULT '',
+                    updated_at INTEGER NOT NULL
                 )
                 """
             )
@@ -305,6 +346,16 @@ class StatsStore:
                 """,
                 (metric, now),
             )
+            connection.execute(
+                """
+                INSERT INTO guild_usage_totals (guild_id, metric, count, last_used_at)
+                VALUES (?, ?, 1, ?)
+                ON CONFLICT(guild_id, metric) DO UPDATE SET
+                    count = guild_usage_totals.count + 1,
+                    last_used_at = excluded.last_used_at
+                """,
+                (guild_id, metric, now),
+            )
 
     async def list_guilds(self) -> list[GuildRecord]:
         async with self.lock:
@@ -315,7 +366,10 @@ class StatsStore:
             rows = connection.execute(
                 """
                 SELECT guild_id, guild_name, owner_id, member_count, channel_count,
-                       joined_at, last_seen_at, left_at, active, usage_count, last_used_at
+                       joined_at, last_seen_at, left_at, active, usage_count, last_used_at,
+                       COALESCE(inviter_id, 0) AS inviter_id,
+                       COALESCE(inviter_name, '') AS inviter_name,
+                       COALESCE(inviter_checked_at, 0) AS inviter_checked_at
                 FROM guild_registry
                 ORDER BY active DESC, member_count DESC, guild_name COLLATE NOCASE ASC
                 """
@@ -337,6 +391,9 @@ class StatsStore:
                     if row["last_used_at"] is not None
                     else None
                 ),
+                inviter_id=int(row["inviter_id"] or 0),
+                inviter_name=str(row["inviter_name"] or ""),
+                inviter_checked_at=int(row["inviter_checked_at"] or 0),
             )
             for row in rows
         ]
@@ -351,6 +408,84 @@ class StatsStore:
                 "SELECT metric, count FROM usage_totals ORDER BY count DESC, metric ASC"
             ).fetchall()
         return [(str(row["metric"]), int(row["count"])) for row in rows]
+
+    async def guild_usage_totals(self, guild_id: int) -> list[tuple[str, int, int]]:
+        async with self.lock:
+            return await asyncio.to_thread(self._guild_usage_totals_sync, guild_id)
+
+    def _guild_usage_totals_sync(self, guild_id: int) -> list[tuple[str, int, int]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT metric, count, last_used_at
+                FROM guild_usage_totals
+                WHERE guild_id = ?
+                ORDER BY count DESC, metric ASC
+                """,
+                (guild_id,),
+            ).fetchall()
+        return [
+            (str(row["metric"]), int(row["count"]), int(row["last_used_at"]))
+            for row in rows
+        ]
+
+    async def get_guild_record(self, guild_id: int) -> GuildRecord | None:
+        async with self.lock:
+            return await asyncio.to_thread(self._get_guild_record_sync, guild_id)
+
+    def _get_guild_record_sync(self, guild_id: int) -> GuildRecord | None:
+        matches = [record for record in self._list_guilds_sync() if record.guild_id == guild_id]
+        return matches[0] if matches else None
+
+    async def set_inviter(
+        self, guild_id: int, inviter_id: int, inviter_name: str, checked_at: int
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._set_inviter_sync, guild_id, inviter_id, inviter_name, checked_at
+            )
+
+    def _set_inviter_sync(
+        self, guild_id: int, inviter_id: int, inviter_name: str, checked_at: int
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE guild_registry
+                SET inviter_id = ?, inviter_name = ?, inviter_checked_at = ?
+                WHERE guild_id = ?
+                """,
+                (inviter_id, inviter_name[:200], checked_at, guild_id),
+            )
+
+    async def get_metadata(self, key: str) -> str:
+        async with self.lock:
+            return await asyncio.to_thread(self._get_metadata_sync, key)
+
+    def _get_metadata_sync(self, key: str) -> str:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM bot_metadata WHERE key = ?",
+                (key,),
+            ).fetchone()
+        return str(row["value"]) if row and row["value"] is not None else ""
+
+    async def set_metadata(self, key: str, value: str) -> None:
+        async with self.lock:
+            await asyncio.to_thread(self._set_metadata_sync, key, value)
+
+    def _set_metadata_sync(self, key: str, value: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO bot_metadata (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                (key, value, int(time.time())),
+            )
 
 
 class AboutLinks(discord.ui.View):
@@ -521,13 +656,22 @@ class BotInfo(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild) -> None:
         await self.store.upsert_guild(guild)
+        inviter = await self.detect_inviter_from_audit_log(guild)
+        if inviter is not None:
+            await self.store.set_inviter(
+                guild.id,
+                inviter.id,
+                str(inviter),
+                int(time.time()),
+            )
         logger.info(
-            "Bot joined guild %s (%s) with approximately %s members",
+            "Bot joined guild %s (%s) with approximately %s members; inviter=%s",
             guild.name,
             guild.id,
             guild.member_count or 0,
+            getattr(inviter, "id", None),
         )
-        await self.notify_owner_about_guild(guild, joined=True)
+        await self.notify_owner_about_guild(guild, joined=True, inviter=inviter)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild) -> None:
@@ -536,7 +680,11 @@ class BotInfo(commands.Cog):
         await self.notify_owner_about_guild(guild, joined=False)
 
     async def notify_owner_about_guild(
-        self, guild: discord.Guild, *, joined: bool
+        self,
+        guild: discord.Guild,
+        *,
+        joined: bool,
+        inviter: discord.abc.User | None = None,
     ) -> None:
         if not self.owner_id:
             return
@@ -564,9 +712,225 @@ class BotInfo(commands.Cog):
                 value=str(len(self.bot.guilds)),
                 inline=True,
             )
+            if joined:
+                if inviter is not None:
+                    embed.add_field(
+                        name="Likely inviter",
+                        value=f"{inviter.mention} (`{inviter.id}`)",
+                        inline=False,
+                    )
+                else:
+                    embed.add_field(
+                        name="Likely inviter",
+                        value=(
+                            "Unknown. Discord only exposes this from the server audit log "
+                            "when the bot can view audit logs near the time it was added."
+                        ),
+                        inline=False,
+                    )
             await owner.send(embed=embed)
         except (discord.Forbidden, discord.NotFound, discord.HTTPException):
             logger.warning("Could not DM the developer about guild %s", guild.id)
+
+    async def detect_inviter_from_audit_log(
+        self, guild: discord.Guild
+    ) -> discord.abc.User | None:
+        """Return the likely user who added the bot, when Discord exposes it."""
+        bot_user = self.bot.user
+        bot_member = guild.me
+        if bot_user is None or bot_member is None:
+            return None
+        permissions = getattr(bot_member, "guild_permissions", None)
+        if permissions is None or not bool(getattr(permissions, "view_audit_log", False)):
+            return None
+        try:
+            async for entry in guild.audit_logs(
+                limit=8, action=discord.AuditLogAction.bot_add
+            ):
+                target = getattr(entry, "target", None)
+                if int(getattr(target, "id", 0) or 0) != bot_user.id:
+                    continue
+                created_at = getattr(entry, "created_at", None)
+                if created_at is not None:
+                    age = abs((discord.utils.utcnow() - created_at).total_seconds())
+                    if age > 15 * 60:
+                        continue
+                return entry.user
+        except (discord.Forbidden, discord.HTTPException):
+            return None
+        return None
+
+    async def user_label(self, user_id: int) -> str:
+        if not user_id:
+            return "unknown"
+        user = self.bot.get_user(user_id)
+        if user is None:
+            try:
+                user = await self.bot.fetch_user(user_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                user = None
+        if user is None:
+            return f"<@{user_id}> (`{user_id}`)"
+        display = discord.utils.escape_markdown(str(user))
+        return f"**{display}** (`{user_id}`)"
+
+    def daily_report_due_date(self) -> str:
+        now = time.time()
+        current = time.gmtime(now)
+        target = calendar.timegm(
+            (
+                current.tm_year,
+                current.tm_mon,
+                current.tm_mday,
+                self.daily_report_utc_hour,
+                self.daily_report_utc_minute,
+                0,
+                0,
+                0,
+                0,
+            )
+        )
+        if now < target:
+            return ""
+        return time.strftime("%Y-%m-%d", current)
+
+    async def daily_owner_report_loop(self) -> None:
+        try:
+            await asyncio.sleep(30)
+            while True:
+                await self.send_daily_owner_report_if_due()
+                await asyncio.sleep(DAILY_REPORT_CHECK_SECONDS)
+        except asyncio.CancelledError:
+            return
+
+    async def send_daily_owner_report_if_due(self) -> None:
+        if not self.owner_id:
+            return
+        report_date = self.daily_report_due_date()
+        if not report_date:
+            return
+        last_sent = await self.store.get_metadata(DAILY_REPORT_METADATA_KEY)
+        if last_sent == report_date:
+            return
+        await self.store.sync_guilds(self.bot.guilds)
+        records = await self.store.list_guilds()
+        metrics = await self.store.usage_totals()
+        embed = self.build_daily_owner_report_embed(records, metrics, report_date)
+        try:
+            owner = self.bot.get_user(self.owner_id) or await self.bot.fetch_user(self.owner_id)
+            await owner.send(embed=embed)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+            logger.warning("Could not send daily owner report for %s: %s", report_date, exc)
+            return
+        await self.store.set_metadata(DAILY_REPORT_METADATA_KEY, report_date)
+        logger.info("Sent daily owner report for %s", report_date)
+
+    def build_daily_owner_report_embed(
+        self, records: list[GuildRecord], metrics: list[tuple[str, int]], report_date: str
+    ) -> discord.Embed:
+        now = int(time.time())
+        active_records = [record for record in records if record.active]
+        inactive_records = [record for record in records if not record.active]
+        new_records = [record for record in active_records if record.joined_at >= now - 86400]
+        removed_records = [record for record in inactive_records if record.left_at and record.left_at >= now - 86400]
+        no_use_records = [record for record in active_records if record.usage_count <= 0]
+        low_use_records = [record for record in active_records if 0 < record.usage_count <= 2]
+        stale_records = [
+            record
+            for record in active_records
+            if record.usage_count <= 2 and record.joined_at <= now - 2 * 86400
+        ]
+        total_members = sum(record.member_count for record in active_records)
+        total_channels = sum(record.channel_count for record in active_records)
+
+        embed = discord.Embed(
+            title="📬 OwO Boss Helper — Daily Owner Report",
+            description=(
+                f"Report for `{report_date}`. Scheduled around "
+                f"`{self.daily_report_utc_hour:02d}:{self.daily_report_utc_minute:02d} UTC`."
+            ),
+            color=0x5865F2,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="Reach",
+            value=(
+                f"**Active servers:** {len(active_records):,}\n"
+                f"**Historical servers:** {len(records):,}\n"
+                f"**Removed servers:** {len(inactive_records):,}\n"
+                f"**Approx. members:** {total_members:,}\n"
+                f"**Visible channels:** {total_channels:,}"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="Last 24 hours",
+            value=(
+                f"**New servers:** {len(new_records):,}\n"
+                f"**Removed servers:** {len(removed_records):,}\n"
+                f"**No tracked use:** {len(no_use_records):,}\n"
+                f"**Low-use servers:** {len(low_use_records):,}"
+            ),
+            inline=True,
+        )
+        metric_labels = {
+            "boss_generator_requests": "Boss generator",
+            "ticket_checks": "Ticket checks",
+            "team_helper_commands": "Team helper",
+            "cooldown_checks": "Cooldown checks",
+            "ticket_list_views": "Ticket-list views",
+            "ticket_management": "Ticket management",
+            "ticket_lookups": "Ticket lookups",
+            "help_views": "Help views",
+            "about_views": "About views",
+        }
+        if metrics:
+            metric_lines = []
+            for metric, count in metrics[:8]:
+                label = metric_labels.get(metric, metric.replace("slash_", "/").replace("_", " "))
+                metric_lines.append(f"**{label}:** {count:,}")
+            embed.add_field(name="Top global usage", value="\n".join(metric_lines), inline=False)
+
+        top_servers = sorted(active_records, key=lambda item: item.usage_count, reverse=True)[:5]
+        if top_servers:
+            embed.add_field(
+                name="Top servers by tracked use",
+                value="\n".join(
+                    f"**{discord.utils.escape_markdown(record.guild_name)}:** {record.usage_count:,} uses"
+                    + (f" • <t:{record.last_used_at}:R>" if record.last_used_at else "")
+                    for record in top_servers
+                ),
+                inline=False,
+            )
+
+        recent_servers = sorted(
+            [record for record in active_records if record.last_used_at],
+            key=lambda item: int(item.last_used_at or 0),
+            reverse=True,
+        )[:5]
+        if recent_servers:
+            embed.add_field(
+                name="Recently active servers",
+                value="\n".join(
+                    f"**{discord.utils.escape_markdown(record.guild_name)}:** <t:{int(record.last_used_at or 0)}:R>"
+                    for record in recent_servers
+                ),
+                inline=False,
+            )
+
+        if stale_records:
+            embed.add_field(
+                name="Needs review",
+                value="\n".join(
+                    f"`{record.guild_id}` • **{discord.utils.escape_markdown(record.guild_name)}** • "
+                    f"{record.member_count:,} members • {record.usage_count:,} uses"
+                    for record in stale_records[:5]
+                ),
+                inline=False,
+            )
+
+        embed.set_footer(text="Owner-only daily DM • Use /bot-servers and /bot-server for details.")
+        return embed
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -854,10 +1218,142 @@ class BotInfo(commands.Cog):
         embed.set_footer(
             text=(
                 f"{sum(1 for item in records if item.active)} active • {len(records)} historical • "
-                "Owner is the current Discord server owner, not always the person who invited the bot."
+                "Use /bot-server server_id:<id> for details. Owner is not always the inviter."
             )
         )
         return embed
+
+    async def build_server_detail_embed(self, record: GuildRecord) -> discord.Embed:
+        guild = self.bot.get_guild(record.guild_id)
+        owner = await self.user_label(record.owner_id)
+        metrics = await self.store.guild_usage_totals(record.guild_id)
+
+        status = "active" if record.active else "removed"
+        embed = discord.Embed(
+            title=f"🔎 Server Detail — {discord.utils.escape_markdown(record.guild_name)}",
+            color=(0x57F287 if record.active else 0x747F8D),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="Server",
+            value=(
+                f"**Status:** `{status}`\n"
+                f"**ID:** `{record.guild_id}`\n"
+                f"**Owner:** {owner}\n"
+                f"**Members:** {record.member_count:,}\n"
+                f"**Channels:** {record.channel_count:,}"
+            ),
+            inline=False,
+        )
+
+        inviter_value = "Unknown / not available retroactively"
+        if record.inviter_id:
+            inviter_value = await self.user_label(record.inviter_id)
+            if record.inviter_checked_at:
+                inviter_value += f"\nDetected <t:{record.inviter_checked_at}:R>"
+        embed.add_field(
+            name="Invite trail",
+            value=(
+                f"**Likely inviter:** {inviter_value}\n"
+                "Discord only exposes this from audit logs when the bot has **View Audit Log** near the join time."
+            ),
+            inline=False,
+        )
+
+        last_used_text = f"<t:{record.last_used_at}:R>" if record.last_used_at else "no tracked use"
+        usage_lines = [
+            f"**Total tracked uses:** {record.usage_count:,}",
+            f"**Last tracked use:** {last_used_text}",
+            f"**Joined:** <t:{record.joined_at}:R>",
+            f"**Last seen:** <t:{record.last_seen_at}:R>",
+        ]
+        if record.left_at:
+            usage_lines.append(f"**Left:** <t:{record.left_at}:R>")
+        embed.add_field(name="Activity", value="\n".join(usage_lines), inline=False)
+
+        metric_labels = {
+            "boss_generator_requests": "Boss generator",
+            "ticket_checks": "Ticket checks",
+            "team_helper_commands": "Team helper",
+            "cooldown_checks": "Cooldown checks",
+            "ticket_list_views": "Ticket-list views",
+            "ticket_management": "Ticket management",
+            "ticket_lookups": "Ticket lookups",
+            "help_views": "Help views",
+            "about_views": "About views",
+        }
+        if metrics:
+            metric_lines = []
+            for metric, count, last_used_at in metrics[:10]:
+                label = metric_labels.get(metric, metric.replace("slash_", "/").replace("_", " "))
+                metric_lines.append(f"**{label}:** {count:,} • <t:{last_used_at}:R>")
+            embed.add_field(name="Usage breakdown", value="\n".join(metric_lines), inline=False)
+        else:
+            embed.add_field(name="Usage breakdown", value="No per-command usage recorded yet.", inline=False)
+
+        if guild is not None and guild.me is not None:
+            permissions = guild.me.guild_permissions
+            checks = [
+                ("View Audit Log", bool(permissions.view_audit_log)),
+                ("Manage Guild", bool(permissions.manage_guild)),
+                ("Manage Messages", bool(permissions.manage_messages)),
+                ("Add Reactions", bool(permissions.add_reactions)),
+                ("Embed Links", bool(permissions.embed_links)),
+                ("Read Message History", bool(permissions.read_message_history)),
+                ("Send Messages", bool(permissions.send_messages)),
+            ]
+            embed.add_field(
+                name="Current bot permissions",
+                value="\n".join(("✅" if ok else "❌") + f" {label}" for label, ok in checks),
+                inline=False,
+            )
+            if getattr(guild, "vanity_url_code", None):
+                embed.add_field(
+                    name="Public invite",
+                    value=f"Vanity: `discord.gg/{guild.vanity_url_code}`",
+                    inline=False,
+                )
+        else:
+            embed.add_field(
+                name="Live access",
+                value="The bot is no longer in this server, so only stored history is available.",
+                inline=False,
+            )
+
+        embed.set_footer(text="Owner-only • Use /bot-server server_id:<id> for this detail view.")
+        return embed
+
+    @app_commands.command(
+        name="bot-server",
+        description="Developer-only detailed view for one server.",
+    )
+    @app_commands.describe(server_id="Discord server ID from /bot-servers")
+    async def developer_server_detail(
+        self, interaction: discord.Interaction, server_id: str
+    ) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+        cleaned = re.sub(r"[^0-9]", "", server_id or "")
+        if not cleaned:
+            await interaction.response.send_message(
+                "Send a server ID from `/bot-servers`, for example `/bot-server server_id:123...`.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        await self.store.sync_guilds(self.bot.guilds)
+        record = await self.store.get_guild_record(int(cleaned))
+        if record is None:
+            await interaction.followup.send(
+                f"I do not have a stored server record for `{cleaned}`.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            embed=await self.build_server_detail_embed(record),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     @app_commands.command(
         name="bot-servers",

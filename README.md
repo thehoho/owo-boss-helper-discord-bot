@@ -663,3 +663,9 @@ Use `HWD skip` or the **Skip weapon** button when a queued weapon was sold, dism
 ### Owner server navigation
 
 The developer-only `/bot-servers` command has Previous, Next, and Refresh buttons. Each row includes the current server owner ID/mention. This identifies the current Discord guild owner, not necessarily the person who invited the bot. The bot does not create invite links automatically; if a guild already has a vanity code visible to the bot, it is shown as a hint.
+
+### Owner server insight tools
+
+Owner-only operational views now include `/bot-servers` for paged server reach and `/bot-server server_id:<id>` for a detailed server view. The detail view shows current owner, activity timestamps, per-command usage breakdowns, current bot permissions, safe vanity invite visibility, and the likely inviter for future joins when Discord exposes that information through audit logs. A daily owner DM report summarizes active servers, new/removed servers, top usage, recent usage, and servers that may need review.
+
+Discord does not expose who invited a bot retroactively. Future inviter detection only works when the bot can read the server audit log near the time it joins.
