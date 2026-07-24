@@ -45,3 +45,15 @@ Team editing and ordering controls are planned as the next v0.11 phase because t
 - Added future join inviter detection when audit logs are available.
 - Invite behavior stays safe: the bot does not create server invite links automatically.
 - Added a daily owner DM report around reset time, configurable with `BOT_DAILY_REPORT_UTC_HOUR` and `BOT_DAILY_REPORT_UTC_MINUTE`.
+
+### Team editor and saved-team order controls
+
+This release adds the final v0.11 team-management layer:
+
+- open a saved-team editor with `HTE <team>` or `HT edit <team>`;
+- edit position 1, 2, or 3 with Discord modals;
+- rename teams without replacing them from a fresh OwO page;
+- move or swap saved teams with `HT move`, `HT swap`, and `HT order`;
+- use the **Edit order** button from the saved-team list.
+
+Discord does not support real drag-and-drop inside bot messages, so the helper uses safe buttons, selectors, and explicit move/swap commands.

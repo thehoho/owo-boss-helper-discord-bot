@@ -669,3 +669,16 @@ The developer-only `/bot-servers` command has Previous, Next, and Refresh button
 Owner-only operational views now include `/bot-servers` for paged server reach and `/bot-server server_id:<id>` for a detailed server view. The detail view shows current owner, activity timestamps, per-command usage breakdowns, current bot permissions, safe vanity invite visibility, and the likely inviter for future joins when Discord exposes that information through audit logs. A daily owner DM report summarizes active servers, new/removed servers, top usage, recent usage, and servers that may need review.
 
 Discord does not expose who invited a bot retroactively. Future inviter detection only works when the bot can read the server audit log near the time it joins.
+
+### Team editor and order controls
+
+Saved teams can be edited without recreating them from a fresh OwO team page.
+
+- `HTE 3` / `HT edit 3` opens the editor for team #3.
+- `HT rename 3 new name` renames a saved team.
+- `HT rename old name to new name` renames by name.
+- `HT move 8 1` moves team #8 to the top of the saved-team list and shifts the others.
+- `HT swap 1 with 5` swaps two saved-team slots.
+- `HT order` opens button controls for saved-team order.
+
+The editor can update each team position's animal/pet identity and weapon ID. Weapon restore commands still equip by animal identity, not by fragile position.

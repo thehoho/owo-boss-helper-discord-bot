@@ -149,6 +149,9 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
     - HT ddc tank / H team ddc tank
     - H team delete 3 / HT D 3 / HTD team-name
     - H team update 3 / HT U 3 / HTU team-name
+    - H team edit 3 / HTE 3 / HT edit team-name
+    - H team rename 3 new-name / HT rename old-name to new-name
+    - HT move 8 1 / HT swap boss farm / HT order
     - H team help / HT help
     - HS / H skip / H escape / HT skip
     - HT cancel
@@ -180,7 +183,7 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
         return "open", rest
 
     action_match = re.match(
-        r"^(create|save|c|s|update|u|delete|remove|d|r|help|h|skip|escape|cancel|stop|x)(?:\s+(.*))?$",
+        r"^(create|save|c|s|update|u|edit|e|rename|move|mv|swap|order|o|delete|remove|d|r|help|h|skip|escape|cancel|stop|x)(?:\s+(.*))?$",
         rest,
         re.IGNORECASE,
     )
@@ -193,6 +196,17 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
         return "create", argument
     if action in {"update", "u"}:
         return "update", argument
+
+    if action in {"edit", "e"}:
+        return "edit", argument
+    if action in {"rename"}:
+        return "rename", argument
+    if action in {"move", "mv"}:
+        return "move", argument
+    if action in {"swap"}:
+        return "swap", argument
+    if action in {"order", "o"}:
+        return "order", argument
     if action in {"delete", "remove", "d", "r"}:
         return "delete", argument
     if action in {"help", "h"}:
@@ -929,6 +943,224 @@ class TeamTemplateStore:
             ).fetchone()
         return self._row_to_template(row) if row else None
 
+
+    @staticmethod
+    def _members_to_json(members: Iterable[TeamMember]) -> str:
+        return json.dumps(
+            [
+                {
+                    "position": member.position,
+                    "animal": member.animal,
+                    "weapon_id": member.weapon_id,
+                }
+                for member in sorted(members, key=lambda item: item.position)
+            ],
+            separators=(",", ":"),
+        )
+
+    async def rename_template(
+        self, user_id: int, template_id: int, new_name: str
+    ) -> tuple[TeamTemplate | None, str | None]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._rename_template_sync, user_id, template_id, new_name
+            )
+
+    def _rename_template_sync(
+        self, user_id: int, template_id: int, new_name: str
+    ) -> tuple[TeamTemplate | None, str | None]:
+        name = re.sub(r"\s+", " ", new_name or "").strip()
+        if not name:
+            return None, "Use a non-empty team name."
+        if len(name) > MAX_TEMPLATE_NAME_LENGTH:
+            return None, f"Template names can contain at most {MAX_TEMPLATE_NAME_LENGTH} characters."
+        now = int(time.time())
+        with self._connect() as connection:
+            duplicate = connection.execute(
+                """
+                SELECT id FROM team_templates
+                WHERE user_id = ? AND name = ? AND id <> ?
+                """,
+                (user_id, name, template_id),
+            ).fetchone()
+            if duplicate is not None:
+                return None, f"You already have a saved team named **{name}**."
+            cursor = connection.execute(
+                """
+                UPDATE team_templates
+                SET name = ?, updated_at = ?
+                WHERE user_id = ? AND id = ?
+                """,
+                (name, now, user_id, template_id),
+            )
+            if cursor.rowcount <= 0:
+                return None, "That saved team no longer exists."
+            row = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND id = ?",
+                (user_id, template_id),
+            ).fetchone()
+        return (self._row_to_template(row) if row else None), None
+
+    async def update_member(
+        self,
+        user_id: int,
+        template_id: int,
+        position: int,
+        animal: str,
+        weapon_id: str,
+    ) -> tuple[TeamTemplate | None, str | None]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._update_member_sync,
+                user_id,
+                template_id,
+                position,
+                animal,
+                weapon_id,
+            )
+
+    def _update_member_sync(
+        self,
+        user_id: int,
+        template_id: int,
+        position: int,
+        animal: str,
+        weapon_id: str,
+    ) -> tuple[TeamTemplate | None, str | None]:
+        if position not in {1, 2, 3}:
+            return None, "Team position must be 1, 2, or 3."
+        clean_animal = re.sub(r"\s+", " ", animal or "").strip()
+        if not clean_animal:
+            return None, "Animal/pet identity cannot be empty."
+        clean_weapon = re.sub(r"[^A-Za-z0-9]", "", weapon_id or "").upper()
+        if clean_weapon and not re.fullmatch(r"[A-Z0-9]{6}", clean_weapon):
+            return None, "Weapon ID must be empty or exactly six letters/numbers."
+        now = int(time.time())
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND id = ?",
+                (user_id, template_id),
+            ).fetchone()
+            if row is None:
+                return None, "That saved team no longer exists."
+            template = self._row_to_template(row)
+            members_by_position = {member.position: member for member in template.members}
+            members_by_position[position] = TeamMember(
+                position=position,
+                animal=clean_animal,
+                weapon_id=clean_weapon,
+            )
+            members = tuple(members_by_position[pos] for pos in sorted(members_by_position))
+            connection.execute(
+                """
+                UPDATE team_templates
+                SET members_json = ?, updated_at = ?
+                WHERE user_id = ? AND id = ?
+                """,
+                (self._members_to_json(members), now, user_id, template_id),
+            )
+            row = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND id = ?",
+                (user_id, template_id),
+            ).fetchone()
+        return (self._row_to_template(row) if row else None), None
+
+    async def move_template_to_slot(
+        self, user_id: int, template_id: int, target_slot: int
+    ) -> tuple[TeamTemplate | None, str | None]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._move_template_to_slot_sync, user_id, template_id, target_slot
+            )
+
+    def _move_template_to_slot_sync(
+        self, user_id: int, template_id: int, target_slot: int
+    ) -> tuple[TeamTemplate | None, str | None]:
+        if not 1 <= target_slot <= MAX_TEMPLATES_PER_USER:
+            return None, f"Team slots must be between 1 and {MAX_TEMPLATES_PER_USER}."
+        now = int(time.time())
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT * FROM team_templates
+                WHERE user_id = ?
+                ORDER BY slot ASC, created_at ASC, id ASC
+                """,
+                (user_id,),
+            ).fetchall()
+            moving = next((row for row in rows if int(row["id"]) == template_id), None)
+            if moving is None:
+                return None, "That saved team no longer exists."
+            remaining = [row for row in rows if int(row["id"]) != template_id]
+            insert_at = min(max(target_slot - 1, 0), len(remaining))
+            reordered = remaining[:insert_at] + [moving] + remaining[insert_at:]
+            for index, row in enumerate(reordered, start=1):
+                connection.execute(
+                    "UPDATE team_templates SET slot = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+                    (-index, now, user_id, int(row["id"])),
+                )
+            for index, row in enumerate(reordered, start=1):
+                connection.execute(
+                    "UPDATE team_templates SET slot = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+                    (index, now, user_id, int(row["id"])),
+                )
+            row = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND id = ?",
+                (user_id, template_id),
+            ).fetchone()
+        return (self._row_to_template(row) if row else None), None
+
+    async def swap_templates(
+        self, user_id: int, first_id: int, second_id: int
+    ) -> tuple[tuple[TeamTemplate, TeamTemplate] | None, str | None]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._swap_templates_sync, user_id, first_id, second_id
+            )
+
+    def _swap_templates_sync(
+        self, user_id: int, first_id: int, second_id: int
+    ) -> tuple[tuple[TeamTemplate, TeamTemplate] | None, str | None]:
+        if first_id == second_id:
+            return None, "Choose two different saved teams to swap."
+        now = int(time.time())
+        with self._connect() as connection:
+            first = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND id = ?",
+                (user_id, first_id),
+            ).fetchone()
+            second = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND id = ?",
+                (user_id, second_id),
+            ).fetchone()
+            if first is None or second is None:
+                return None, "One of those saved teams no longer exists."
+            first_slot = int(first["slot"])
+            second_slot = int(second["slot"])
+            temp_slot = -abs(first_id)
+            connection.execute(
+                "UPDATE team_templates SET slot = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+                (temp_slot, now, user_id, first_id),
+            )
+            connection.execute(
+                "UPDATE team_templates SET slot = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+                (first_slot, now, user_id, second_id),
+            )
+            connection.execute(
+                "UPDATE team_templates SET slot = ?, updated_at = ? WHERE user_id = ? AND id = ?",
+                (second_slot, now, user_id, first_id),
+            )
+            first_row = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND id = ?",
+                (user_id, first_id),
+            ).fetchone()
+            second_row = connection.execute(
+                "SELECT * FROM team_templates WHERE user_id = ? AND id = ?",
+                (user_id, second_id),
+            ).fetchone()
+        if first_row is None or second_row is None:
+            return None, "The swap could not be confirmed."
+        return (self._row_to_template(first_row), self._row_to_template(second_row)), None
     async def delete_by_id(self, user_id: int, template_id: int) -> bool:
         async with self.lock:
             return await asyncio.to_thread(self._delete_by_id_sync, user_id, template_id)
@@ -1191,6 +1423,15 @@ class TemplateActionView(OwnedView):
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
+    @discord.ui.button(label="Edit team", emoji="✏️", style=discord.ButtonStyle.secondary)
+    async def edit_team(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await self.cog.send_template_editor_from_interaction(
+            interaction, self.template.template_id
+        )
+
+
     @discord.ui.button(label="Delete", emoji="🗑️", style=discord.ButtonStyle.danger)
     async def delete_template(
         self, interaction: discord.Interaction, _: discord.ui.Button
@@ -1215,6 +1456,282 @@ class TemplateActionView(OwnedView):
             )
 
 
+
+class TeamMemberEditModal(discord.ui.Modal):
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        template: TeamTemplate,
+        position: int,
+        member: TeamMember | None,
+    ) -> None:
+        super().__init__(title=f"Edit team #{template.slot} position {position}")
+        self.cog = cog
+        self.template = template
+        self.position = position
+        self.animal = discord.ui.TextInput(
+            label="Animal / pet identity",
+            placeholder="Example: lizard or 2025dec_daisy",
+            default=(member.animal if member else ""),
+            max_length=80,
+            required=True,
+        )
+        self.weapon_id = discord.ui.TextInput(
+            label="Weapon ID",
+            placeholder="Six-character ID, or leave empty",
+            default=(member.weapon_id if member else ""),
+            min_length=0,
+            max_length=12,
+            required=False,
+        )
+        self.add_item(self.animal)
+        self.add_item(self.weapon_id)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        updated, error = await self.cog.store.update_member(
+            interaction.user.id,
+            self.template.template_id,
+            self.position,
+            str(self.animal.value),
+            str(self.weapon_id.value),
+        )
+        if error or updated is None:
+            await interaction.response.send_message(
+                f"⚠️ {error or 'The saved team could not be updated.'}",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.edit_message(
+            embed=self.cog.build_template_editor_embed(updated),
+            view=TemplateEditView(self.cog, interaction.user.id, updated),
+        )
+
+
+class TeamRenameModal(discord.ui.Modal):
+    def __init__(self, cog: "TeamTemplates", template: TeamTemplate) -> None:
+        super().__init__(title=f"Rename team #{template.slot}")
+        self.cog = cog
+        self.template = template
+        self.name = discord.ui.TextInput(
+            label="New team name",
+            default=template.name,
+            max_length=MAX_TEMPLATE_NAME_LENGTH,
+            required=True,
+        )
+        self.add_item(self.name)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        updated, error = await self.cog.store.rename_template(
+            interaction.user.id,
+            self.template.template_id,
+            str(self.name.value),
+        )
+        if error or updated is None:
+            await interaction.response.send_message(
+                f"⚠️ {error or 'The saved team could not be renamed.'}",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.edit_message(
+            embed=self.cog.build_template_editor_embed(updated),
+            view=TemplateEditView(self.cog, interaction.user.id, updated),
+        )
+
+
+class TeamMoveModal(discord.ui.Modal):
+    def __init__(self, cog: "TeamTemplates", template: TeamTemplate) -> None:
+        super().__init__(title=f"Move team #{template.slot}")
+        self.cog = cog
+        self.template = template
+        self.target_slot = discord.ui.TextInput(
+            label="Move to list position",
+            placeholder=f"1-{MAX_TEMPLATES_PER_USER}",
+            default=str(template.slot),
+            max_length=3,
+            required=True,
+        )
+        self.add_item(self.target_slot)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        raw_slot = str(self.target_slot.value).strip()
+        if not raw_slot.isdigit():
+            await interaction.response.send_message(
+                "⚠️ Slot must be a number.", ephemeral=True
+            )
+            return
+        updated, error = await self.cog.store.move_template_to_slot(
+            interaction.user.id,
+            self.template.template_id,
+            int(raw_slot),
+        )
+        if error or updated is None:
+            await interaction.response.send_message(
+                f"⚠️ {error or 'The saved team could not be moved.'}",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.edit_message(
+            embed=self.cog.build_template_editor_embed(updated),
+            view=TemplateEditView(self.cog, interaction.user.id, updated),
+        )
+
+
+class TemplateEditView(OwnedView):
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        owner_id: int,
+        template: TeamTemplate,
+    ) -> None:
+        super().__init__(owner_id, timeout=600)
+        self.cog = cog
+        self.template = template
+
+    async def open_member_modal(self, interaction: discord.Interaction, position: int) -> None:
+        latest = await self.cog.store.get(interaction.user.id, self.template.template_id)
+        if latest is None:
+            await interaction.response.send_message("That saved team no longer exists.", ephemeral=True)
+            return
+        await interaction.response.send_modal(
+            TeamMemberEditModal(
+                self.cog,
+                latest,
+                position,
+                next((member for member in latest.members if member.position == position), None),
+            )
+        )
+
+    @discord.ui.button(label="Edit pos 1", emoji="1️⃣", style=discord.ButtonStyle.primary)
+    async def edit_pos_1(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.open_member_modal(interaction, 1)
+
+    @discord.ui.button(label="Edit pos 2", emoji="2️⃣", style=discord.ButtonStyle.primary)
+    async def edit_pos_2(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.open_member_modal(interaction, 2)
+
+    @discord.ui.button(label="Edit pos 3", emoji="3️⃣", style=discord.ButtonStyle.primary)
+    async def edit_pos_3(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.open_member_modal(interaction, 3)
+
+    @discord.ui.button(label="Rename", emoji="🏷️", style=discord.ButtonStyle.secondary)
+    async def rename(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        latest = await self.cog.store.get(interaction.user.id, self.template.template_id)
+        if latest is None:
+            await interaction.response.send_message("That saved team no longer exists.", ephemeral=True)
+            return
+        await interaction.response.send_modal(TeamRenameModal(self.cog, latest))
+
+    @discord.ui.button(label="Move order", emoji="↕️", style=discord.ButtonStyle.secondary)
+    async def move_order(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        latest = await self.cog.store.get(interaction.user.id, self.template.template_id)
+        if latest is None:
+            await interaction.response.send_message("That saved team no longer exists.", ephemeral=True)
+            return
+        await interaction.response.send_modal(TeamMoveModal(self.cog, latest))
+
+
+class TemplateOrderSelect(discord.ui.Select):
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        templates: list[TeamTemplate],
+        selected_template_id: int | None,
+    ) -> None:
+        self.cog = cog
+        current = templates[:25]
+        options: list[discord.SelectOption] = []
+        for template in current:
+            options.append(
+                discord.SelectOption(
+                    label=f"#{template.slot} — {template.name}"[:100],
+                    value=str(template.template_id),
+                    description=("selected" if template.template_id == selected_template_id else "move this saved team")[:100],
+                    emoji=("✅" if template.template_id == selected_template_id else "🐾"),
+                    default=(template.template_id == selected_template_id),
+                )
+            )
+        super().__init__(
+            placeholder="Choose a team to move up/down…",
+            min_values=1,
+            max_values=1,
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        templates = await self.cog.store.list_for_user(interaction.user.id)
+        selected_id = int(self.values[0])
+        await interaction.response.edit_message(
+            embed=self.cog.build_order_embed(templates, selected_id),
+            view=TemplateOrderView(self.cog, interaction.user.id, templates, selected_id),
+        )
+
+
+class TemplateOrderView(OwnedView):
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        owner_id: int,
+        templates: list[TeamTemplate],
+        selected_template_id: int | None = None,
+    ) -> None:
+        super().__init__(owner_id, timeout=600)
+        self.cog = cog
+        self.templates = templates
+        self.selected_template_id = selected_template_id
+        if templates:
+            self.add_item(TemplateOrderSelect(cog, templates, selected_template_id))
+        selected = self.selected_template()
+        self.move_up.disabled = selected is None or selected.slot <= 1
+        self.move_down.disabled = selected is None or selected.slot >= len(templates)
+
+    def selected_template(self) -> TeamTemplate | None:
+        if self.selected_template_id is None:
+            return None
+        return next(
+            (template for template in self.templates if template.template_id == self.selected_template_id),
+            None,
+        )
+
+    async def move_selected(self, interaction: discord.Interaction, delta: int) -> None:
+        selected = self.selected_template()
+        if selected is None:
+            await interaction.response.send_message("Choose a team first.", ephemeral=True)
+            return
+        target_slot = max(1, min(len(self.templates), selected.slot + delta))
+        updated, error = await self.cog.store.move_template_to_slot(
+            interaction.user.id,
+            selected.template_id,
+            target_slot,
+        )
+        if error or updated is None:
+            await interaction.response.send_message(
+                f"⚠️ {error or 'The team order could not be updated.'}",
+                ephemeral=True,
+            )
+            return
+        templates = await self.cog.store.list_for_user(interaction.user.id)
+        await interaction.response.edit_message(
+            embed=self.cog.build_order_embed(templates, updated.template_id),
+            view=TemplateOrderView(self.cog, interaction.user.id, templates, updated.template_id),
+        )
+
+    @discord.ui.button(label="Move up", emoji="⬆️", style=discord.ButtonStyle.secondary, row=1)
+    async def move_up(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.move_selected(interaction, -1)
+
+    @discord.ui.button(label="Move down", emoji="⬇️", style=discord.ButtonStyle.secondary, row=1)
+    async def move_down(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.move_selected(interaction, 1)
+
+    @discord.ui.button(label="Refresh", emoji="🔄", style=discord.ButtonStyle.primary, row=1)
+    async def refresh(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        templates = await self.cog.store.list_for_user(interaction.user.id)
+        selected_id = self.selected_template_id
+        await interaction.response.edit_message(
+            embed=self.cog.build_order_embed(templates, selected_id),
+            view=TemplateOrderView(self.cog, interaction.user.id, templates, selected_id),
+        )
 class TemplateSelect(discord.ui.Select):
     def __init__(
         self,
@@ -1305,10 +1822,18 @@ class TemplateListView(OwnedView):
             disabled=self.page >= self.page_count - 1,
             row=1,
         )
+        order_button = discord.ui.Button(
+            label="Edit order",
+            emoji="↕️",
+            style=discord.ButtonStyle.primary,
+            row=1,
+        )
         previous.callback = self.previous_page
         next_button.callback = self.next_page
+        order_button.callback = self.open_order_view
         self.add_item(previous)
         self.add_item(next_button)
+        self.add_item(order_button)
 
     async def previous_page(self, interaction: discord.Interaction) -> None:
         target = max(0, self.page - 1)
@@ -1332,6 +1857,14 @@ class TemplateListView(OwnedView):
                 self.templates,
                 page=target,
             ),
+        )
+
+    async def open_order_view(self, interaction: discord.Interaction) -> None:
+        templates = await self.cog.store.list_for_user(interaction.user.id)
+        await interaction.response.send_message(
+            embed=self.cog.build_order_embed(templates, None),
+            view=TemplateOrderView(self.cog, interaction.user.id, templates),
+            ephemeral=True,
         )
 
 
@@ -1990,7 +2523,7 @@ class TeamTemplates(commands.Cog):
                 "Choose **Quick replace** or **Exact reset**. The helper shows the full "
                 "packet, then posts one command at a time. Animal adds and weapon equips "
                 "alternate, and weapon equips use the animal name instead of the team position. "
-                "Use **All commands** to post a public, clean command list in one message."
+                "Use **All commands** to post a public, clean command list in one message. Discord does not allow true drag-and-drop inside bot messages, so ordering uses buttons, `HT move`, and `HT swap`."
             ),
             inline=False,
         )
@@ -2188,6 +2721,242 @@ class TeamTemplates(commands.Cog):
             message.author.id,
         )
 
+
+    def build_template_editor_embed(self, template: TeamTemplate) -> discord.Embed:
+        embed = discord.Embed(
+            title=f"✏️ Edit team #{template.slot} — {template.name}",
+            description=(
+                f"Saved from **{template.source_title}**\n\n"
+                f"{format_team_members(template.members)}\n\n"
+                "Use the buttons below to edit one position, rename the team, or move it in your saved-team order. "
+                "Weapon IDs stay tied to the animal/pet identity, not the visible team position."
+            ),
+            color=0xFEE75C,
+        )
+        embed.set_footer(text="Discord does not support real drag-and-drop in bot messages, so order changes use buttons or HT move / HT swap.")
+        return embed
+
+    def build_order_embed(
+        self,
+        templates: list[TeamTemplate],
+        selected_template_id: int | None,
+    ) -> discord.Embed:
+        selected = next(
+            (template for template in templates if template.template_id == selected_template_id),
+            None,
+        )
+        lines: list[str] = []
+        for template in templates[:25]:
+            marker = "✅" if selected and selected.template_id == template.template_id else "•"
+            lines.append(f"{marker} `#{template.slot}` **{discord.utils.escape_markdown(template.name)}**")
+        if len(templates) > 25:
+            lines.append(f"…and {len(templates) - 25} more. Use `HT move <team> <slot>` for teams past the first page.")
+        embed = discord.Embed(
+            title="↕️ Edit saved-team order",
+            description=(
+                "Choose a team, then use **Move up** or **Move down**. "
+                "For exact control, use `HT move <slot/name> <new position>` or `HT swap <team A> with <team B>`.\n\n"
+                + ("\n".join(lines) if lines else "No saved teams yet.")
+            ),
+            color=0x5865F2,
+        )
+        if selected:
+            embed.add_field(
+                name="Selected",
+                value=f"`#{selected.slot}` **{discord.utils.escape_markdown(selected.name)}**",
+                inline=False,
+            )
+        return embed
+
+    async def send_template_editor_from_interaction(
+        self, interaction: discord.Interaction, template_id: int
+    ) -> None:
+        template = await self.store.get(interaction.user.id, template_id)
+        if template is None:
+            await interaction.response.send_message(
+                "That saved team no longer exists.", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            embed=self.build_template_editor_embed(template),
+            view=TemplateEditView(self, interaction.user.id, template),
+            ephemeral=True,
+        )
+
+    async def send_template_editor(
+        self, message: discord.Message, template: TeamTemplate
+    ) -> None:
+        await message.reply(
+            embed=self.build_template_editor_embed(template),
+            view=TemplateEditView(self, message.author.id, template),
+            mention_author=False,
+        )
+
+    async def resolve_template_selector(
+        self,
+        message: discord.Message,
+        selector: str | None,
+        *,
+        action_name: str,
+    ) -> TeamTemplate | None:
+        value = re.sub(r"\s+", " ", selector or "").strip()
+        if not value:
+            await message.reply(
+                f"Use `HT {action_name} <number or name>`.",
+                mention_author=False,
+            )
+            return None
+        if value.isdigit():
+            template = await self.store.get_by_slot(message.author.id, int(value))
+            if template is None:
+                await message.reply(
+                    f"You do not have a saved team in slot **#{value}**.",
+                    mention_author=False,
+                )
+            return template
+
+        templates = await self.store.list_for_user(message.author.id)
+        matches = [template for template in templates if template_matches_query(template, value)]
+        if not matches:
+            await message.reply(
+                f"I could not find a saved team matching **{value}**.",
+                mention_author=False,
+            )
+            return None
+        normalized_value = normalize_template_query(value)
+        exact_matches = [
+            template
+            for template in matches
+            if normalize_template_query(template.name) == normalized_value
+        ]
+        if len(exact_matches) == 1:
+            return exact_matches[0]
+        if len(matches) == 1:
+            return matches[0]
+        await message.reply(
+            content=(
+                f"I found **{len(matches)}** saved teams matching **{value}**. "
+                f"Choose the exact one, then run `HT {action_name} <number>`."
+            ),
+            embed=self.build_template_list_embed(matches, 0),
+            view=TemplateListView(self, message.author.id, matches, page=0),
+            mention_author=False,
+            delete_after=300,
+        )
+        return None
+
+    async def edit_template(self, message: discord.Message, selector: str | None) -> None:
+        template = await self.resolve_template_selector(message, selector, action_name="edit")
+        if template is None:
+            return
+        await self.send_template_editor(message, template)
+
+    async def show_order_manager(self, message: discord.Message) -> None:
+        templates = await self.store.list_for_user(message.author.id)
+        if not templates:
+            await message.reply(
+                "You do not have any saved teams yet.",
+                mention_author=False,
+            )
+            return
+        await message.reply(
+            embed=self.build_order_embed(templates, None),
+            view=TemplateOrderView(self, message.author.id, templates),
+            mention_author=False,
+        )
+
+    async def rename_template_command(self, message: discord.Message, argument: str | None) -> None:
+        value = re.sub(r"\s+", " ", argument or "").strip()
+        if not value:
+            await message.reply(
+                "Use `HT rename <number> <new name>` or `HT rename <old name> to <new name>`.",
+                mention_author=False,
+            )
+            return
+        selector = ""
+        new_name = ""
+        first, _, rest = value.partition(" ")
+        if first.isdigit() and rest.strip():
+            selector = first
+            new_name = rest.strip()
+        else:
+            split = re.split(r"\s+to\s+", value, maxsplit=1, flags=re.IGNORECASE)
+            if len(split) == 2:
+                selector, new_name = split[0].strip(), split[1].strip()
+        if not selector or not new_name:
+            await message.reply(
+                "For named teams, use `HT rename <old name> to <new name>`. For slots, use `HT rename 3 new name`.",
+                mention_author=False,
+            )
+            return
+        template = await self.resolve_template_selector(message, selector, action_name="rename")
+        if template is None:
+            return
+        updated, error = await self.store.rename_template(message.author.id, template.template_id, new_name)
+        if error or updated is None:
+            await message.reply(f"⚠️ {error or 'The team could not be renamed.'}", mention_author=False)
+            return
+        await message.reply(
+            f"🏷️ Renamed team **#{updated.slot}** to **{updated.name}**.",
+            mention_author=False,
+        )
+
+    async def move_template_command(self, message: discord.Message, argument: str | None) -> None:
+        value = re.sub(r"\s+", " ", argument or "").strip()
+        match = re.match(r"^(.+?)\s+(\d{1,3})$", value)
+        if not match:
+            await message.reply(
+                "Use `HT move <number or name> <new position>`, for example `HT move 8 1`.",
+                mention_author=False,
+            )
+            return
+        selector = match.group(1).strip()
+        target_slot = int(match.group(2))
+        template = await self.resolve_template_selector(message, selector, action_name="move")
+        if template is None:
+            return
+        updated, error = await self.store.move_template_to_slot(
+            message.author.id,
+            template.template_id,
+            target_slot,
+        )
+        if error or updated is None:
+            await message.reply(f"⚠️ {error or 'The team could not be moved.'}", mention_author=False)
+            return
+        await message.reply(
+            f"↕️ Moved **{updated.name}** to saved-team position **#{updated.slot}**.",
+            mention_author=False,
+        )
+
+    async def swap_template_command(self, message: discord.Message, argument: str | None) -> None:
+        value = re.sub(r"\s+", " ", argument or "").strip()
+        parts = re.split(r"\s+(?:with|and)\s+|,\s*", value, maxsplit=1, flags=re.IGNORECASE)
+        if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+            await message.reply(
+                "Use `HT swap <team A> with <team B>`, for example `HT swap 1 with 5`.",
+                mention_author=False,
+            )
+            return
+        first = await self.resolve_template_selector(message, parts[0].strip(), action_name="swap")
+        if first is None:
+            return
+        second = await self.resolve_template_selector(message, parts[1].strip(), action_name="swap")
+        if second is None:
+            return
+        swapped, error = await self.store.swap_templates(
+            message.author.id,
+            first.template_id,
+            second.template_id,
+        )
+        if error or swapped is None:
+            await message.reply(f"⚠️ {error or 'The teams could not be swapped.'}", mention_author=False)
+            return
+        left, right = swapped
+        await message.reply(
+            f"🔁 Swapped **{left.name}** and **{right.name}**. New slots: "
+            f"**{left.name}** `#{left.slot}`, **{right.name}** `#{right.slot}`.",
+            mention_author=False,
+        )
     async def send_template_card(
         self, message: discord.Message, template: TeamTemplate
     ) -> None:
@@ -2196,9 +2965,10 @@ class TeamTemplates(commands.Cog):
             title=f"🐾 #{template.slot} — {template.name}",
             description=(
                 f"Saved from **{template.source_title}**\n\n{member_lines}\n\n"
-                "Choose **Quick replace** to overwrite the listed positions, or "
-                "**Exact reset** to clear all three positions first. Guided mode will "
-                "post each command as OwO confirms the previous one."
+                "Choose **Quick replace** to overwrite the listed positions, "
+                "**Exact reset** to clear all three positions first, or **Edit team** "
+                "to change one animal/weapon, rename it, or move it in your saved order. "
+                "Guided mode posts each command as OwO confirms the previous one."
             ),
             color=0x5865F2,
         )
@@ -2232,7 +3002,8 @@ class TeamTemplates(commands.Cog):
             description=(
                 f"You have **{len(templates)}/{MAX_TEMPLATES_PER_USER}** templates.\n\n"
                 f"{numbered}\n\nChoose one below, use the arrows to change pages, "
-                "or open a known slot directly with `HT<number>` such as `HT73`."
+                "open a known slot directly with `HT<number>` such as `HT73`, "
+                "or use **Edit order** / `HT order` to reorder saved teams."
             ),
             color=0x5865F2,
         )
@@ -2375,6 +3146,22 @@ class TeamTemplates(commands.Cog):
                 return
             if action == "delete":
                 await self.delete_template(message, argument)
+                return
+
+            if action == "edit":
+                await self.edit_template(message, argument)
+                return
+            if action == "rename":
+                await self.rename_template_command(message, argument)
+                return
+            if action == "move":
+                await self.move_template_command(message, argument)
+                return
+            if action == "swap":
+                await self.swap_template_command(message, argument)
+                return
+            if action == "order":
+                await self.show_order_manager(message)
                 return
             if action == "help":
                 await self.send_team_help(message)

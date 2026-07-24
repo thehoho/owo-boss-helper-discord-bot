@@ -313,3 +313,9 @@
 - Added safe invite-trail tracking for future joins when Discord audit logs expose the bot inviter.
 - Kept server invites safe: no automatic invite creation for random servers.
 - Added a daily owner DM report with reach, movement, usage, and low-use server review signals.
+
+### v0.11.0-beta — phase 2B team editor and order controls
+- Added saved-team editing with buttons and modals for each animal/weapon position.
+- Added `HTE <team>` / `HT edit <team>` to open a saved team editor without recreating the template.
+- Added `HT rename`, `HT move`, `HT swap`, and `HT order` for saved-team naming and ordering.
+- Added an **Edit order** button to the saved-team list; Discord does not support true drag-and-drop in bot messages, so the helper uses controlled move/swap actions instead.
