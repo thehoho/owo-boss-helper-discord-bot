@@ -1383,7 +1383,7 @@ class BossGenerator(commands.Cog):
                 "for mobile-friendly one-command prompts labelled with the weapon owner's name. "
                 "The helper advances only after Neon confirms the shown weapon, then waits about two seconds, "
                 "removes the old prompt, and posts the next one. Any confirmed Neon blueprint marks that weapon "
-                "dexed for every matching owner queue. Use `H stop`, `Hstop`, or `HS` to pause. "
+                "dexed for every matching owner queue. Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Use `H stop`, `Hstop`, or `HS` to pause. "
                 "`HW stats` / `H weapon stats` shows scanned, queued, saved, and no-action counts. Rows without a green tick are queued too, including orb/empowered rows that Neon does not mark with M."
             ),
             inline=False,

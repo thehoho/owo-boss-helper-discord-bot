@@ -1927,7 +1927,7 @@ class TeamTemplates(commands.Cog):
                 "and posts the next one. Any confirmed Neon blueprint marks that weapon "
                 "dexed for every matching owner queue. Rows without a green tick are "
                 "queued too, including orb/empowered rows that Neon does not mark with M. "
-                "Use `H stop`, `Hstop`, or `HS` to pause."
+                "Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Use `H stop`, `Hstop`, or `HS` to pause."
             ),
             inline=False,
         )

@@ -291,3 +291,18 @@
 - Learned weapon and passive context from Neon/OwO emoji names in weapon pages and max-quality reaction reports.
 - Improved filtered dex lookups such as `HWD mtap`, `HWD resonance`, and `HWD dagger mtap` by updating existing queued weapon IDs with inferred context.
 - Fixed passive-filtered queue lookup so matching entries are not missed just because they are outside the first quality-sorted page.
+
+## v0.11.0-beta
+
+### Long Neon dex sessions and skip controls
+
+- Added long `HWD` dex sessions with optional counts such as `HWD 100`, `HWD mtap 250`, and `HWD all` up to a safe 1,000-command cap.
+- Extended active dex sessions to stay alive for long runs while still advancing only after OwO and Neon confirmation.
+- Added `HWD skip` plus a **Skip weapon** button to remove sold, dismantled, or missing weapon IDs from the current owner queue.
+- Active dex prompts now show progress, such as `27/250`, while keeping the mobile-copyable command line short.
+
+### Owner server navigation
+
+- Added previous/next/refresh buttons to `/bot-servers`.
+- Server rows now show the current Discord server owner ID/mention so the developer can better understand where the bot is being used.
+- The server list still avoids creating invite links automatically; it only displays an existing vanity code when Discord exposes one.

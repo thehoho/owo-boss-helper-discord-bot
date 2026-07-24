@@ -32,8 +32,9 @@ DATABASE_FILE = PROJECT_ROOT / "neon_weapons.db"
 SCAN_REACTION = "🧾"
 PENDING_WW_SECONDS = 90
 DEX_STEP_SECONDS = 2
-DEX_PAGE_SIZE = 20
-DEX_SESSION_MAX_SECONDS = 30 * 60
+DEX_DEFAULT_PAGE_SIZE = 20
+DEX_MAX_SESSION_SIZE = 1000
+DEX_SESSION_MAX_SECONDS = 6 * 60 * 60
 DEX_COMMAND_PREFIXES = ("ww", "wuse")
 WEAPON_ID_RE = re.compile(r"\b([A-Z0-9]{6})\b", re.IGNORECASE)
 CUSTOM_EMOJI_RE = re.compile(r"<a?:([A-Za-z0-9_]+):(\d{15,22})>")
@@ -795,6 +796,28 @@ def parse_neon_command(content: str) -> tuple[str, str] | None:
     if compact in {"h weapons", "h weapon", "hw"} or compact_no_space in {"hweapons", "hweapon"}:
         return "guide", ""
 
+    stop_commands = {
+        "h stop",
+        "hstop",
+        "hs",
+        "h dex stop",
+        "hwd stop",
+        "h weapon stop",
+        "h weapon dex stop",
+    }
+    if compact in stop_commands or compact_no_space in {"hstop", "hs"}:
+        return "stop", ""
+
+    skip_commands = {
+        "h dex skip",
+        "hwd skip",
+        "h weapon skip",
+        "h weapon dex skip",
+        "hweapondex skip",
+    }
+    if compact in skip_commands or compact_no_space in {"hwdskip", "hdexskip", "hweapondexskip"}:
+        return "skip", ""
+
     dex_prefixes = (
         "h weapon dex",
         "h weapondex",
@@ -820,17 +843,6 @@ def parse_neon_command(content: str) -> tuple[str, str] | None:
     for prefix in ("h weapon clear", "h dex clear", "hw clear", "hwd clear"):
         if compact == prefix:
             return "clear", ""
-    stop_commands = {
-        "h stop",
-        "hstop",
-        "hs",
-        "h dex stop",
-        "hwd stop",
-        "h weapon stop",
-        "h weapon dex stop",
-    }
-    if compact in stop_commands or compact_no_space in {"hstop", "hs"}:
-        return "stop", ""
     return None
 
 
@@ -849,6 +861,31 @@ def parse_filter_terms(query: str) -> tuple[str, tuple[str, ...], list[str]]:
         else:
             unknown.append(token)
     return weapon_type, tuple(passives), unknown
+
+
+def parse_dex_query_options(query: str) -> tuple[str, int, bool]:
+    """Extract optional session length from a dex query.
+
+    Examples:
+    - ``mtap 100`` -> ``mtap``, 100
+    - ``all`` -> empty filter, max cap
+    - ``dagger mtap all`` -> ``dagger mtap``, max cap
+    """
+    tokens = re.findall(r"<@!?\d{15,22}>|\d{1,5}|[A-Za-z][A-Za-z0-9_'-]*", query or "")
+    limit = DEX_DEFAULT_PAGE_SIZE
+    requested_all = False
+    remaining: list[str] = []
+    for token in tokens:
+        lowered = token.casefold()
+        if lowered in {"all", "max", "long", "full"}:
+            limit = DEX_MAX_SESSION_SIZE
+            requested_all = True
+            continue
+        if token.isdigit():
+            limit = max(1, min(int(token), DEX_MAX_SESSION_SIZE))
+            continue
+        remaining.append(token)
+    return " ".join(remaining).strip(), limit, requested_all
 
 
 class NeonWeaponStore:
@@ -1312,6 +1349,18 @@ class NeonWeaponStore:
             )
         return cursor.rowcount > 0
 
+    async def delete_weapon(self, owner_user_id: int, weapon_id: str) -> bool:
+        async with self.lock:
+            return await asyncio.to_thread(self._delete_weapon_sync, owner_user_id, weapon_id)
+
+    def _delete_weapon_sync(self, owner_user_id: int, weapon_id: str) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM neon_weapon_entries WHERE owner_user_id = ? AND weapon_id = ?",
+                (owner_user_id, weapon_id.upper()),
+            )
+        return cursor.rowcount > 0
+
     @staticmethod
     def _entry_from_row(row: sqlite3.Row) -> NeonWeaponEntry:
         try:
@@ -1411,6 +1460,43 @@ class WeaponDexView(discord.ui.View):
         self.stop()
 
 
+class ActiveDexStepView(discord.ui.View):
+    def __init__(self, cog: "NeonWeapons", runner_user_id: int) -> None:
+        super().__init__(timeout=DEX_SESSION_MAX_SECONDS)
+        self.cog = cog
+        self.runner_user_id = runner_user_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.runner_user_id:
+            await interaction.response.send_message(
+                "This dex-session prompt belongs to another helper.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Skip weapon", style=discord.ButtonStyle.secondary)
+    async def skip_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+        skipped = await self.cog.skip_dex_session_interaction(interaction)
+        if skipped:
+            await interaction.followup.send("Skipped this weapon and moved on.", ephemeral=True)
+        else:
+            await interaction.followup.send("No active dex weapon was skipped.", ephemeral=True)
+
+    @discord.ui.button(label="Stop", style=discord.ButtonStyle.danger)
+    async def stop_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+        stopped = await self.cog.stop_dex_session_interaction(interaction)
+        if stopped:
+            await interaction.followup.send("Stopped your weapon dex session.", ephemeral=True)
+        else:
+            await interaction.followup.send("You do not have an active dex session here.", ephemeral=True)
+
+
 class NeonWeapons(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -1452,6 +1538,8 @@ class NeonWeapons(commands.Cog):
                 await self.clear_queue(message)
             elif action == "stop":
                 await self.stop_dex_session(message)
+            elif action == "skip":
+                await self.skip_dex_session(message)
             return
         weapon_id = parse_ww_weapon_command(message.content or "")
         if weapon_id:
@@ -1764,7 +1852,8 @@ class NeonWeapons(commands.Cog):
     async def send_dex(self, message: discord.Message, query: str) -> None:
         target_user_id, target_display_name, clean_query = self.resolve_dex_target(message, query)
         runner_display_name = self.user_display_name(message.author)
-        weapon_type, passive_types, unknown = parse_filter_terms(clean_query)
+        filter_query, session_limit, requested_all = parse_dex_query_options(clean_query)
+        weapon_type, passive_types, unknown = parse_filter_terms(filter_query)
         if unknown:
             await safe_reply(
                 message,
@@ -1778,10 +1867,10 @@ class NeonWeapons(commands.Cog):
             target_user_id,
             weapon_type=weapon_type,
             passive_types=passive_types,
-            limit=DEX_PAGE_SIZE,
+            limit=session_limit,
         )
         if not entries:
-            suffix = f" for `{clean_query}`" if clean_query else ""
+            suffix = f" for `{filter_query}`" if filter_query else ""
             await safe_reply(
                 message,
                 f"I do not have any queued Neon weapon dex commands for **{target_display_name}**{suffix}. Scan Neon weapon pages first with `ww` / `nw`, then run `HWD` or `H dex`.",
@@ -1802,15 +1891,24 @@ class NeonWeapons(commands.Cog):
         embed = discord.Embed(
             title=f"🧾 Weapons needing Neon dex for {target_display_name}",
             description=(
-                "These are the next queued weapons. Click **Start dexing session** for short mobile-friendly prompts. The session alternates `ww` and `wuse`, and only moves forward after Neon confirms the weapon.\n\n"
+                "These are the next queued weapons. Click **Start dexing session** for short mobile-friendly prompts. The session alternates `ww` and `wuse`, supports long runs with `HWD 100` / `HWD all`, and only moves forward after Neon confirms the weapon.\n\n"
                 + "\n".join(lines)
             ),
             color=0xFEE75C,
         )
-        if clean_query:
-            embed.add_field(name="Filter", value=f"`{clean_query}`", inline=False)
+        if filter_query:
+            embed.add_field(name="Filter", value=f"`{filter_query}`", inline=False)
+        embed.add_field(
+            name="Session length",
+            value=(
+                f"`{len(entries)}` command{'s' if len(entries) != 1 else ''}"
+                + (" requested by `all`" if requested_all else "")
+                + f" · cap `{DEX_MAX_SESSION_SIZE}`"
+            ),
+            inline=False,
+        )
         if len(entries) > 10:
-            embed.set_footer(text=f"Showing a guided batch from {len(entries)} matching queued weapons.")
+            embed.set_footer(text=f"Showing first 10 of {len(entries)} queued weapons for this session.")
         await safe_reply(
             message,
             embed=embed,
@@ -1843,7 +1941,7 @@ class NeonWeapons(commands.Cog):
         runner_note = ""
         if session.runner_user_id != session.owner_user_id:
             runner_note = f" — **{session.runner_display_name}** running"
-        return f"**{session.owner_display_name}**{runner_note}\n`{command}`"
+        return f"**{session.owner_display_name}**{runner_note} — {session.index + 1}/{len(session.entries)}\n`{command}`"
 
     async def delete_session_prompt(self, channel: discord.abc.Messageable, session: ActiveDexSession) -> None:
         if not session.guide_message_id:
@@ -1863,6 +1961,7 @@ class NeonWeapons(commands.Cog):
         await self.delete_session_prompt(channel, session)
         sent = await channel.send(
             self.build_session_message(session),
+            view=ActiveDexStepView(self, session.runner_user_id),
             allowed_mentions=discord.AllowedMentions.none(),
         )
         session.guide_message_id = sent.id
@@ -1910,7 +2009,7 @@ class NeonWeapons(commands.Cog):
             if channel is not None:
                 await self.delete_session_prompt(channel, session)
                 await channel.send(
-                    "Your weapon dex session expired. Run `HWD` to start a fresh session.",
+                    "Your weapon dex session expired. Run `HWD 100` or `HWD all` to start a fresh long session.",
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
             return
@@ -1959,6 +2058,59 @@ class NeonWeapons(commands.Cog):
             "Stopped your weapon dex session. Run `HWD` to continue later from the remaining queue.",
             mention_author=False,
         )
+
+    async def skip_active_session(
+        self, channel: discord.abc.Messageable, runner_user_id: int
+    ) -> tuple[bool, str]:
+        key = self.dex_session_key(getattr(channel, "id", 0), runner_user_id)
+        session = self.active_dex_sessions.get(key)
+        if session is None or session.index >= len(session.entries):
+            return False, ""
+        entry = session.entries.pop(session.index)
+        await self.store.delete_weapon(session.owner_user_id, entry.weapon_id)
+        if session.index >= len(session.entries):
+            await self.delete_session_prompt(channel, session)
+            self.active_dex_sessions.pop(key, None)
+            await channel.send(
+                f"Skipped `{entry.weapon_id}`. ✅ Weapon dex session complete.",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return True, entry.weapon_id
+        await self.send_session_prompt(channel, session)
+        return True, entry.weapon_id
+
+    async def skip_dex_session(self, message: discord.Message) -> None:
+        skipped, weapon_id = await self.skip_active_session(message.channel, message.author.id)
+        if not skipped:
+            await safe_reply(
+                message,
+                "You do not have an active weapon dex prompt to skip in this channel.",
+                mention_author=False,
+            )
+            return
+        await safe_reply(
+            message,
+            f"Skipped and removed `{weapon_id}` from this dex queue. It can be re-added if Neon scans it again later.",
+            mention_author=False,
+        )
+
+    async def skip_dex_session_interaction(self, interaction: discord.Interaction) -> bool:
+        channel = interaction.channel
+        if channel is None:
+            return False
+        skipped, _weapon_id = await self.skip_active_session(channel, interaction.user.id)
+        return skipped
+
+    async def stop_dex_session_interaction(self, interaction: discord.Interaction) -> bool:
+        channel = interaction.channel
+        if channel is None:
+            return False
+        key = self.dex_session_key(getattr(channel, "id", 0), interaction.user.id)
+        session = self.active_dex_sessions.pop(key, None)
+        if session is None:
+            return False
+        await self.delete_session_prompt(channel, session)
+        return True
 
     async def send_stats(self, message: discord.Message) -> None:
         stats = await self.store.stats(message.author.id)

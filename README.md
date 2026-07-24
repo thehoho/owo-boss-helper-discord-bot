@@ -639,3 +639,27 @@ Saved team views include an **All commands** button. It posts the clean quick-re
 ### Neon emoji context enrichment
 
 Neon max-quality reports and weapon pages include compact emoji names such as `raedge`, `cswarm`, `mresonance`, and `eawand`. OwO Boss Helper normalizes those names by removing rarity/frame prefixes, then stores the inferred weapon and passive context on the matching weapon ID. This makes filters like `HWD mtap`, `HWD resonance`, and `HWD dagger mtap` work even when the original queue entry was scanned as unknown.
+
+## v0.11.0-beta notes
+
+### Long Neon dex sessions
+
+`HWD` supports optional session lengths for large weapon cleanups:
+
+```text
+HWD
+HWD 100
+HWD 250
+HWD all
+HWD mtap 100
+HWD dagger mtap 50
+HWD @member all
+```
+
+The default session remains 20 weapons. `all` and large numbers are capped at 1,000 queued commands for safety. A session still alternates `ww <weapon_id>` and `wuse <weapon_id>`, and it still advances only after OwO replies and Neon confirms the weapon.
+
+Use `HWD skip` or the **Skip weapon** button when a queued weapon was sold, dismantled, or no longer exists. Skipping deletes that weapon ID from the owner’s dex queue; if Neon scans it again later, it can be re-added.
+
+### Owner server navigation
+
+The developer-only `/bot-servers` command has Previous, Next, and Refresh buttons. Each row includes the current server owner ID/mention. This identifies the current Discord guild owner, not necessarily the person who invited the bot. The bot does not create invite links automatically; if a guild already has a vanity code visible to the bot, it is shown as a hint.

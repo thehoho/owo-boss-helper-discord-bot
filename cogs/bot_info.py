@@ -32,7 +32,7 @@ TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.10.5-beta"
+BOT_VERSION = "0.11.0-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -360,6 +360,71 @@ class AboutLinks(discord.ui.View):
             self.add_item(discord.ui.Button(label="Source code", url=github_url))
         if support_url.startswith("https://"):
             self.add_item(discord.ui.Button(label="Support server", url=support_url))
+
+
+class ServerListView(discord.ui.View):
+    def __init__(
+        self,
+        cog: "BotInfo",
+        owner_id: int,
+        records: list[GuildRecord],
+        *,
+        page: int = 0,
+    ) -> None:
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.records = records
+        self.page_count = max(1, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE)
+        self.page = max(0, min(page, self.page_count - 1))
+        self._sync_button_state()
+
+    def _sync_button_state(self) -> None:
+        self.previous_button.disabled = self.page <= 0
+        self.next_button.disabled = self.page >= self.page_count - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "This server list is owner-only.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Previous", emoji="◀️", style=discord.ButtonStyle.secondary)
+    async def previous_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        target = max(0, self.page - 1)
+        await interaction.response.edit_message(
+            embed=self.cog.build_servers_embed(self.records, target),
+            view=ServerListView(self.cog, self.owner_id, self.records, page=target),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @discord.ui.button(label="Next", emoji="▶️", style=discord.ButtonStyle.secondary)
+    async def next_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        target = min(self.page_count - 1, self.page + 1)
+        await interaction.response.edit_message(
+            embed=self.cog.build_servers_embed(self.records, target),
+            view=ServerListView(self.cog, self.owner_id, self.records, page=target),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @discord.ui.button(label="Refresh", emoji="🔄", style=discord.ButtonStyle.primary)
+    async def refresh_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+        await self.cog.store.sync_guilds(self.cog.bot.guilds)
+        records = await self.cog.store.list_guilds()
+        target = min(self.page, max(0, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE - 1))
+        await interaction.edit_original_response(
+            embed=self.cog.build_servers_embed(records, target),
+            view=ServerListView(self.cog, self.owner_id, records, page=target),
+        )
 
 
 class BotInfo(commands.Cog):
@@ -755,6 +820,45 @@ class BotInfo(commands.Cog):
         embed.set_footer(text="Owner-only • Stored locally in bot_stats.db")
         await interaction.followup.send(embed=embed, ephemeral=True)
 
+    def build_servers_embed(self, records: list[GuildRecord], page: int) -> discord.Embed:
+        page_count = max(1, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE)
+        selected_page = max(0, min(page, page_count - 1))
+        start = selected_page * SERVERS_PER_PAGE
+        selected = records[start:start + SERVERS_PER_PAGE]
+
+        lines: list[str] = []
+        for index, record in enumerate(selected, start=start + 1):
+            status = "🟢" if record.active else "⚫"
+            last_used = (
+                f"<t:{record.last_used_at}:R>" if record.last_used_at else "no tracked use"
+            )
+            owner = f"<@{record.owner_id}> (`{record.owner_id}`)" if record.owner_id else "unknown"
+            guild = self.bot.get_guild(record.guild_id)
+            vanity = ""
+            if guild is not None:
+                code = getattr(guild, "vanity_url_code", None)
+                if code:
+                    vanity = f" • vanity: `discord.gg/{code}`"
+            lines.append(
+                f"{status} **{index}. {discord.utils.escape_markdown(record.guild_name)}**\n"
+                f"`{record.guild_id}` • owner: {owner}\n"
+                f"{record.member_count:,} members • {record.channel_count:,} channels • "
+                f"{record.usage_count:,} uses • {last_used}{vanity}"
+            )
+
+        embed = discord.Embed(
+            title=f"🌐 Bot Servers — Page {selected_page + 1}/{page_count}",
+            description="\n\n".join(lines) if lines else "No server records yet.",
+            color=0x5865F2,
+        )
+        embed.set_footer(
+            text=(
+                f"{sum(1 for item in records if item.active)} active • {len(records)} historical • "
+                "Owner is the current Discord server owner, not always the person who invited the bot."
+            )
+        )
+        return embed
+
     @app_commands.command(
         name="bot-servers",
         description="Developer-only list of servers using the bot.",
@@ -770,33 +874,13 @@ class BotInfo(commands.Cog):
         await interaction.response.defer(ephemeral=True)
         await self.store.sync_guilds(self.bot.guilds)
         records = await self.store.list_guilds()
-
-        page_count = max(1, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE)
-        selected_page = min(page, page_count)
-        start = (selected_page - 1) * SERVERS_PER_PAGE
-        selected = records[start:start + SERVERS_PER_PAGE]
-
-        lines: list[str] = []
-        for index, record in enumerate(selected, start=start + 1):
-            status = "🟢" if record.active else "⚫"
-            last_used = (
-                f"<t:{record.last_used_at}:R>" if record.last_used_at else "no tracked use"
-            )
-            lines.append(
-                f"{status} **{index}. {discord.utils.escape_markdown(record.guild_name)}**\n"
-                f"`{record.guild_id}` • {record.member_count:,} members • "
-                f"{record.channel_count:,} channels • {record.usage_count:,} uses • {last_used}"
-            )
-
-        embed = discord.Embed(
-            title=f"🌐 Bot Servers — Page {selected_page}/{page_count}",
-            description="\n\n".join(lines) if lines else "No server records yet.",
-            color=0x5865F2,
+        selected_page = max(0, min(page - 1, max(0, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE - 1)))
+        await interaction.followup.send(
+            embed=self.build_servers_embed(records, selected_page),
+            view=ServerListView(self, interaction.user.id, records, page=selected_page),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
         )
-        embed.set_footer(
-            text=f"{sum(1 for item in records if item.active)} active • {len(records)} historical"
-        )
-        await interaction.followup.send(embed=embed, ephemeral=True)
 
 
 async def setup(bot: commands.Bot) -> None:
