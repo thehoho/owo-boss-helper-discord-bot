@@ -666,9 +666,9 @@ The developer-only `/bot-servers` command has Previous, Next, and Refresh button
 
 ### Owner server insight tools
 
-Owner-only operational views now include `/bot-servers` for paged server reach and `/bot-server server_id:<id>` for a detailed server view. The detail view shows current owner, activity timestamps, per-command usage breakdowns, current bot permissions, safe vanity invite visibility, and the likely inviter for future joins when Discord exposes that information through audit logs. A daily owner DM report summarizes active servers, new/removed servers, top usage, recent usage, and servers that may need review.
+Owner-only operational views now include `/bot-servers` for paged server reach and `/bot-server server_id:<id>` for a detailed server view. The detail view shows current owner, activity timestamps, per-command usage breakdowns, current bot permissions, and safe vanity invite visibility. A daily owner DM report summarizes active servers, new/removed servers, top usage, recent usage, and servers that may need review.
 
-Discord does not expose who invited a bot retroactively. Future inviter detection only works when the bot can read the server audit log near the time it joins.
+Discord does not reliably expose who invited a bot, so server insight views focus on the current server owner and actual bot usage.
 
 ### Team editor and order controls
 
@@ -682,3 +682,37 @@ Saved teams can be edited without recreating them from a fresh OwO team page.
 - `HT order` opens button controls for saved-team order.
 
 The editor can update each team position's animal/pet identity and weapon ID. Weapon restore commands still equip by animal identity, not by fragile position.
+
+## v0.11.1-beta notes
+
+### Per-server OwO prefix for team restores
+
+Saved-team restore commands now respect the OwO prefix used in each Discord server. The default remains `w`, so generated commands are still `wtm` and `ww` unless a server manager changes it.
+
+Examples:
+
+```text
+HT prefix
+HT prefix o
+H team prefix g
+```
+
+After setting `HT prefix o`, guided team restore commands use `otm ...` and `ow <weapon_id> <animal>`. Only members with **Manage Server** can change the prefix, but anyone can run `HT prefix` to check the current setting.
+
+### Combined Neon dex filters
+
+Weapon dex filters can now include more than one weapon type in the same command. This lets members clean multiple selected categories in one guided session instead of starting separate sessions.
+
+Examples:
+
+```text
+HWD dagger shield 100
+HWD sword shield crane all
+HWD @member dagger shield mtap 250
+```
+
+Weapon type filters are OR-based, while passive filters are still matched together. For example, `HWD dagger shield mtap` shows queued daggers or shields that include Mana Tap.
+
+### Daily owner report fix
+
+The scheduled owner DM report now starts with the bot. The owner can also run `/bot-daily-report-test` to send a report immediately for verification.

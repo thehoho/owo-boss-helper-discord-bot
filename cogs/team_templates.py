@@ -33,6 +33,8 @@ DELETE_CONFIRMED_USER_COMMANDS = True
 GUIDED_SESSION_TIMEOUT_SECONDS = 15 * 60
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
+OWO_PREFIX_DEFAULT = "w"
+MAX_OWO_PREFIX_LENGTH = 5
 
 TEAM_COMMAND_PREFIXES = ("h teams", "h team", "hteam", "htm", "ht")
 
@@ -152,6 +154,7 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
     - H team edit 3 / HTE 3 / HT edit team-name
     - H team rename 3 new-name / HT rename old-name to new-name
     - HT move 8 1 / HT swap boss farm / HT order
+    - HT prefix o / H team prefix w
     - H team help / HT help
     - HS / H skip / H escape / HT skip
     - HT cancel
@@ -183,7 +186,7 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
         return "open", rest
 
     action_match = re.match(
-        r"^(create|save|c|s|update|u|edit|e|rename|move|mv|swap|order|o|delete|remove|d|r|help|h|skip|escape|cancel|stop|x)(?:\s+(.*))?$",
+        r"^(create|save|c|s|update|u|edit|e|rename|move|mv|swap|order|o|prefix|owoprefix|owo-prefix|p|delete|remove|d|r|help|h|skip|escape|cancel|stop|x)(?:\s+(.*))?$",
         rest,
         re.IGNORECASE,
     )
@@ -207,6 +210,8 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
         return "swap", argument
     if action in {"order", "o"}:
         return "order", argument
+    if action in {"prefix", "owoprefix", "owo-prefix", "p"}:
+        return "prefix", argument
     if action in {"delete", "remove", "d", "r"}:
         return "delete", argument
     if action in {"help", "h"}:
@@ -261,6 +266,7 @@ class GuidedTeamSession:
     identity_tokens: tuple[str, ...]
     mode: str
     commands: tuple[str, ...]
+    owo_prefix: str = OWO_PREFIX_DEFAULT
     next_index: int = 0
     ready_for_user: bool = False
     waiting_for_owo: bool = False
@@ -494,27 +500,58 @@ def parse_team_message(text: str) -> tuple[str, tuple[TeamMember, ...]] | None:
         return None
     return parsed.source_title, parsed.members
 
-def interleaved_member_commands(template: TeamTemplate) -> list[str]:
+
+def normalize_owo_prefix(value: str | None) -> str | None:
+    """Validate the OwO prefix configured for this Discord server."""
+    prefix = re.sub(r"\s+", "", value or "").strip()
+    if not prefix:
+        return None
+    if len(prefix) > MAX_OWO_PREFIX_LENGTH:
+        return None
+    # Keep the prefix copy/paste safe for generated Discord messages. Most OwO
+    # server prefixes are one visible character such as w, o, or g.
+    if not re.fullmatch(r"[A-Za-z0-9_!?$./~#%&+\-=]{1,5}", prefix):
+        return None
+    return prefix.lower()
+
+
+def owo_team_command(prefix: str, *parts: object) -> str:
+    suffix = " ".join(str(part).strip() for part in parts if str(part).strip())
+    base = f"{prefix or OWO_PREFIX_DEFAULT}tm"
+    return f"{base} {suffix}" if suffix else base
+
+
+def owo_weapon_command(prefix: str, weapon_id: str, animal: str) -> str:
+    return f"{prefix or OWO_PREFIX_DEFAULT}w {weapon_id} {animal}"
+
+
+def interleaved_member_commands(template: TeamTemplate, owo_prefix: str = OWO_PREFIX_DEFAULT) -> list[str]:
     """Alternate team edits and weapon equips to avoid same-action cooldowns."""
     commands: list[str] = []
     for member in template.members:
-        commands.append(f"wtm a {member.animal} {member.position}")
+        commands.append(owo_team_command(owo_prefix, "a", member.animal, member.position))
         if member.weapon_id:
-            commands.append(f"ww {member.weapon_id} {member.animal}")
+            commands.append(owo_weapon_command(owo_prefix, member.weapon_id, member.animal))
     return commands
 
 
-def exact_reset_commands(template: TeamTemplate) -> list[str]:
-    commands = [f"wtm d {position}" for position in (1, 2, 3)]
-    commands.extend(interleaved_member_commands(template))
+def exact_reset_commands(template: TeamTemplate, owo_prefix: str = OWO_PREFIX_DEFAULT) -> list[str]:
+    commands = [owo_team_command(owo_prefix, "d", position) for position in (1, 2, 3)]
+    commands.extend(interleaved_member_commands(template, owo_prefix))
     return commands
 
 
-def quick_replace_commands(template: TeamTemplate) -> list[str]:
-    return interleaved_member_commands(template)
+def quick_replace_commands(template: TeamTemplate, owo_prefix: str = OWO_PREFIX_DEFAULT) -> list[str]:
+    return interleaved_member_commands(template, owo_prefix)
 
 
-def format_command_packet(title: str, commands: Iterable[str], note: str) -> str:
+def format_command_packet(
+    title: str,
+    commands: Iterable[str],
+    note: str,
+    *,
+    owo_prefix: str = OWO_PREFIX_DEFAULT,
+) -> str:
     command_list = list(commands)
     lines = [f"**{title}**", ""]
     lines.extend(f"`{command}`" for command in command_list)
@@ -529,7 +566,7 @@ def format_command_packet(title: str, commands: Iterable[str], note: str) -> str
             "Use `HS` / `H skip` or the **Skip step** button when a saved animal or "
             "weapon is already correct. Use `HT cancel` to stop.",
             "The full packet stays here as a backup. At the end, the helper sends "
-            "`wtm` so you can verify all three animals and weapon IDs before battling.",
+            f"`{owo_team_command(owo_prefix)}` so you can verify all three animals and weapon IDs before battling.",
         )
     )
     return "\n".join(lines)
@@ -565,7 +602,7 @@ def normalize_owo_command(value: str) -> str:
 def parse_team_add_target(command: str) -> tuple[str, int] | None:
     """Return the animal and target position from a guided `wtm a` command."""
     match = re.fullmatch(
-        r"wtm\s+a\s+(.+?)\s+([1-3])",
+        r"\S+tm\s+a\s+(.+?)\s+([1-3])",
         normalize_owo_command(command),
     )
     if not match:
@@ -589,7 +626,7 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
     if any(phrase in lowered for phrase in retry_phrases):
         return "retry"
 
-    if normalized.startswith("ww "):
+    if re.match(r"^\S+w\s+", normalized):
         if any(
             phrase in lowered
             for phrase in (
@@ -603,7 +640,7 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
             return "success"
         return None
 
-    if normalized.startswith("wtm d "):
+    if re.match(r"^\S+tm\s+d\s+", normalized):
         if any(
             phrase in lowered
             for phrase in (
@@ -617,7 +654,7 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
             return "success"
         return None
 
-    if normalized.startswith("wtm a "):
+    if re.match(r"^\S+tm\s+a\s+", normalized):
         if any(
             phrase in lowered
             for phrase in (
@@ -694,6 +731,17 @@ class TeamTemplateStore:
                 """
             )
 
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS team_guild_config (
+                    guild_id INTEGER PRIMARY KEY,
+                    owo_prefix TEXT NOT NULL DEFAULT 'w',
+                    updated_by INTEGER NOT NULL DEFAULT 0,
+                    updated_at INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
+
             columns = {
                 str(row["name"])
                 for row in connection.execute("PRAGMA table_info(team_templates)")
@@ -742,6 +790,48 @@ class TeamTemplateStore:
                 "CREATE UNIQUE INDEX IF NOT EXISTS idx_team_templates_user_slot "
                 "ON team_templates(user_id, slot)"
             )
+
+    async def get_guild_owo_prefix(self, guild_id: int) -> str:
+        async with self.lock:
+            return await asyncio.to_thread(self._get_guild_owo_prefix_sync, guild_id)
+
+    def _get_guild_owo_prefix_sync(self, guild_id: int) -> str:
+        if not guild_id:
+            return OWO_PREFIX_DEFAULT
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT owo_prefix FROM team_guild_config WHERE guild_id = ?",
+                (guild_id,),
+            ).fetchone()
+        prefix = normalize_owo_prefix(str(row["owo_prefix"])) if row else OWO_PREFIX_DEFAULT
+        return prefix or OWO_PREFIX_DEFAULT
+
+    async def set_guild_owo_prefix(
+        self, guild_id: int, owo_prefix: str, updated_by: int
+    ) -> str:
+        prefix = normalize_owo_prefix(owo_prefix) or OWO_PREFIX_DEFAULT
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._set_guild_owo_prefix_sync, guild_id, prefix, updated_by
+            )
+
+    def _set_guild_owo_prefix_sync(
+        self, guild_id: int, owo_prefix: str, updated_by: int
+    ) -> str:
+        now = int(time.time())
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO team_guild_config (guild_id, owo_prefix, updated_by, updated_at)
+                VALUES (?, ?, ?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                    owo_prefix = excluded.owo_prefix,
+                    updated_by = excluded.updated_by,
+                    updated_at = excluded.updated_at
+                """,
+                (guild_id, owo_prefix, updated_by, now),
+            )
+        return owo_prefix
 
     async def save(
         self,
@@ -1379,40 +1469,45 @@ class TemplateActionView(OwnedView):
     async def quick_replace(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
-        commands = quick_replace_commands(self.template)
+        owo_prefix = await self.cog.store.get_guild_owo_prefix(interaction.guild_id or 0)
+        commands = quick_replace_commands(self.template, owo_prefix)
         packet = format_command_packet(
             f"Quick replace — #{self.template.slot} {self.template.name}",
             commands,
             "This replaces positions directly. If an animal already exists in a "
             "different slot, OwO may reject the add step; the helper will catch that "
             "brief error and tell you how to move it. Unmentioned positions remain unchanged.",
+            owo_prefix=owo_prefix,
         )
         await interaction.response.send_message(packet, ephemeral=True)
         await self.cog.start_guided_session(
-            interaction, self.template, commands, "Quick replace"
+            interaction, self.template, commands, "Quick replace", owo_prefix=owo_prefix
         )
 
     @discord.ui.button(label="Exact reset", emoji="🔄", style=discord.ButtonStyle.success)
     async def exact_reset(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
-        commands = exact_reset_commands(self.template)
+        owo_prefix = await self.cog.store.get_guild_owo_prefix(interaction.guild_id or 0)
+        commands = exact_reset_commands(self.template, owo_prefix)
         packet = format_command_packet(
             f"Exact reset — #{self.template.slot} {self.template.name}",
             commands,
             "This clears all three positions first, then restores each animal and its "
             "weapon as an alternating pair.",
+            owo_prefix=owo_prefix,
         )
         await interaction.response.send_message(packet, ephemeral=True)
         await self.cog.start_guided_session(
-            interaction, self.template, commands, "Exact reset"
+            interaction, self.template, commands, "Exact reset", owo_prefix=owo_prefix
         )
 
     @discord.ui.button(label="All commands", emoji="📋", style=discord.ButtonStyle.secondary)
     async def all_commands(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
-        commands = quick_replace_commands(self.template)
+        owo_prefix = await self.cog.store.get_guild_owo_prefix(interaction.guild_id or 0)
+        commands = quick_replace_commands(self.template, owo_prefix)
         packet = format_plain_command_list(
             f"All commands — #{self.template.slot} {self.template.name}",
             commands,
@@ -1945,6 +2040,8 @@ class TeamTemplates(commands.Cog):
         template: TeamTemplate,
         commands_to_run: Iterable[str],
         mode: str,
+        *,
+        owo_prefix: str = OWO_PREFIX_DEFAULT,
     ) -> None:
         if interaction.guild_id is None or interaction.channel_id is None:
             return
@@ -1982,6 +2079,7 @@ class TeamTemplates(commands.Cog):
             identity_tokens=identity_tokens,
             mode=mode,
             commands=tuple(commands_to_run),
+            owo_prefix=owo_prefix,
             last_activity=time.monotonic(),
         )
         self.guided_sessions[key] = session
@@ -2071,7 +2169,7 @@ class TeamTemplates(commands.Cog):
                 f"<@{session.user_id}> ✅ **Team #{session.template_slot} "
                 f"`{session.template_name}` setup finished.**\n"
                 "Run this final check and confirm every animal and weapon before battling:\n"
-                "`wtm`"
+                f"`{owo_team_command(session.owo_prefix)}`"
             ),
             allowed_mentions=discord.AllowedMentions(
                 users=True, roles=False, everyone=False, replied_user=False
@@ -2399,6 +2497,51 @@ class TeamTemplates(commands.Cog):
             ),
         )
 
+    @staticmethod
+    def can_manage_team_settings(member: discord.abc.User | discord.Member) -> bool:
+        permissions = getattr(member, "guild_permissions", None)
+        return bool(
+            permissions
+            and (
+                getattr(permissions, "manage_guild", False)
+                or getattr(permissions, "administrator", False)
+            )
+        )
+
+    async def set_owo_prefix_command(self, message: discord.Message, argument: str | None) -> None:
+        if message.guild is None:
+            return
+        current = await self.store.get_guild_owo_prefix(message.guild.id)
+        value = re.sub(r"\s+", "", argument or "").strip()
+        if not value:
+            await message.reply(
+                f"This server's OwO prefix for team restores is currently `{current}`. "
+                f"Generated commands use `{owo_team_command(current)}` and `{current}w <weapon_id> <animal>`. "
+                "Server managers can change it with `HT prefix <prefix>`, for example `HT prefix o`.",
+                mention_author=False,
+            )
+            return
+        if not isinstance(message.author, discord.Member) or not self.can_manage_team_settings(message.author):
+            await message.reply(
+                "Only members with **Manage Server** can change the OwO prefix used for team restore commands.",
+                mention_author=False,
+            )
+            return
+        prefix = normalize_owo_prefix(value)
+        if prefix is None:
+            await message.reply(
+                f"Use a short no-space prefix, up to **{MAX_OWO_PREFIX_LENGTH}** characters. "
+                "Examples: `HT prefix w`, `HT prefix o`, or `HT prefix g`.",
+                mention_author=False,
+            )
+            return
+        saved = await self.store.set_guild_owo_prefix(message.guild.id, prefix, message.author.id)
+        await message.reply(
+            f"✅ OwO team prefix saved for this server: `{saved}`. "
+            f"Guided team restore now uses `{owo_team_command(saved)}` and `{saved}w <weapon_id> <animal>`.",
+            mention_author=False,
+        )
+
     async def send_combined_help(self, message: discord.Message) -> None:
         if message.guild is None:
             return
@@ -2442,7 +2585,8 @@ class TeamTemplates(commands.Cog):
             value=(
                 f"Save up to **{MAX_TEMPLATES_PER_USER}** teams. Reply to an OwO team "
                 "page with `HT C <name>`. Use `HT`, `HT<number>`, `HT U <slot/name>`, "
-                "or `HT D <slot/name>`. During guided setup use `HS` to skip and "
+                "or `HT D <slot/name>`. Server managers can set the OwO restore prefix with "
+                "`HT prefix o` when the server uses `otm` instead of `wtm`. During guided setup use `HS` to skip and "
                 "`HT cancel` to stop. Use `HT help` for the complete team guide. Use **All commands** on a saved team for a clean paste-ready command list."
             ),
             inline=False,
@@ -2453,14 +2597,14 @@ class TeamTemplates(commands.Cog):
                 "Use `HW` or `H weapons` for Pencilvester's Neon setup guide. "
                 "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` "
                 "to show queued alternating `ww` / `wuse` commands. Helpers can target another "
-                "member with `HWD @member` or `HWD @member dagger mtap sg`. Click "
+                "member with `HWD @member`, `HWD @member dagger shield 100`, or `HWD @member dagger mtap sg`. Click "
                 "**Start dexing session** for mobile-friendly one-command prompts labelled "
                 "with the weapon owner's name. The helper advances only after Neon confirms "
                 "the shown weapon, waits about two seconds, removes the old prompt, "
                 "and posts the next one. Any confirmed Neon blueprint marks that weapon "
                 "dexed for every matching owner queue. Rows without a green tick are "
                 "queued too, including orb/empowered rows that Neon does not mark with M. "
-                "Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Use `H stop`, `Hstop`, or `HS` to pause."
+                "Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Multiple weapon types can be combined in one run, such as `HWD dagger shield 100`. Use `H stop`, `Hstop`, or `HS` to pause."
             ),
             inline=False,
         )
@@ -2486,7 +2630,8 @@ class TeamTemplates(commands.Cog):
             description=(
                 f"Save up to **{MAX_TEMPLATES_PER_USER}** personal templates. Each "
                 "template keeps a stable number, every animal position, and the exact "
-                "six-character weapon ID."
+                "six-character weapon ID. Server managers can set the local OwO prefix, "
+                "so servers using `otm` / `gtm` do not need to edit generated commands."
             ),
             color=0x5865F2,
         )
@@ -2518,6 +2663,15 @@ class TeamTemplates(commands.Cog):
             inline=False,
         )
         embed.add_field(
+            name="Server OwO prefix",
+            value=(
+                "Default generated commands use `wtm` and `ww`. If your server uses "
+                "another OwO prefix, a manager can run `HT prefix o`, `HT prefix g`, "
+                "or `H team prefix <prefix>`. Use `HT prefix` to check the current setting."
+            ),
+            inline=False,
+        )
+        embed.add_field(
             name="Guided setup",
             value=(
                 "Choose **Quick replace** or **Exact reset**. The helper shows the full "
@@ -2528,7 +2682,7 @@ class TeamTemplates(commands.Cog):
             inline=False,
         )
         embed.set_footer(
-            text="The final step is always wtm so you can verify the finished team."
+            text="The final check uses this server's configured OwO team command."
         )
         await message.reply(embed=embed, mention_author=False)
 
@@ -3143,6 +3297,9 @@ class TeamTemplates(commands.Cog):
                 return
             if action == "update":
                 await self.update_from_reply(message, argument)
+                return
+            if action == "prefix":
+                await self.set_owo_prefix_command(message, argument)
                 return
             if action == "delete":
                 await self.delete_template(message, argument)

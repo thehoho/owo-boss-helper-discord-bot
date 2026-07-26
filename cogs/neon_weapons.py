@@ -846,21 +846,21 @@ def parse_neon_command(content: str) -> tuple[str, str] | None:
     return None
 
 
-def parse_filter_terms(query: str) -> tuple[str, tuple[str, ...], list[str]]:
-    weapon_type = ""
+def parse_filter_terms(query: str) -> tuple[tuple[str, ...], tuple[str, ...], list[str]]:
+    weapon_types: list[str] = []
     passives: list[str] = []
     unknown: list[str] = []
     tokens = re.findall(r"[A-Za-z][A-Za-z0-9_'-]*", query or "")
     for token in tokens:
         weapon = normalize_weapon(token)
         passive = normalize_passive(token)
-        if weapon and not weapon_type:
-            weapon_type = weapon
+        if weapon and weapon not in weapon_types:
+            weapon_types.append(weapon)
         elif passive and passive not in passives:
             passives.append(passive)
-        else:
+        elif not weapon and not passive:
             unknown.append(token)
-    return weapon_type, tuple(passives), unknown
+    return tuple(weapon_types), tuple(passives), unknown
 
 
 def parse_dex_query_options(query: str) -> tuple[str, int, bool]:
@@ -1247,7 +1247,7 @@ class NeonWeaponStore:
         self,
         owner_user_id: int,
         *,
-        weapon_type: str = "",
+        weapon_types: tuple[str, ...] = (),
         passive_types: tuple[str, ...] = (),
         limit: int = 25,
     ) -> list[NeonWeaponEntry]:
@@ -1255,7 +1255,7 @@ class NeonWeaponStore:
             return await asyncio.to_thread(
                 self._list_dex_queue_sync,
                 owner_user_id,
-                weapon_type,
+                weapon_types,
                 passive_types,
                 limit,
             )
@@ -1263,15 +1263,16 @@ class NeonWeaponStore:
     def _list_dex_queue_sync(
         self,
         owner_user_id: int,
-        weapon_type: str,
+        weapon_types: tuple[str, ...],
         passive_types: tuple[str, ...],
         limit: int,
     ) -> list[NeonWeaponEntry]:
         clauses = ["owner_user_id = ?", "needs_dex = 1"]
         params: list[Any] = [owner_user_id]
-        if weapon_type:
-            clauses.append("weapon_type = ?")
-            params.append(weapon_type)
+        if weapon_types:
+            placeholders = ",".join("?" for _ in weapon_types)
+            clauses.append(f"weapon_type IN ({placeholders})")
+            params.extend(weapon_types)
         query = (
             "SELECT * FROM neon_weapon_entries WHERE "
             + " AND ".join(clauses)
@@ -1280,8 +1281,8 @@ class NeonWeaponStore:
         fetch_limit = max(1, limit)
         if passive_types:
             # Passive filtering happens after JSON decoding, so overfetch enough rows
-            # that filters like `HWD mtap` do not miss matching queued weapons that
-            # fall outside the first quality-sorted page.
+            # that filters like `HWD mtap` or `HWD dagger shield mtap` do not
+            # miss matching queued weapons that fall outside the first quality-sorted page.
             fetch_limit = max(fetch_limit, 1000)
         params.append(fetch_limit)
         with self._connect() as connection:
@@ -1808,7 +1809,7 @@ class NeonWeapons(commands.Cog):
                 "4. Click through your weapon pages.\n\n"
                 "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible** or any scanned row without a green saved tick. "
                 "Then run `HWD`, `H dex`, or `H weapon dex` to get guided alternating `ww <weapon_id>` / `wuse <weapon_id>` commands.\n\n"
-                "Battle helpers can scan another member's Neon filtered pages; the queue is saved under the member shown in Neon's title. Helpers can run `HWD @member` to dex that member's queue, and any confirmed Neon blueprint removes the weapon from every matching owner's queue across all servers the helper can see."
+                "Battle helpers can scan another member's Neon filtered pages; the queue is saved under the member shown in Neon's title. Helpers can run `HWD @member` to dex that member's queue, combine weapon filters such as `HWD dagger shield 100`, and any confirmed Neon blueprint removes the weapon from every matching owner's queue across all servers the helper can see."
             ),
             color=0xFEE75C,
         )
@@ -1853,7 +1854,7 @@ class NeonWeapons(commands.Cog):
         target_user_id, target_display_name, clean_query = self.resolve_dex_target(message, query)
         runner_display_name = self.user_display_name(message.author)
         filter_query, session_limit, requested_all = parse_dex_query_options(clean_query)
-        weapon_type, passive_types, unknown = parse_filter_terms(filter_query)
+        weapon_types, passive_types, unknown = parse_filter_terms(filter_query)
         if unknown:
             await safe_reply(
                 message,
@@ -1865,7 +1866,7 @@ class NeonWeapons(commands.Cog):
             return
         entries = await self.store.list_dex_queue(
             target_user_id,
-            weapon_type=weapon_type,
+            weapon_types=weapon_types,
             passive_types=passive_types,
             limit=session_limit,
         )
@@ -1891,7 +1892,7 @@ class NeonWeapons(commands.Cog):
         embed = discord.Embed(
             title=f"🧾 Weapons needing Neon dex for {target_display_name}",
             description=(
-                "These are the next queued weapons. Click **Start dexing session** for short mobile-friendly prompts. The session alternates `ww` and `wuse`, supports long runs with `HWD 100` / `HWD all`, and only moves forward after Neon confirms the weapon.\n\n"
+                "These are the next queued weapons. Click **Start dexing session** for short mobile-friendly prompts. The session alternates `ww` and `wuse`, supports long runs with `HWD 100` / `HWD all`, supports combined weapon filters like `HWD dagger shield 100`, and only moves forward after Neon confirms the weapon.\n\n"
                 + "\n".join(lines)
             ),
             color=0xFEE75C,

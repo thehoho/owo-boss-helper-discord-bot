@@ -42,7 +42,6 @@ Team editing and ordering controls are planned as the next v0.11 phase because t
 ### Phase 2A server insight controls
 - Added `/bot-server server_id:<id>` for owner-only server detail views.
 - Added per-server usage breakdown tracking for commands and slash commands.
-- Added future join inviter detection when audit logs are available.
 - Invite behavior stays safe: the bot does not create server invite links automatically.
 - Added a daily owner DM report around reset time, configurable with `BOT_DAILY_REPORT_UTC_HOUR` and `BOT_DAILY_REPORT_UTC_MINUTE`.
 

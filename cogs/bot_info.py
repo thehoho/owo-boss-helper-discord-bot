@@ -33,7 +33,7 @@ TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.11.0-beta"
+BOT_VERSION = "0.11.1-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -568,6 +568,9 @@ class BotInfo(commands.Cog):
         self.store = StatsStore(DATABASE_FILE)
         self.started_monotonic = time.monotonic()
         self.periodic_task: asyncio.Task[None] | None = None
+        self.daily_report_task: asyncio.Task[None] | None = None
+        self.daily_report_utc_hour = max(0, min(safe_epoch(os.getenv("BOT_DAILY_REPORT_UTC_HOUR"), DAILY_REPORT_DEFAULT_UTC_HOUR), 23))
+        self.daily_report_utc_minute = max(0, min(safe_epoch(os.getenv("BOT_DAILY_REPORT_UTC_MINUTE"), DAILY_REPORT_DEFAULT_UTC_MINUTE), 59))
         self.restored = False
         self.owner_id = safe_epoch(os.getenv("BOT_OWNER_ID"), 0)
         self.developer_name = os.getenv(
@@ -580,6 +583,7 @@ class BotInfo(commands.Cog):
     async def cog_load(self) -> None:
         await self.store.initialize()
         self.periodic_task = asyncio.create_task(self.periodic_sync())
+        self.daily_report_task = asyncio.create_task(self.daily_owner_report_loop())
         if not self.owner_id:
             logger.warning(
                 "BOT_OWNER_ID is not configured; owner statistics and join/leave DMs are disabled"
@@ -591,6 +595,12 @@ class BotInfo(commands.Cog):
             self.periodic_task.cancel()
             try:
                 await self.periodic_task
+            except asyncio.CancelledError:
+                pass
+        if self.daily_report_task is not None:
+            self.daily_report_task.cancel()
+            try:
+                await self.daily_report_task
             except asyncio.CancelledError:
                 pass
 
@@ -656,22 +666,13 @@ class BotInfo(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild) -> None:
         await self.store.upsert_guild(guild)
-        inviter = await self.detect_inviter_from_audit_log(guild)
-        if inviter is not None:
-            await self.store.set_inviter(
-                guild.id,
-                inviter.id,
-                str(inviter),
-                int(time.time()),
-            )
         logger.info(
-            "Bot joined guild %s (%s) with approximately %s members; inviter=%s",
+            "Bot joined guild %s (%s) with approximately %s members",
             guild.name,
             guild.id,
             guild.member_count or 0,
-            getattr(inviter, "id", None),
         )
-        await self.notify_owner_about_guild(guild, joined=True, inviter=inviter)
+        await self.notify_owner_about_guild(guild, joined=True)
 
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild) -> None:
@@ -684,7 +685,6 @@ class BotInfo(commands.Cog):
         guild: discord.Guild,
         *,
         joined: bool,
-        inviter: discord.abc.User | None = None,
     ) -> None:
         if not self.owner_id:
             return
@@ -712,22 +712,6 @@ class BotInfo(commands.Cog):
                 value=str(len(self.bot.guilds)),
                 inline=True,
             )
-            if joined:
-                if inviter is not None:
-                    embed.add_field(
-                        name="Likely inviter",
-                        value=f"{inviter.mention} (`{inviter.id}`)",
-                        inline=False,
-                    )
-                else:
-                    embed.add_field(
-                        name="Likely inviter",
-                        value=(
-                            "Unknown. Discord only exposes this from the server audit log "
-                            "when the bot can view audit logs near the time it was added."
-                        ),
-                        inline=False,
-                    )
             await owner.send(embed=embed)
         except (discord.Forbidden, discord.NotFound, discord.HTTPException):
             logger.warning("Could not DM the developer about guild %s", guild.id)
@@ -1218,7 +1202,7 @@ class BotInfo(commands.Cog):
         embed.set_footer(
             text=(
                 f"{sum(1 for item in records if item.active)} active • {len(records)} historical • "
-                "Use /bot-server server_id:<id> for details. Owner is not always the inviter."
+                "Use /bot-server server_id:<id> for details."
             )
         )
         return embed
@@ -1242,20 +1226,6 @@ class BotInfo(commands.Cog):
                 f"**Owner:** {owner}\n"
                 f"**Members:** {record.member_count:,}\n"
                 f"**Channels:** {record.channel_count:,}"
-            ),
-            inline=False,
-        )
-
-        inviter_value = "Unknown / not available retroactively"
-        if record.inviter_id:
-            inviter_value = await self.user_label(record.inviter_id)
-            if record.inviter_checked_at:
-                inviter_value += f"\nDetected <t:{record.inviter_checked_at}:R>"
-        embed.add_field(
-            name="Invite trail",
-            value=(
-                f"**Likely inviter:** {inviter_value}\n"
-                "Discord only exposes this from audit logs when the bot has **View Audit Log** near the join time."
             ),
             inline=False,
         )
@@ -1294,7 +1264,6 @@ class BotInfo(commands.Cog):
         if guild is not None and guild.me is not None:
             permissions = guild.me.guild_permissions
             checks = [
-                ("View Audit Log", bool(permissions.view_audit_log)),
                 ("Manage Guild", bool(permissions.manage_guild)),
                 ("Manage Messages", bool(permissions.manage_messages)),
                 ("Add Reactions", bool(permissions.add_reactions)),
@@ -1322,6 +1291,27 @@ class BotInfo(commands.Cog):
 
         embed.set_footer(text="Owner-only • Use /bot-server server_id:<id> for this detail view.")
         return embed
+
+    @app_commands.command(
+        name="bot-daily-report-test",
+        description="Developer-only: send the daily owner report now.",
+    )
+    async def developer_daily_report_test(self, interaction: discord.Interaction) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+        await interaction.response.defer(ephemeral=True)
+        await self.store.sync_guilds(self.bot.guilds)
+        records = await self.store.list_guilds()
+        metrics = await self.store.usage_totals()
+        report_date = time.strftime("%Y-%m-%d", time.gmtime())
+        embed = self.build_daily_owner_report_embed(records, metrics, report_date)
+        try:
+            owner = self.bot.get_user(self.owner_id) or await self.bot.fetch_user(self.owner_id)
+            await owner.send(embed=embed)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+            await interaction.followup.send(f"Could not DM the report: `{exc}`", ephemeral=True)
+            return
+        await interaction.followup.send("✅ Daily owner report test sent to your DM.", ephemeral=True)
 
     @app_commands.command(
         name="bot-server",

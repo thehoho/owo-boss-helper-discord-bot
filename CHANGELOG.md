@@ -1,3 +1,12 @@
+## v0.11.1-beta
+
+- Added per-server OwO prefix configuration for saved-team restore commands with `HT prefix <prefix>` / `H team prefix <prefix>`. Servers using `otm`, `gtm`, or another OwO prefix no longer need to edit generated team commands manually.
+- Guided team setup, **All commands**, quick replace, exact reset, and the final team check now use the configured server prefix.
+- Added combined Neon dex weapon filters such as `HWD dagger shield 100` and `HWD sword shield crane all`, so multiple weapon types can be cleaned in one session.
+- Fixed the daily owner DM report loop so the scheduled report actually starts when the bot loads. Added `/bot-daily-report-test` for owner-only manual verification.
+- Removed inviter/audit-log messaging from server insight views; server views now focus on owner, usage, activity, permissions, and safe vanity visibility.
+- Updated the public bot version to `0.11.1-beta`.
+
 ## v0.10.5-beta hotfix 6
 
 - Neon max-quality result messages from clicking Neon's reaction on a `ww` weapon-list message are now scanned and acknowledged with `🧾`.
