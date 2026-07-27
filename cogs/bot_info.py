@@ -398,4 +398,976 @@ class StatsStore:
             for row in rows
         ]
 
-    async def usage_totals(self) -> list[tuple[str, intóß9¶‰ËkºwµçUÅÕ¥É•‘}µ¥ÍÍ¥¹œ¤€¬€ˆ¨¨¸ˆ4(€€€€€€€€€€€€¤4(€€€€€€€€€€€½±½È€ô€ÁáĞÈĞÔ4(4(€€€€€€€•µ‰•€ô‘¥Í½É¹µ‰• 4(€€€€€€€€€€€Ñ¥Ñ±”ô‹Â~R8¡…¹¹•°¥…¹½ÍÑ¥Ìˆ°4(€€€€€€€€€€€‘•ÍÉ¥ÁÑ¥½¸ô‰q¸ˆ¹©½¥¸¡‘•Ñ…¥±Ì¤°4(€€€€€€€€€€€½±½Èõ½±½È°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€¹…µ”ô‰™™•Ñ¥Ù”Á•Éµ¥ÍÍ¥½¹Ìˆ°4(€€€€€€€€€€€Ù…±Õ”ô‰q¸ˆ¹©½¥¸¡±¥¹•Ì¤°4(€€€€€€€€€€€¥¹±¥¹”õ…±Í”°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹…‘‘}™¥•±¡¹…µ”ô‰I•ÍÕ±Ğˆ°Ù…±Õ”õ½¹±ÕÍ¥½¸°¥¹±¥¹”õ…±Í”¤4(€€€€€€€•µ‰•¹Í•Ñ}™½½Ñ•È 4(€€€€€€€€€€€Ñ•áĞô‰IÕ¸Ñ¡¥Ì½µµ…¹¥¹Í¥‘”Ñ¡”¡…¹¹•°½ÈÑ¡É•…å½Ôİ…¹ĞÑ¼Ñ•ÍĞ¸ˆ4(€€€€€€€€¤4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹É•ÍÁ½¹Í”¹Í•¹‘}µ•ÍÍ…”¡•µ‰•õ•µ‰•°•Á¡•µ•É…°õQÉÕ”¤4(€€€€€€€±½•È¹¥¹™¼ 4(€€€€€€€€€€€€‰¡…¹¹•°‘¥…¹½ÍÑ¥ÌÉ•ÅÕ•ÍÑ•‰ä€•Ì¥¸Õ¥±€•Ì¡…¹¹•°€•Ììµ¥ÍÍ¥¹œô•Ìˆ°4(€€€€€€€€€€€¥¹Ñ•É…Ñ¥½¸¹ÕÍ•È¹¥°4(€€€€€€€€€€€Õ¥±¹¥°4(€€€€€€€€€€€¡…¹¹•°¹¥°4(€€€€€€€€€€€É•ÅÕ¥É•‘}µ¥ÍÍ¥¹œ°4(€€€€€€€€¤4(4(€€€…ÁÁ}½µµ…¹‘Ì¹½µµ…¹ 4(€€€€€€€¹…µ”ô‰‰½ĞµÍÑ…ÑÌˆ°4(€€€€€€€‘•ÍÉ¥ÁÑ¥½¸ô‰•Ù•±½Á•Èµ½¹±ä½Á•É…Ñ¥½¹…°ÍÑ…Ñ¥ÍÑ¥Ì™½ÈÑ¡”‰½Ğ¸ˆ°4(€€€€¤4(€€€…Íå¹Œ‘•˜‘•Ù•±½Á•É}ÍÑ…ÑÌ¡Í•±˜°¥¹Ñ•É…Ñ¥½¸è‘¥Í½É¹%¹Ñ•É…Ñ¥½¸¤€´ø9½¹”è4(€€€€€€€¥˜…İ…¥ĞÍ•±˜¹É•©•Ñ}¹½¹}½İ¹•È¡¥¹Ñ•É…Ñ¥½¸¤è4(€€€€€€€€€€€É•ÑÕÉ¸4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹É•ÍÁ½¹Í”¹‘•™•È¡•Á¡•µ•É…°õQÉÕ”¤4(€€€€€€€…İ…¥ĞÍ•±˜¹ÍÑ½É”¹Íå¹}Õ¥±‘Ì¡Í•±˜¹‰½Ğ¹Õ¥±‘Ì¤4(4(€€€€€€€É•½É‘Ì€ô…İ…¥ĞÍ•±˜¹ÍÑ½É”¹±¥ÍÑ}Õ¥±‘Ì ¤4(€€€€€€€µ•ÑÉ¥Ì€ô…İ…¥ĞÍ•±˜¹ÍÑ½É”¹ÕÍ…•}Ñ½Ñ…±Ì ¤4(€€€€€€€…Ñ¥Ù•}É•½É‘Ì€ômÉ•½É™½ÈÉ•½É¥¸É•½É‘Ì¥˜É•½É¹…Ñ¥Ù•t4(€€€€€€€¥¹…Ñ¥Ù•}É•½É‘Ì€ômÉ•½É™½ÈÉ•½É¥¸É•½É‘Ì¥˜¹½ĞÉ•½É¹…Ñ¥Ù•t4(€€€€€€€Ñ½Ñ…±}µ•µ‰•ÉÌ€ôÍÕ´¡¥¹Ğ¡Õ¥±¹µ•µ‰•É}½Õ¹Ğ½È€À¤™½ÈÕ¥±¥¸Í•±˜¹‰½Ğ¹Õ¥±‘Ì¤4(€€€€€€€Ñ½Ñ…±}¡…¹¹•±Ì€ôÍÕ´¡±•¸¡Õ¥±¹¡…¹¹•±Ì¤™½ÈÕ¥±¥¸Í•±˜¹‰½Ğ¹Õ¥±‘Ì¤4(4(€€€€€€€Ñ•µÁ±…Ñ•}½Õ¹Ğ€ôÅÕ•Éå}‘…Ñ…‰…Í” 4(€€€€€€€€€€€Q5}Q	M}%1°€‰M1P=U9P ¨¤I=4Ñ•…µ}Ñ•µÁ±…Ñ•Ìˆ4(€€€€€€€€¤4(€€€€€€€Ñ•µÁ±…Ñ•}ÕÍ•ÉÌ€ôÅÕ•Éå}‘…Ñ…‰…Í” 4(€€€€€€€€€€€Q5}Q	M}%1°€‰M1P=U9P¡%MQ%9PÕÍ•É}¥¤I=4Ñ•…µ}Ñ•µÁ±…Ñ•Ìˆ4(€€€€€€€€¤4(€€€€€€€Ñ¥­•Ñ}•¹ÑÉ¥•Ì€ôÅÕ•Éå}‘…Ñ…‰…Í” 4(€€€€€€€€€€€Q%-Q}Q	M}%1°€‰M1P=U9P ¨¤I=4Ñ¥­•Ñ}ÍÑ…ÑÕÌˆ4(€€€€€€€€¤4(€€€€€€€Ñ¥­•Ñ}Õ¥±‘Ì€ôÅÕ•Éå}‘…Ñ…‰…Í” 4(€€€€€€€€€€€Q%-Q}Q	M}%1°4(€€€€€€€€€€€€‰M1P=U9P ¨¤I=4Ñ¥­•Ñ}Õ¥±‘}½¹™¥œˆ°4(€€€€€€€€¤4(€€€€€€€¹¥­¹…µ•}µ…É­•É}Õ¥±‘Ì€ôÅÕ•Éå}‘…Ñ…‰…Í” 4(€€€€€€€€€€€Q%-Q}Q	M}%1°4(€€€€€€€€€€€€‰M1P=U9P ¨¤I=4Ñ¥­•Ñ}¹¥­¹…µ•}½¹™¥œ]!I•¹…‰±•€ô€Äˆ°4(€€€€€€€€¤4(€€€€€€€¹¥­¹…µ•}½ÁÑ}½ÕÑÌ€ôÅÕ•Éå}‘…Ñ…‰…Í” 4(€€€€€€€€€€€Q%-Q}Q	M}%1°4(€€€€€€€€€€€€‰M1P=U9P ¨¤I=4Ñ¥­•Ñ}¹¥­¹…µ•}ÁÉ•™•É•¹•Ì]!I•¹…‰±•€ô€Àˆ°4(€€€€€€€€¤4(4(€€€€€€€µ•ÑÉ¥}±…‰•±Ì€ôì4(€€€€€€€€€€€€‰‰½ÍÍ}•¹•É…Ñ½É}É•ÅÕ•ÍÑÌˆè€‰	½ÍÌ•¹•É…Ñ½Èˆ°4(€€€€€€€€€€€€‰Ñ¥­•Ñ}¡•­Ìˆè€‰Q¥­•Ğ¡•­Ìˆ°4(€€€€€€€€€€€€‰Ñ•…µ}¡•±Á•É}½µµ…¹‘Ìˆè€‰Q•…´¡•±Á•Èˆ°4(€€€€€€€€€€€€‰½½±‘½İ¹}¡•­Ìˆè€‰½½±‘½İ¸¡•­Ìˆ°4(€€€€€€€€€€€€‰Ñ¥­•Ñ}±¥ÍÑ}Ù¥•İÌˆè€‰Q¥­•Ğµ±¥ÍĞÙ¥•İÌˆ°4(€€€€€€€€€€€€‰Ñ¥­•Ñ}µ…¹…•µ•¹Ğˆè€‰Q¥­•Ğµ…¹…•µ•¹Ğˆ°4(€€€€€€€€€€€€‰Ñ¥­•Ñ}±½½­ÕÁÌˆè€‰Q¥­•Ğ±½½­ÕÁÌˆ°4(€€€€€€€€€€€€‰¡•±Á}Ù¥•İÌˆè€‰!•±ÀÙ¥•İÌˆ°4(€€€€€€€€€€€€‰…‰½ÕÑ}Ù¥•İÌˆè€‰‰½ÕĞÙ¥•İÌˆ°4(€€€€€€€ô4(€€€€€€€µ•ÑÉ¥}±¥¹•Ì€ômt4(€€€€€€€™½Èµ•ÑÉ¥Œ°½Õ¹Ğ¥¸µ•ÑÉ¥ÍlèÄÁtè4(€€€€€€€€€€€±…‰•°€ôµ•ÑÉ¥}±…‰•±Ì¹•Ğ¡µ•ÑÉ¥Œ°µ•ÑÉ¥Œ¹É•Á±…” ‰Í±…Í¡|ˆ°€ˆ¼ˆ¤¹É•Á±…” ‰|ˆ°€ˆ€ˆ¤¤4(€€€€€€€€€€€µ•ÑÉ¥}±¥¹•Ì¹…ÁÁ•¹¡˜ˆ¨©í±…‰•±ôè¨¨í½Õ¹Ğè±ôˆ¤4(4(€€€€€€€ÍÑ½É…•}Í¥é”€ôÍÕ´ 4(€€€€€€€€€€€™¥±•}Í¥é”¡Á…Ñ ¤4(€€€€€€€€€€€™½ÈÁ…Ñ ¥¸€ 4(€€€€€€€€€€€€€€€Q	M}%1°4(€€€€€€€€€€€€€€€Q5}Q	M}%1°4(€€€€€€€€€€€€€€€Q%-Q}Q	M}%1°4(€€€€€€€€€€€€€€€1=}%1°4(€€€€€€€€€€€€¤4(€€€€€€€€¤4(4(€€€€€€€•µ‰•€ô‘¥Í½É¹µ‰• 4(€€€€€€€€€€€Ñ¥Ñ±”ô‹Â~N(=İ<	½ÍÌ!•±Á•ÈƒŠP•Ù•±½Á•ÈMÑ…ÑÌˆ°4(€€€€€€€€€€€½±½ÈôÁàÔàØÕÈ°4(€€€€€€€€€€€Ñ¥µ•ÍÑ…µÀõ‘¥Í½É¹ÕÑ¥±Ì¹ÕÑ¹½Ü ¤°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€¹…µ”ô‰I•… ˆ°4(€€€€€€€€€€€Ù…±Õ”ô 4(€€€€€€€€€€€€€€€˜ˆ¨©Ñ¥Ù”Í•ÉÙ•ÉÌè¨¨í±•¸¡…Ñ¥Ù•}É•½É‘Ì¤è±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©!¥ÍÑ½É¥…°Í•ÉÙ•ÉÌè¨¨í±•¸¡É•½É‘Ì¤è±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©I•µ½Ù•Í•ÉÙ•ÉÌè¨¨í±•¸¡¥¹…Ñ¥Ù•}É•½É‘Ì¤è±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©ÁÁÉ½à¸µ•µ‰•ÉÌè¨¨íÑ½Ñ…±}µ•µ‰•ÉÌè±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©Y¥Í¥‰±”¡…¹¹•±Ìè¨¨íÑ½Ñ…±}¡…¹¹•±Ìè±ôˆ4(€€€€€€€€€€€€¤°4(€€€€€€€€€€€¥¹±¥¹”õQÉÕ”°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€¹…µ”ô‰M…Ù•‘…Ñ„ˆ°4(€€€€€€€€€€€Ù…±Õ”ô 4(€€€€€€€€€€€€€€€˜ˆ¨©Q•…´Ñ•µÁ±…Ñ•Ìè¨¨íÑ•µÁ±…Ñ•}½Õ¹Ğè±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©Q•µÁ±…Ñ”ÕÍ•ÉÌè¨¨íÑ•µÁ±…Ñ•}ÕÍ•ÉÌè±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©Q¥­•Ğ•¹ÑÉ¥•Ìè¨¨íÑ¥­•Ñ}•¹ÑÉ¥•Ìè±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©Q¥­•Ğ‰½…É‘Ìè¨¨íÑ¥­•Ñ}Õ¥±‘Ìè±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©9¥­¹…µ”µ…É­•ÉÌè¨¨í¹¥­¹…µ•}µ…É­•É}Õ¥±‘Ìè±ôÍ•ÉÙ•È¡Ì¥q¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©A•ÉÍ½¹…°µ…É­•È½ÁĞµ½ÕÑÌè¨¨í¹¥­¹…µ•}½ÁÑ}½ÕÑÌè±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©1½…°ÑÉ…­•Í¥é”è¨¨í¡Õµ…¹}‰åÑ•Ì¡ÍÑ½É…•}Í¥é”¥ôˆ4(€€€€€€€€€€€€¤°4(€€€€€€€€€€€¥¹±¥¹”õQÉÕ”°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€¹…µ”ô‰IÕ¹Ñ¥µ”ˆ°4(€€€€€€€€€€€Ù…±Õ”ô 4(€€€€€€€€€€€€€€€˜ˆ¨©Y•ÉÍ¥½¸è¨¨í	=Q}YIM%=9õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©UÁÑ¥µ”è¨¨í¡Õµ…¹}‘ÕÉ…Ñ¥½¸¡Ñ¥µ”¹µ½¹½Ñ½¹¥Œ ¤€´Í•±˜¹ÍÑ…ÉÑ•‘}µ½¹½Ñ½¹¥Œ¥õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©1…Ñ•¹äè¨¨íÉ½Õ¹¡Í•±˜¹‰½Ğ¹±…Ñ•¹ä€¨€ÄÀÀÀ¥ôµÍq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©AåÑ¡½¸è¨¨íÁ±…Ñ™½É´¹ÁåÑ¡½¹}Ù•ÉÍ¥½¸ ¥õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©‘¥Í½É¹Áäè¨¨í‘¥Í½É¹}}Ù•ÉÍ¥½¹}}ôˆ4(€€€€€€€€€€€€¤°4(€€€€€€€€€€€¥¹±¥¹”õQÉÕ”°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€¹…µ”ô‰UÍ…”É•½É‘•Í¥¹”ØÀ¸à¸Àˆ°4(€€€€€€€€€€€Ù…±Õ”ô‰q¸ˆ¹©½¥¸¡µ•ÑÉ¥}±¥¹•Ì¤¥˜µ•ÑÉ¥}±¥¹•Ì•±Í”€‰9¼ÑÉ…­•ÕÍ…”å•Ğ¸ˆ°4(€€€€€€€€€€€¥¹±¥¹”õ…±Í”°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹Í•Ñ}™½½Ñ•È¡Ñ•áĞô‰=İ¹•Èµ½¹±äƒŠˆMÑ½É•±½…±±ä¥¸‰½Ñ}ÍÑ…ÑÌ¹‘ˆˆ¤4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹™½±±½İÕÀ¹Í•¹¡•µ‰•õ•µ‰•°•Á¡•µ•É…°õQÉÕ”¤4(4(€€€‘•˜‰Õ¥±‘}Í•ÉÙ•ÉÍ}•µ‰•¡Í•±˜°É•½É‘Ìè±¥ÍÑmÕ¥±‘I•½É‘t°Á…”è¥¹Ğ¤€´ø‘¥Í½É¹µ‰•è4(€€€€€€€Á…•}½Õ¹Ğ€ôµ…à Ä°€¡±•¸¡É•½É‘Ì¤€¬MIYIM}AI}A€´€Ä¤€¼¼MIYIM}AI}A¤4(€€€€€€€Í•±•Ñ•‘}Á…”€ôµ…à À°µ¥¸¡Á…”°Á…•}½Õ¹Ğ€´€Ä¤¤4(€€€€€€€ÍÑ…ÉĞ€ôÍ•±•Ñ•‘}Á…”€¨MIYIM}AI}A4(€€€€€€€Í•±•Ñ•€ôÉ•½É‘ÍmÍÑ…ÉĞéÍÑ…ÉĞ€¬MIYIM}AI}At4(4(€€€€€€€±¥¹•Ìè±¥ÍÑmÍÑÉt€ômt4(€€€€€€€™½È¥¹‘•à°É•½É¥¸•¹Õµ•É…Ñ”¡Í•±•Ñ•°ÍÑ…ÉĞõÍÑ…ÉĞ€¬€Ä¤è4(€€€€€€€€€€€ÍÑ…ÑÕÌ€ô€‹Â~~ˆˆ¥˜É•½É¹…Ñ¥Ù”•±Í”€‹Šj¬ˆ4(€€€€€€€€€€€±…ÍÑ}ÕÍ•€ô€ 4(€€€€€€€€€€€€€€€˜ˆñĞéíÉ•½É¹±…ÍÑ}ÕÍ•‘}…ÑôéHøˆ¥˜É•½É¹±…ÍÑ}ÕÍ•‘}…Ğ•±Í”€‰¹¼ÑÉ…­•ÕÍ”ˆ4(€€€€€€€€€€€€¤4(€€€€€€€€€€€½İ¹•È€ô˜ˆñíÉ•½É¹½İ¹•É}¥‘ôø€¡íÉ•½É¹½İ¹•É}¥‘õ€¤ˆ¥˜É•½É¹½İ¹•É}¥•±Í”€‰Õ¹­¹½İ¸ˆ4(€€€€€€€€€€€Õ¥±€ôÍ•±˜¹‰½Ğ¹•Ñ}Õ¥±¡É•½É¹Õ¥±‘}¥¤4(€€€€€€€€€€€Ù…¹¥Ñä€ô€ˆˆ4(€€€€€€€€€€€¥˜Õ¥±¥Ì¹½Ğ9½¹”è4(€€€€€€€€€€€€€€€½‘”€ô•Ñ…ÑÑÈ¡Õ¥±°€‰Ù…¹¥Ñå}ÕÉ±}½‘”ˆ°9½¹”¤4(€€€€€€€€€€€€€€€¥˜½‘”è4(€€€€€€€€€€€€€€€€€€€Ù…¹¥Ñä€ô˜ˆƒŠˆÙ…¹¥Ñäè‘¥Í½É¹œ½í½‘•õ€ˆ4(€€€€€€€€€€€±¥¹•Ì¹…ÁÁ•¹ 4(€€€€€€€€€€€€€€€˜‰íÍÑ…ÑÕÍô€¨©í¥¹‘•áô¸í‘¥Í½É¹ÕÑ¥±Ì¹•Í…Á•}µ…É­‘½İ¸¡É•½É¹Õ¥±‘}¹…µ”¥ô¨©q¸ˆ4(€€€€€€€€€€€€€€€˜‰íÉ•½É¹Õ¥±‘}¥‘õ€ƒŠˆ½İ¹•Èèí½İ¹•Éõq¸ˆ4(€€€€€€€€€€€€€€€˜‰íÉ•½É¹µ•µ‰•É}½Õ¹Ğè±ôµ•µ‰•ÉÌƒŠˆíÉ•½É¹¡…¹¹•±}½Õ¹Ğè±ô¡…¹¹•±ÌƒŠˆ€ˆ4(€€€€€€€€€€€€€€€˜‰íÉ•½É¹ÕÍ…•}½Õ¹Ğè±ôÕÍ•ÌƒŠˆí±…ÍÑ}ÕÍ•‘õíÙ…¹¥Ñåôˆ4(€€€€€€€€€€€€¤4(4(€€€€€€€•µ‰•€ô‘¥Í½É¹µ‰• 4(€€€€€€€€€€€Ñ¥Ñ±”õ˜‹Â~2@	½ĞM•ÉÙ•ÉÌƒŠPA…”íÍ•±•Ñ•‘}Á…”€¬€Åô½íÁ…•}½Õ¹Ñôˆ°4(€€€€€€€€€€€‘•ÍÉ¥ÁÑ¥½¸ô‰q¹q¸ˆ¹©½¥¸¡±¥¹•Ì¤¥˜±¥¹•Ì•±Í”€‰9¼Í•ÉÙ•ÈÉ•½É‘Ìå•Ğ¸ˆ°4(€€€€€€€€€€€½±½ÈôÁàÔàØÕÈ°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹Í•Ñ}™½½Ñ•È 4(€€€€€€€€€€€Ñ•áĞô 4(€€€€€€€€€€€€€€€˜‰íÍÕ´ Ä™½È¥Ñ•´¥¸É•½É‘Ì¥˜¥Ñ•´¹…Ñ¥Ù”¥ô…Ñ¥Ù”ƒŠˆí±•¸¡É•½É‘Ì¥ô¡¥ÍÑ½É¥…°ƒŠˆ€ˆ4(€€€€€€€€€€€€€€€€‰UÍ”€½‰½ĞµÍ•ÉÙ•ÈÍ•ÉÙ•É}¥èñ¥ø™½È‘•Ñ…¥±Ì¸ˆ4(€€€€€€€€€€€€¤4(€€€€€€€€¤4(€€€€€€€É•ÑÕÉ¸•µ‰•4(4(€€€…Íå¹Œ‘•˜‰Õ¥±‘}Í•ÉÙ•É}‘•Ñ…¥±}•µ‰•¡Í•±˜°É•½ÉèÕ¥±‘I•½É¤€´ø‘¥Í½É¹µ‰•è4(€€€€€€€Õ¥±€ôÍ•±˜¹‰½Ğ¹•Ñ}Õ¥±¡É•½É¹Õ¥±‘}¥¤4(€€€€€€€½İ¹•È€ô…İ…¥ĞÍ•±˜¹ÕÍ•É}±…‰•°¡É•½É¹½İ¹•É}¥¤4(€€€€€€€µ•ÑÉ¥Ì€ô…İ…¥ĞÍ•±˜¹ÍÑ½É”¹Õ¥±‘}ÕÍ…•}Ñ½Ñ…±Ì¡É•½É¹Õ¥±‘}¥¤4(4(€€€€€€€ÍÑ…ÑÕÌ€ô€‰…Ñ¥Ù”ˆ¥˜É•½É¹…Ñ¥Ù”•±Í”€‰É•µ½Ù•ˆ4(€€€€€€€•µ‰•€ô‘¥Í½É¹µ‰• 4(€€€€€€€€€€€Ñ¥Ñ±”õ˜‹Â~R8M•ÉÙ•È•Ñ…¥°ƒŠPí‘¥Í½É¹ÕÑ¥±Ì¹•Í…Á•}µ…É­‘½İ¸¡É•½É¹Õ¥±‘}¹…µ”¥ôˆ°4(€€€€€€€€€€€½±½Èô ÁàÔİÈàÜ¥˜É•½É¹…Ñ¥Ù”•±Í”€ÁàÜĞİá¤°4(€€€€€€€€€€€Ñ¥µ•ÍÑ…µÀõ‘¥Í½É¹ÕÑ¥±Ì¹ÕÑ¹½Ü ¤°4(€€€€€€€€¤4(€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€¹…µ”ô‰M•ÉÙ•Èˆ°4(€€€€€€€€€€€Ù…±Õ”ô 4(€€€€€€€€€€€€€€€˜ˆ¨©MÑ…ÑÕÌè¨¨íÍÑ…ÑÕÍõq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©%è¨¨íÉ•½É¹Õ¥±‘}¥‘õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©=İ¹•Èè¨¨í½İ¹•Éõq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©5•µ‰•ÉÌè¨¨íÉ•½É¹µ•µ‰•É}½Õ¹Ğè±õq¸ˆ4(€€€€€€€€€€€€€€€˜ˆ¨©¡…¹¹•±Ìè¨¨íÉ•½É¹¡…¹¹•±}½Õ¹Ğè±ôˆ4(€€€€€€€€€€€€¤°4(€€€€€€€€€€€¥¹±¥¹”õ…±Í”°4(€€€€€€€€¤4(4(€€€€€€€±…ÍÑ}ÕÍ•‘}Ñ•áĞ€ô˜ˆñĞéíÉ•½É¹±…ÍÑ}ÕÍ•‘}…ÑôéHøˆ¥˜É•½É¹±…ÍÑ}ÕÍ•‘}…Ğ•±Í”€‰¹¼ÑÉ…­•ÕÍ”ˆ4(€€€€€€€ÕÍ…•}±¥¹•Ì€ôl4(€€€€€€€€€€€˜ˆ¨©Q½Ñ…°ÑÉ…­•ÕÍ•Ìè¨¨íÉ•½É¹ÕÍ…•}½Õ¹Ğè±ôˆ°4(€€€€€€€€€€€˜ˆ¨©1…ÍĞÑÉ…­•ÕÍ”è¨¨í±…ÍÑ}ÕÍ•‘}Ñ•áÑôˆ°4(€€€€€€€€€€€˜ˆ¨©)½¥¹•è¨¨€ñĞéíÉ•½É¹©½¥¹•‘}…ÑôéHøˆ°4(€€€€€€€€€€€˜ˆ¨©1…ÍĞÍ••¸è¨¨€ñĞéíÉ•½É¹±…ÍÑ}Í••¹}…ÑôéHøˆ°4(€€€€€€€t4(€€€€€€€¥˜É•½É¹±•™Ñ}…Ğè4(€€€€€€€€€€€ÕÍ…•}±¥¹•Ì¹…ÁÁ•¹¡˜ˆ¨©1•™Ğè¨¨€ñĞéíÉ•½É¹±•™Ñ}…ÑôéHøˆ¤4(€€€€€€€•µ‰•¹…‘‘}™¥•±¡¹…µ”ô‰Ñ¥Ù¥Ñäˆ°Ù…±Õ”ô‰q¸ˆ¹©½¥¸¡ÕÍ…•}±¥¹•Ì¤°¥¹±¥¹”õ…±Í”¤4(4(€€€€€€€µ•ÑÉ¥}±…‰•±Ì€ôì4(€€€€€€€€€€€€‰‰½ÍÍ}•¹•É…Ñ½É}É•ÅÕ•ÍÑÌˆè€‰	½ÍÌ•¹•É…Ñ½Èˆ°4(€€€€€€€€€€€€‰Ñ¥­•Ñ}¡•­Ìˆè€‰Q¥­•Ğ¡•­Ìˆ°4(€€€€€€€€€€€€‰Ñ•…µ}¡•±Á•É}½µµ…¹‘Ìˆè€‰Q•…´¡•±Á•Èˆ°4(€€€€€€€€€€€€‰½½±‘½İ¹}¡•­Ìˆè€‰½½±‘½İ¸¡•­Ìˆ°4(€€€€€€€€€€€€‰Ñ¥­•Ñ}±¥ÍÑ}Ù¥•İÌˆè€‰Q¥­•Ğµ±¥ÍĞÙ¥•İÌˆ°4(€€€€€€€€€€€€‰Ñ¥­•Ñ}µ…¹…•µ•¹Ğˆè€‰Q¥­•Ğµ…¹…•µ•¹Ğˆ°4(€€€€€€€€€€€€‰Ñ¥­•Ñ}±½½­ÕÁÌˆè€‰Q¥­•Ğ±½½­ÕÁÌˆ°4(€€€€€€€€€€€€‰¡•±Á}Ù¥•İÌˆè€‰!•±ÀÙ¥•İÌˆ°4(€€€€€€€€€€€€‰…‰½ÕÑ}Ù¥•İÌˆè€‰‰½ÕĞÙ¥•İÌˆ°4(€€€€€€€ô4(€€€€€€€¥˜µ•ÑÉ¥Ìè4(€€€€€€€€€€€µ•ÑÉ¥}±¥¹•Ì€ômt4(€€€€€€€€€€€™½Èµ•ÑÉ¥Œ°½Õ¹Ğ°±…ÍÑ}ÕÍ•‘}…Ğ¥¸µ•ÑÉ¥ÍlèÄÁtè4(€€€€€€€€€€€€€€€±…‰•°€ôµ•ÑÉ¥}±…‰•±Ì¹•Ğ¡µ•ÑÉ¥Œ°µ•ÑÉ¥Œ¹É•Á±…” ‰Í±…Í¡|ˆ°€ˆ¼ˆ¤¹É•Á±…” ‰|ˆ°€ˆ€ˆ¤¤4(€€€€€€€€€€€€€€€µ•ÑÉ¥}±¥¹•Ì¹…ÁÁ•¹¡˜ˆ¨©í±…‰•±ôè¨¨í½Õ¹Ğè±ôƒŠˆ€ñĞéí±…ÍÑ}ÕÍ•‘}…ÑôéHøˆ¤4(€€€€€€€€€€€•µ‰•¹…‘‘}™¥•±¡¹…µ”ô‰UÍ…”‰É•…­‘½İ¸ˆ°Ù…±Õ”ô‰q¸ˆ¹©½¥¸¡µ•ÑÉ¥}±¥¹•Ì¤°¥¹±¥¹”õ…±Í”¤4(€€€€€€€•±Í”è4(€€€€€€€€€€€•µ‰•¹…‘‘}™¥•±¡¹…µ”ô‰UÍ…”‰É•…­‘½İ¸ˆ°Ù…±Õ”ô‰9¼Á•Èµ½µµ…¹ÕÍ…”É•½É‘•å•Ğ¸ˆ°¥¹±¥¹”õ…±Í”¤4(4(€€€€€€€¥˜Õ¥±¥Ì¹½Ğ9½¹”…¹Õ¥±¹µ”¥Ì¹½Ğ9½¹”è4(€€€€€€€€€€€Á•Éµ¥ÍÍ¥½¹Ì€ôÕ¥±¹µ”¹Õ¥±‘}Á•Éµ¥ÍÍ¥½¹Ì4(€€€€€€€€€€€¡•­Ì€ôl4(€€€€€€€€€€€€€€€€ ‰5…¹…”Õ¥±ˆ°‰½½°¡Á•Éµ¥ÍÍ¥½¹Ì¹µ…¹…•}Õ¥±¤¤°4(€€€€€€€€€€€€€€€€ ‰5…¹…”5•ÍÍ…•Ìˆ°‰½½°¡Á•Éµ¥ÍÍ¥½¹Ì¹µ…¹…•}µ•ÍÍ…•Ì¤¤°4(€€€€€€€€€€€€€€€€ ‰‘I•…Ñ¥½¹Ìˆ°‰½½°¡Á•Éµ¥ÍÍ¥½¹Ì¹…‘‘}É•…Ñ¥½¹Ì¤¤°4(€€€€€€€€€€€€€€€€ ‰µ‰•1¥¹­Ìˆ°‰½½°¡Á•Éµ¥ÍÍ¥½¹Ì¹•µ‰•‘}±¥¹­Ì¤¤°4(€€€€€€€€€€€€€€€€ ‰I•…5•ÍÍ…”!¥ÍÑ½Éäˆ°‰½½°¡Á•Éµ¥ÍÍ¥½¹Ì¹É•…‘}µ•ÍÍ…•}¡¥ÍÑ½Éä¤¤°4(€€€€€€€€€€€€€€€€ ‰M•¹5•ÍÍ…•Ìˆ°‰½½°¡Á•Éµ¥ÍÍ¥½¹Ì¹Í•¹‘}µ•ÍÍ…•Ì¤¤°4(€€€€€€€€€€€t4(€€€€€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€€€€€¹…µ”ô‰ÕÉÉ•¹Ğ‰½ĞÁ•Éµ¥ÍÍ¥½¹Ìˆ°4(€€€€€€€€€€€€€€€Ù…±Õ”ô‰q¸ˆ¹©½¥¸  ‹Šrˆ¥˜½¬•±Í”€‹Šv0ˆ¤€¬˜ˆí±…‰•±ôˆ™½È±…‰•°°½¬¥¸¡•­Ì¤°4(€€€€€€€€€€€€€€€¥¹±¥¹”õ…±Í”°4(€€€€€€€€€€€€¤4(€€€€€€€€€€€¥˜•Ñ…ÑÑÈ¡Õ¥±°€‰Ù…¹¥Ñå}ÕÉ±}½‘”ˆ°9½¹”¤è4(€€€€€€€€€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€€€€€€€€€¹…µ”ô‰AÕ‰±¥Œ¥¹Ù¥Ñ”ˆ°4(€€€€€€€€€€€€€€€€€€€Ù…±Õ”õ˜‰Y…¹¥Ñäè‘¥Í½É¹œ½íÕ¥±¹Ù…¹¥Ñå}ÕÉ±}½‘•õ€ˆ°4(€€€€€€€€€€€€€€€€€€€¥¹±¥¹”õ…±Í”°4(€€€€€€€€€€€€€€€€¤4(€€€€€€€•±Í”è4(€€€€€€€€€€€•µ‰•¹…‘‘}™¥•± 4(€€€€€€€€€€€€€€€¹…µ”ô‰1¥Ù”…•ÍÌˆ°4(€€€€€€€€€€€€€€€Ù…±Õ”ô‰Q¡”‰½Ğ¥Ì¹¼±½¹•È¥¸Ñ¡¥ÌÍ•ÉÙ•È°Í¼½¹±äÍÑ½É•¡¥ÍÑ½Éä¥Ì…Ù…¥±…‰±”¸ˆ°4(€€€€€€€€€€€€€€€¥¹±¥¹”õ…±Í”°4(€€€€€€€€€€€€¤4(4(€€€€€€€•µ‰•¹Í•Ñ}™½½Ñ•È¡Ñ•áĞô‰=İ¹•Èµ½¹±äƒŠˆUÍ”€½‰½ĞµÍ•ÉÙ•ÈÍ•ÉÙ•É}¥èñ¥ø™½ÈÑ¡¥Ì‘•Ñ…¥°Ù¥•Ü¸ˆ¤4(€€€€€€€É•ÑÕÉ¸•µ‰•4(4(€€€…ÁÁ}½µµ…¹‘Ì¹½µµ…¹ 4(€€€€€€€¹…µ”ô‰‰½Ğµ‘…¥±äµÉ•Á½ÉĞµÑ•ÍĞˆ°4(€€€€€€€‘•ÍÉ¥ÁÑ¥½¸ô‰•Ù•±½Á•Èµ½¹±äèÍ•¹Ñ¡”‘…¥±ä½İ¹•ÈÉ•Á½ÉĞ¹½Ü¸ˆ°4(€€€€¤4(€€€…Íå¹Œ‘•˜‘•Ù•±½Á•É}‘…¥±å}É•Á½ÉÑ}Ñ•ÍĞ¡Í•±˜°¥¹Ñ•É…Ñ¥½¸è‘¥Í½É¹%¹Ñ•É…Ñ¥½¸¤€´ø9½¹”è4(€€€€€€€¥˜…İ…¥ĞÍ•±˜¹É•©•Ñ}¹½¹}½İ¹•È¡¥¹Ñ•É…Ñ¥½¸¤è4(€€€€€€€€€€€É•ÑÕÉ¸4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹É•ÍÁ½¹Í”¹‘•™•È¡•Á¡•µ•É…°õQÉÕ”¤4(€€€€€€€…İ…¥ĞÍ•±˜¹ÍÑ½É”¹Íå¹}Õ¥±‘Ì¡Í•±˜¹‰½Ğ¹Õ¥±‘Ì¤4(€€€€€€€É•½É‘Ì€ô…İ…¥ĞÍ•±˜¹ÍÑ½É”¹±¥ÍÑ}Õ¥±‘Ì ¤4(€€€€€€€µ•ÑÉ¥Ì€ô…İ…¥ĞÍ•±˜¹ÍÑ½É”¹ÕÍ…•}Ñ½Ñ…±Ì ¤4(€€€€€€€É•Á½ÉÑ}‘…Ñ”€ôÑ¥µ”¹ÍÑÉ™Ñ¥µ” ˆ•d´•´´•ˆ°Ñ¥µ”¹µÑ¥µ” ¤¤4(€€€€€€€•µ‰•€ôÍ•±˜¹‰Õ¥±‘}‘…¥±å}½İ¹•É}É•Á½ÉÑ}•µ‰•¡É•½É‘Ì°µ•ÑÉ¥Ì°É•Á½ÉÑ}‘…Ñ”¤4(€€€€€€€ÑÉäè4(€€€€€€€€€€€½İ¹•È€ôÍ•±˜¹‰½Ğ¹•Ñ}ÕÍ•È¡Í•±˜¹½İ¹•É}¥¤½È…İ…¥ĞÍ•±˜¹‰½Ğ¹™•Ñ¡}ÕÍ•È¡Í•±˜¹½İ¹•É}¥¤4(€€€€€€€€€€€…İ…¥Ğ½İ¹•È¹Í•¹¡•µ‰•õ•µ‰•¤4(€€€€€€€•á•ÁĞ€¡‘¥Í½É¹½É‰¥‘‘•¸°‘¥Í½É¹9½Ñ½Õ¹°‘¥Í½É¹!QQAá•ÁÑ¥½¸¤…Ì•áŒè4(€€€€€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹™½±±½İÕÀ¹Í•¹¡˜‰½Õ±¹½Ğ4Ñ¡”É•Á½ÉĞèí•áõ€ˆ°•Á¡•µ•É…°õQÉÕ”¤4(€€€€€€€€€€€É•ÑÕÉ¸4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹™½±±½İÕÀ¹Í•¹ ‹Šr…¥±ä½İ¹•ÈÉ•Á½ÉĞÑ•ÍĞÍ•¹ĞÑ¼å½ÕÈ4¸ˆ°•Á¡•µ•É…°õQÉÕ”¤4(4(€€€…ÁÁ}½µµ…¹‘Ì¹½µµ…¹ 4(€€€€€€€¹…µ”ô‰‰½ĞµÍ•ÉÙ•Èˆ°4(€€€€€€€‘•ÍÉ¥ÁÑ¥½¸ô‰•Ù•±½Á•Èµ½¹±ä‘•Ñ…¥±•Ù¥•Ü™½È½¹”Í•ÉÙ•È¸ˆ°4(€€€€¤4(€€€…ÁÁ}½µµ…¹‘Ì¹‘•ÍÉ¥‰”¡Í•ÉÙ•É}¥ô‰¥Í½ÉÍ•ÉÙ•È%™É½´€½‰½ĞµÍ•ÉÙ•ÉÌˆ¤4(€€€…Íå¹Œ‘•˜‘•Ù•±½Á•É}Í•ÉÙ•É}‘•Ñ…¥° 4(€€€€€€€Í•±˜°¥¹Ñ•É…Ñ¥½¸è‘¥Í½É¹%¹Ñ•É…Ñ¥½¸°Í•ÉÙ•É}¥èÍÑÈ4(€€€€¤€´ø9½¹”è4(€€€€€€€¥˜…İ…¥ĞÍ•±˜¹É•©•Ñ}¹½¹}½İ¹•È¡¥¹Ñ•É…Ñ¥½¸¤è4(€€€€€€€€€€€É•ÑÕÉ¸4(€€€€€€€±•…¹•€ôÉ”¹ÍÕˆ¡È‰mxÀ´åtˆ°€ˆˆ°Í•ÉÙ•É}¥½È€ˆˆ¤4(€€€€€€€¥˜¹½Ğ±•…¹•è4(€€€€€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹É•ÍÁ½¹Í”¹Í•¹‘}µ•ÍÍ…” 4(€€€€€€€€€€€€€€€€‰M•¹„Í•ÉÙ•È%™É½´€½‰½ĞµÍ•ÉÙ•ÉÍ€°™½È•á…µÁ±”€½‰½ĞµÍ•ÉÙ•ÈÍ•ÉÙ•É}¥èÄÈÌ¸¸¹€¸ˆ°4(€€€€€€€€€€€€€€€•Á¡•µ•É…°õQÉÕ”°4(€€€€€€€€€€€€¤4(€€€€€€€€€€€É•ÑÕÉ¸4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹É•ÍÁ½¹Í”¹‘•™•È¡•Á¡•µ•É…°õQÉÕ”¤4(€€€€€€€…İ…¥ĞÍ•±˜¹ÍÑ½É”¹Íå¹}Õ¥±‘Ì¡Í•±˜¹‰½Ğ¹Õ¥±‘Ì¤4(€€€€€€€É•½É€ô…İ…¥ĞÍ•±˜¹ÍÑ½É”¹•Ñ}Õ¥±‘}É•½É¡¥¹Ğ¡±•…¹•¤¤4(€€€€€€€¥˜É•½É¥Ì9½¹”è4(€€€€€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹™½±±½İÕÀ¹Í•¹ 4(€€€€€€€€€€€€€€€˜‰$‘¼¹½Ğ¡…Ù”„ÍÑ½É•Í•ÉÙ•ÈÉ•½É™½Èí±•…¹•‘õ€¸ˆ°4(€€€€€€€€€€€€€€€•Á¡•µ•É…°õQÉÕ”°4(€€€€€€€€€€€€¤4(€€€€€€€€€€€É•ÑÕÉ¸4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹™½±±½İÕÀ¹Í•¹ 4(€€€€€€€€€€€•µ‰•õ…İ…¥ĞÍ•±˜¹‰Õ¥±‘}Í•ÉÙ•É}‘•Ñ…¥±}•µ‰•¡É•½É¤°4(€€€€€€€€€€€•Á¡•µ•É…°õQÉÕ”°4(€€€€€€€€€€€…±±½İ•‘}µ•¹Ñ¥½¹Ìõ‘¥Í½É¹±±½İ•‘5•¹Ñ¥½¹Ì¹¹½¹” ¤°4(€€€€€€€€¤4(4(€€€…ÁÁ}½µµ…¹‘Ì¹½µµ…¹ 4(€€€€€€€¹…µ”ô‰‰½ĞµÍ•ÉÙ•ÉÌˆ°4(€€€€€€€‘•ÍÉ¥ÁÑ¥½¸ô‰•Ù•±½Á•Èµ½¹±ä±¥ÍĞ½˜Í•ÉÙ•ÉÌÕÍ¥¹œÑ¡”‰½Ğ¸ˆ°4(€€€€¤4(€€€…ÁÁ}½µµ…¹‘Ì¹‘•ÍÉ¥‰”¡Á…”ô‰A…”¹Õµ‰•Èˆ¤4(€€€…Íå¹Œ‘•˜‘•Ù•±½Á•É}Í•ÉÙ•ÉÌ 4(€€€€€€€Í•±˜°4(€€€€€€€¥¹Ñ•É…Ñ¥½¸è‘¥Í½É¹%¹Ñ•É…Ñ¥½¸°4(€€€€€€€Á…”è…ÁÁ}½µµ…¹‘Ì¹I…¹•m¥¹Ğ°€Ä°€ääåt€ô€Ä°4(€€€€¤€´ø9½¹”è4(€€€€€€€¥˜…İ…¥ĞÍ•±˜¹É•©•Ñ}¹½¹}½İ¹•È¡¥¹Ñ•É…Ñ¥½¸¤è4(€€€€€€€€€€€É•ÑÕÉ¸4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹É•ÍÁ½¹Í”¹‘•™•È¡•Á¡•µ•É…°õQÉÕ”¤4(€€€€€€€…İ…¥ĞÍ•±˜¹ÍÑ½É”¹Íå¹}Õ¥±‘Ì¡Í•±˜¹‰½Ğ¹Õ¥±‘Ì¤4(€€€€€€€É•½É‘Ì€ô…İ…¥ĞÍ•±˜¹ÍÑ½É”¹±¥ÍÑ}Õ¥±‘Ì ¤4(€€€€€€€Í•±•Ñ•‘}Á…”€ôµ…à À°µ¥¸¡Á…”€´€Ä°µ…à À°€¡±•¸¡É•½É‘Ì¤€¬MIYIM}AI}A€´€Ä¤€¼¼MIYIM}AI}A€´€Ä¤¤¤4(€€€€€€€…İ…¥Ğ¥¹Ñ•É…Ñ¥½¸¹™½±±½İÕÀ¹Í•¹ 4(€€€€€€€€€€€•µ‰•õÍ•±˜¹‰Õ¥±‘}Í•ÉÙ•ÉÍ}•µ‰•¡É•½É‘Ì°Í•±•Ñ•‘}Á…”¤°4(€€€€€€€€€€€Ù¥•ÜõM•ÉÙ•É1¥ÍÑY¥•Ü¡Í•±˜°¥¹Ñ•É…Ñ¥½¸¹ÕÍ•È¹¥°É•½É‘Ì°Á…”õÍ•±•Ñ•‘}Á…”¤°4(€€€€€€€€€€€•Á¡•µ•É…°õQÉÕ”°4(€€€€€€€€€€€…±±½İ•‘}µ•¹Ñ¥½¹Ìõ‘¥Í½É¹±±½İ•‘5•¹Ñ¥½¹Ì¹¹½¹” ¤°4(€€€€€€€€¤4(4(4)…Íå¹Œ‘•˜Í•ÑÕÀ¡‰½Ğè½µµ…¹‘Ì¹	½Ğ¤€´ø9½¹”è4(€€€…İ…¥Ğ‰½Ğ¹…‘‘}½œ¡	½Ñ%¹™¼¡‰½Ğ¤¤4(
+    async def usage_totals(self) -> list[tuple[str, int]]:
+        async with self.lock:
+            return await asyncio.to_thread(self._usage_totals_sync)
+
+    def _usage_totals_sync(self) -> list[tuple[str, int]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT metric, count FROM usage_totals ORDER BY count DESC, metric ASC"
+            ).fetchall()
+        return [(str(row["metric"]), int(row["count"])) for row in rows]
+
+    async def guild_usage_totals(self, guild_id: int) -> list[tuple[str, int, int]]:
+        async with self.lock:
+            return await asyncio.to_thread(self._guild_usage_totals_sync, guild_id)
+
+    def _guild_usage_totals_sync(self, guild_id: int) -> list[tuple[str, int, int]]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT metric, count, last_used_at
+                FROM guild_usage_totals
+                WHERE guild_id = ?
+                ORDER BY count DESC, metric ASC
+                """,
+                (guild_id,),
+            ).fetchall()
+        return [
+            (str(row["metric"]), int(row["count"]), int(row["last_used_at"]))
+            for row in rows
+        ]
+
+    async def get_guild_record(self, guild_id: int) -> GuildRecord | None:
+        async with self.lock:
+            return await asyncio.to_thread(self._get_guild_record_sync, guild_id)
+
+    def _get_guild_record_sync(self, guild_id: int) -> GuildRecord | None:
+        matches = [record for record in self._list_guilds_sync() if record.guild_id == guild_id]
+        return matches[0] if matches else None
+
+    async def set_inviter(
+        self, guild_id: int, inviter_id: int, inviter_name: str, checked_at: int
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._set_inviter_sync, guild_id, inviter_id, inviter_name, checked_at
+            )
+
+    def _set_inviter_sync(
+        self, guild_id: int, inviter_id: int, inviter_name: str, checked_at: int
+    ) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                UPDATE guild_registry
+                SET inviter_id = ?, inviter_name = ?, inviter_checked_at = ?
+                WHERE guild_id = ?
+                """,
+                (inviter_id, inviter_name[:200], checked_at, guild_id),
+            )
+
+    async def get_metadata(self, key: str) -> str:
+        async with self.lock:
+            return await asyncio.to_thread(self._get_metadata_sync, key)
+
+    def _get_metadata_sync(self, key: str) -> str:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT value FROM bot_metadata WHERE key = ?",
+                (key,),
+            ).fetchone()
+        return str(row["value"]) if row and row["value"] is not None else ""
+
+    async def set_metadata(self, key: str, value: str) -> None:
+        async with self.lock:
+            await asyncio.to_thread(self._set_metadata_sync, key, value)
+
+    def _set_metadata_sync(self, key: str, value: str) -> None:
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO bot_metadata (key, value, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(key) DO UPDATE SET
+                    value = excluded.value,
+                    updated_at = excluded.updated_at
+                """,
+                (key, value, int(time.time())),
+            )
+
+
+class AboutLinks(discord.ui.View):
+    def __init__(self, github_url: str, support_url: str) -> None:
+        super().__init__(timeout=120)
+        if github_url.startswith("https://"):
+            self.add_item(discord.ui.Button(label="Source code", url=github_url))
+        if support_url.startswith("https://"):
+            self.add_item(discord.ui.Button(label="Support server", url=support_url))
+
+
+class ServerListView(discord.ui.View):
+    def __init__(
+        self,
+        cog: "BotInfo",
+        owner_id: int,
+        records: list[GuildRecord],
+        *,
+        page: int = 0,
+    ) -> None:
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.records = records
+        self.page_count = max(1, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE)
+        self.page = max(0, min(page, self.page_count - 1))
+        self._sync_button_state()
+
+    def _sync_button_state(self) -> None:
+        self.previous_button.disabled = self.page <= 0
+        self.next_button.disabled = self.page >= self.page_count - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.owner_id:
+            await interaction.response.send_message(
+                "This server list is owner-only.", ephemeral=True
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Previous", emoji="â—€ï¸", style=discord.ButtonStyle.secondary)
+    async def previous_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        target = max(0, self.page - 1)
+        await interaction.response.edit_message(
+            embed=self.cog.build_servers_embed(self.records, target),
+            view=ServerListView(self.cog, self.owner_id, self.records, page=target),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @discord.ui.button(label="Next", emoji="â–¶ï¸", style=discord.ButtonStyle.secondary)
+    async def next_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        target = min(self.page_count - 1, self.page + 1)
+        await interaction.response.edit_message(
+            embed=self.cog.build_servers_embed(self.records, target),
+            view=ServerListView(self.cog, self.owner_id, self.records, page=target),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @discord.ui.button(label="Refresh", emoji="ğŸ”„", style=discord.ButtonStyle.primary)
+    async def refresh_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+        await self.cog.store.sync_guilds(self.cog.bot.guilds)
+        records = await self.cog.store.list_guilds()
+        target = min(self.page, max(0, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE - 1))
+        await interaction.edit_original_response(
+            embed=self.cog.build_servers_embed(records, target),
+            view=ServerListView(self.cog, self.owner_id, records, page=target),
+        )
+
+
+class BotInfo(commands.Cog):
+    def __init__(self, bot: commands.Bot) -> None:
+        self.bot = bot
+        self.store = StatsStore(DATABASE_FILE)
+        self.started_monotonic = time.monotonic()
+        self.periodic_task: asyncio.Task[None] | None = None
+        self.daily_report_task: asyncio.Task[None] | None = None
+        self.daily_report_utc_hour = max(0, min(safe_epoch(os.getenv("BOT_DAILY_REPORT_UTC_HOUR"), DAILY_REPORT_DEFAULT_UTC_HOUR), 23))
+        self.daily_report_utc_minute = max(0, min(safe_epoch(os.getenv("BOT_DAILY_REPORT_UTC_MINUTE"), DAILY_REPORT_DEFAULT_UTC_MINUTE), 59))
+        self.restored = False
+        self.owner_id = safe_epoch(os.getenv("BOT_OWNER_ID"), 0)
+        self.developer_name = os.getenv(
+            "BOT_DEVELOPER_NAME", DEFAULT_DEVELOPER_NAME
+        ).strip() or DEFAULT_DEVELOPER_NAME
+        self.github_url = os.getenv("BOT_GITHUB_URL", DEFAULT_GITHUB_URL).strip()
+        self.support_url = os.getenv("BOT_SUPPORT_URL", "").strip()
+        self.description = os.getenv("BOT_DESCRIPTION", DEFAULT_DESCRIPTION).strip()
+
+    async def cog_load(self) -> None:
+        await self.store.initialize()
+        self.periodic_task = asyncio.create_task(self.periodic_sync())
+        self.daily_report_task = asyncio.create_task(self.daily_owner_report_loop())
+        if not self.owner_id:
+            logger.warning(
+                "BOT_OWNER_ID is not configured; owner statistics and join/leave DMs are disabled"
+            )
+        logger.info("Bot statistics storage ready at %s", DATABASE_FILE)
+
+    async def cog_unload(self) -> None:
+        if self.periodic_task is not None:
+            self.periodic_task.cancel()
+            try:
+                await self.periodic_task
+            except asyncio.CancelledError:
+                pass
+        if self.daily_report_task is not None:
+            self.daily_report_task.cancel()
+            try:
+                await self.daily_report_task
+            except asyncio.CancelledError:
+                pass
+
+    async def periodic_sync(self) -> None:
+        try:
+            while True:
+                await asyncio.sleep(PERIODIC_SYNC_SECONDS)
+                await self.store.sync_guilds(self.bot.guilds)
+                logger.info("Refreshed persistent metadata for %s guild(s)", len(self.bot.guilds))
+        except asyncio.CancelledError:
+            return
+
+    def is_owner(self, user_id: int) -> bool:
+        return bool(self.owner_id and user_id == self.owner_id)
+
+    async def reject_non_owner(self, interaction: discord.Interaction) -> bool:
+        if self.is_owner(interaction.user.id):
+            return False
+        message = "This operational command is available only to the bot developer."
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+        return True
+
+    def build_about_embed(self) -> discord.Embed:
+        embed = discord.Embed(
+            title="ğŸ¾ OwO Boss Helper",
+            description=self.description,
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name="What it helps with",
+            value=(
+                "â€¢ Ordered Neon boss commands with detected HP\n"
+                "â€¢ Guild-boss timing and cooldown alerts\n"
+                "â€¢ Exact weapon-ID team templates\n"
+                "â€¢ Per-server boss-ticket boards"
+            ),
+            inline=False,
+        )
+        embed.add_field(name="Developer", value=f"**{self.developer_name}**", inline=True)
+        embed.add_field(name="Version", value=f"`{BOT_VERSION}`", inline=True)
+        embed.add_field(name="Servers", value=str(len(self.bot.guilds)), inline=True)
+        embed.add_field(
+            name="Get started",
+            value="Use `H help` for commands and setup instructions.",
+            inline=False,
+        )
+        embed.set_footer(
+            text="Independent community project â€¢ Not affiliated with OwO Bot or NeonUtil"
+        )
+        return embed
+
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        if self.restored:
+            return
+        self.restored = True
+        await self.store.sync_guilds(self.bot.guilds)
+        logger.info("Recorded %s active guild(s) in bot statistics", len(self.bot.guilds))
+
+    @commands.Cog.listener()
+    async def on_guild_join(self, guild: discord.Guild) -> None:
+        await self.store.upsert_guild(guild)
+        logger.info(
+            "Bot joined guild %s (%s) with approximately %s members",
+            guild.name,
+            guild.id,
+            guild.member_count or 0,
+        )
+        await self.notify_owner_about_guild(guild, joined=True)
+
+    @commands.Cog.listener()
+    async def on_guild_remove(self, guild: discord.Guild) -> None:
+        await self.store.mark_left(guild)
+        logger.info("Bot left guild %s (%s)", guild.name, guild.id)
+        await self.notify_owner_about_guild(guild, joined=False)
+
+    async def notify_owner_about_guild(
+        self,
+        guild: discord.Guild,
+        *,
+        joined: bool,
+    ) -> None:
+        if not self.owner_id:
+            return
+        try:
+            owner = self.bot.get_user(self.owner_id) or await self.bot.fetch_user(
+                self.owner_id
+            )
+            embed = discord.Embed(
+                title=("âœ… Bot added to a server" if joined else "â– Bot removed from a server"),
+                color=(0x57F287 if joined else 0xED4245),
+                timestamp=discord.utils.utcnow(),
+            )
+            embed.add_field(
+                name="Server",
+                value=f"**{guild.name}**\n`{guild.id}`",
+                inline=False,
+            )
+            embed.add_field(
+                name="Approximate members",
+                value=str(guild.member_count or 0),
+                inline=True,
+            )
+            embed.add_field(
+                name="Current active servers",
+                value=str(len(self.bot.guilds)),
+                inline=True,
+            )
+            await owner.send(embed=embed)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            logger.warning("Could not DM the developer about guild %s", guild.id)
+
+    async def detect_inviter_from_audit_log(
+        self, guild: discord.Guild
+    ) -> discord.abc.User | None:
+        """Return the likely user who added the bot, when Discord exposes it."""
+        bot_user = self.bot.user
+        bot_member = guild.me
+        if bot_user is None or bot_member is None:
+            return None
+        permissions = getattr(bot_member, "guild_permissions", None)
+        if permissions is None or not bool(getattr(permissions, "view_audit_log", False)):
+            return None
+        try:
+            async for entry in guild.audit_logs(
+                limit=8, action=discord.AuditLogAction.bot_add
+            ):
+                target = getattr(entry, "target", None)
+                if int(getattr(target, "id", 0) or 0) != bot_user.id:
+                    continue
+                created_at = getattr(entry, "created_at", None)
+                if created_at is not None:
+                    age = abs((discord.utils.utcnow() - created_at).total_seconds())
+                    if age > 15 * 60:
+                        continue
+                return entry.user
+        except (discord.Forbidden, discord.HTTPException):
+            return None
+        return None
+
+    async def user_label(self, user_id: int) -> str:
+        if not user_id:
+            return "unknown"
+        user = self.bot.get_user(user_id)
+        if user is None:
+            try:
+                user = await self.bot.fetch_user(user_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                user = None
+        if user is None:
+            return f"<@{user_id}> (`{user_id}`)"
+        display = discord.utils.escape_markdown(str(user))
+        return f"**{display}** (`{user_id}`)"
+
+    def daily_report_due_date(self) -> str:
+        now = time.time()
+        current = time.gmtime(now)
+        target = calendar.timegm(
+            (
+                current.tm_year,
+                current.tm_mon,
+                current.tm_mday,
+                self.daily_report_utc_hour,
+                self.daily_report_utc_minute,
+                0,
+                0,
+                0,
+                0,
+            )
+        )
+        if now < target:
+            return ""
+        return time.strftime("%Y-%m-%d", current)
+
+    async def daily_owner_report_loop(self) -> None:
+        try:
+            await asyncio.sleep(30)
+            while True:
+                await self.send_daily_owner_report_if_due()
+                await asyncio.sleep(DAILY_REPORT_CHECK_SECONDS)
+        except asyncio.CancelledError:
+            return
+
+    async def send_daily_owner_report_if_due(self) -> None:
+        if not self.owner_id:
+            return
+        report_date = self.daily_report_due_date()
+        if not report_date:
+            return
+        last_sent = await self.store.get_metadata(DAILY_REPORT_METADATA_KEY)
+        if last_sent == report_date:
+            return
+        await self.store.sync_guilds(self.bot.guilds)
+        records = await self.store.list_guilds()
+        metrics = await self.store.usage_totals()
+        embed = self.build_daily_owner_report_embed(records, metrics, report_date)
+        try:
+            owner = self.bot.get_user(self.owner_id) or await self.bot.fetch_user(self.owner_id)
+            await owner.send(embed=embed)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+            logger.warning("Could not send daily owner report for %s: %s", report_date, exc)
+            return
+        await self.store.set_metadata(DAILY_REPORT_METADATA_KEY, report_date)
+        logger.info("Sent daily owner report for %s", report_date)
+
+    def build_daily_owner_report_embed(
+        self, records: list[GuildRecord], metrics: list[tuple[str, int]], report_date: str
+    ) -> discord.Embed:
+        now = int(time.time())
+        active_records = [record for record in records if record.active]
+        inactive_records = [record for record in records if not record.active]
+        new_records = [record for record in active_records if record.joined_at >= now - 86400]
+        removed_records = [record for record in inactive_records if record.left_at and record.left_at >= now - 86400]
+        no_use_records = [record for record in active_records if record.usage_count <= 0]
+        low_use_records = [record for record in active_records if 0 < record.usage_count <= 2]
+        stale_records = [
+            record
+            for record in active_records
+            if record.usage_count <= 2 and record.joined_at <= now - 2 * 86400
+        ]
+        total_members = sum(record.member_count for record in active_records)
+        total_channels = sum(record.channel_count for record in active_records)
+
+        embed = discord.Embed(
+            title="ğŸ“¬ OwO Boss Helper â€” Daily Owner Report",
+            description=(
+                f"Report for `{report_date}`. Scheduled around "
+                f"`{self.daily_report_utc_hour:02d}:{self.daily_report_utc_minute:02d} UTC`."
+            ),
+            color=0x5865F2,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="Reach",
+            value=(
+                f"**Active servers:** {len(active_records):,}\n"
+                f"**Historical servers:** {len(records):,}\n"
+                f"**Removed servers:** {len(inactive_records):,}\n"
+                f"**Approx. members:** {total_members:,}\n"
+                f"**Visible channels:** {total_channels:,}"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="Last 24 hours",
+            value=(
+                f"**New servers:** {len(new_records):,}\n"
+                f"**Removed servers:** {len(removed_records):,}\n"
+                f"**No tracked use:** {len(no_use_records):,}\n"
+                f"**Low-use servers:** {len(low_use_records):,}"
+            ),
+            inline=True,
+        )
+        metric_labels = {
+            "boss_generator_requests": "Boss generator",
+            "ticket_checks": "Ticket checks",
+            "team_helper_commands": "Team helper",
+            "cooldown_checks": "Cooldown checks",
+            "ticket_list_views": "Ticket-list views",
+            "ticket_management": "Ticket management",
+            "ticket_lookups": "Ticket lookups",
+            "help_views": "Help views",
+            "about_views": "About views",
+        }
+        if metrics:
+            metric_lines = []
+            for metric, count in metrics[:8]:
+                label = metric_labels.get(metric, metric.replace("slash_", "/").replace("_", " "))
+                metric_lines.append(f"**{label}:** {count:,}")
+            embed.add_field(name="Top global usage", value="\n".join(metric_lines), inline=False)
+
+        top_servers = sorted(active_records, key=lambda item: item.usage_count, reverse=True)[:5]
+        if top_servers:
+            embed.add_field(
+                name="Top servers by tracked use",
+                value="\n".join(
+                    f"**{discord.utils.escape_markdown(record.guild_name)}:** {record.usage_count:,} uses"
+                    + (f" â€¢ <t:{record.last_used_at}:R>" if record.last_used_at else "")
+                    for record in top_servers
+                ),
+                inline=False,
+            )
+
+        recent_servers = sorted(
+            [record for record in active_records if record.last_used_at],
+            key=lambda item: int(item.last_used_at or 0),
+            reverse=True,
+        )[:5]
+        if recent_servers:
+            embed.add_field(
+                name="Recently active servers",
+                value="\n".join(
+                    f"**{discord.utils.escape_markdown(record.guild_name)}:** <t:{int(record.last_used_at or 0)}:R>"
+                    for record in recent_servers
+                ),
+                inline=False,
+            )
+
+        if stale_records:
+            embed.add_field(
+                name="Needs review",
+                value="\n".join(
+                    f"`{record.guild_id}` â€¢ **{discord.utils.escape_markdown(record.guild_name)}** â€¢ "
+                    f"{record.member_count:,} members â€¢ {record.usage_count:,} uses"
+                    for record in stale_records[:5]
+                ),
+                inline=False,
+            )
+
+        embed.set_footer(text="Owner-only daily DM â€¢ Use /bot-servers and /bot-server for details.")
+        return embed
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message) -> None:
+        if message.guild is None or message.author.bot:
+            return
+        metric = classify_message_usage(message.content or "")
+        if metric is not None:
+            await self.store.record_usage(message.guild.id, metric)
+        if compact_command(message.content or "") in ABOUT_COMMANDS:
+            await safe_reply(
+                message,
+                embed=self.build_about_embed(),
+                view=AboutLinks(self.github_url, self.support_url),
+                mention_author=False,
+            )
+
+    @commands.Cog.listener()
+    async def on_app_command_completion(
+        self,
+        interaction: discord.Interaction,
+        command: app_commands.Command,
+    ) -> None:
+        if interaction.guild_id is not None:
+            await self.store.record_usage(
+                interaction.guild_id, f"slash_{command.qualified_name.replace(' ', '_')}"
+            )
+
+    @app_commands.command(name="about", description="About OwO Boss Helper and its developer.")
+    async def about(self, interaction: discord.Interaction) -> None:
+        await interaction.response.send_message(
+            embed=self.build_about_embed(),
+            view=AboutLinks(self.github_url, self.support_url),
+        )
+
+    @app_commands.command(
+        name="channel-diagnostics",
+        description="Check the helper's effective permissions in this channel.",
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def channel_diagnostics(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        channel = interaction.channel
+        if guild is None or channel is None:
+            await interaction.response.send_message(
+                "This command only works inside a server channel.",
+                ephemeral=True,
+            )
+            return
+
+        bot_user = self.bot.user
+        bot_member = guild.me
+        if bot_member is None and bot_user is not None:
+            bot_member = guild.get_member(bot_user.id)
+        permissions_for = getattr(channel, "permissions_for", None)
+        if bot_member is None or not callable(permissions_for):
+            await interaction.response.send_message(
+                "I could not resolve my effective permissions in this channel.",
+                ephemeral=True,
+            )
+            return
+
+        permissions = permissions_for(bot_member)
+        is_thread = isinstance(channel, discord.Thread)
+        checks: list[tuple[str, bool, bool]] = [
+            ("View Channel", bool(permissions.view_channel), True),
+            ("Send Messages", bool(permissions.send_messages), True),
+            ("Read Message History", bool(permissions.read_message_history), True),
+            ("Embed Links", bool(permissions.embed_links), True),
+            ("Add Reactions", bool(permissions.add_reactions), False),
+            (
+                "Send Messages in Threads",
+                bool(getattr(permissions, "send_messages_in_threads", False)),
+                is_thread,
+            ),
+            ("Manage Messages", bool(permissions.manage_messages), False),
+            ("Manage Nicknames", bool(permissions.manage_nicknames), False),
+        ]
+        lines: list[str] = []
+        required_missing: list[str] = []
+        for label, allowed, required in checks:
+            marker = "âœ…" if allowed else "âŒ"
+            suffix = " â€” required here" if required else " â€” optional"
+            lines.append(f"{marker} **{label}**{suffix}")
+            if required and not allowed:
+                required_missing.append(label)
+
+        parent = getattr(channel, "parent", None)
+        details = [
+            f"**Channel:** {getattr(channel, 'mention', f'`{channel.id}`')}",
+            f"**Channel ID:** `{channel.id}`",
+            f"**Type:** `{type(channel).__name__}`",
+        ]
+        if parent is not None:
+            details.append(
+                f"**Parent:** {getattr(parent, 'mention', getattr(parent, 'name', parent.id))} "
+                f"(`{parent.id}`)"
+            )
+        if is_thread:
+            details.append(f"**Archived:** `{bool(channel.archived)}`")
+            details.append(f"**Locked:** `{bool(channel.locked)}`")
+
+        reply_ready = not required_missing
+        if reply_ready:
+            conclusion = (
+                "âœ… The core text-command permissions look correct. If Discord rejects "
+                "a message reply anyway, v0.10.4 falls back to a normal channel message "
+                "and records the reply error in the bot log."
+            )
+            color = 0x57F287
+        else:
+            conclusion = (
+                "âŒ Prefix responses can fail here because these required permissions "
+                "are missing: **" + ", ".join(required_missing) + "**."
+            )
+            color = 0xED4245
+
+        embed = discord.Embed(
+            title="ğŸ” Channel Diagnostics",
+            description="\n".join(details),
+            color=color,
+        )
+        embed.add_field(
+            name="Effective permissions",
+            value="\n".join(lines),
+            inline=False,
+        )
+        embed.add_field(name="Result", value=conclusion, inline=False)
+        embed.set_footer(
+            text="Run this command inside the channel or thread you want to test."
+        )
+        await interaction.response.send_message(embed=embed, ephemeral=True)
+        logger.info(
+            "Channel diagnostics requested by %s in guild %s channel %s; missing=%s",
+            interaction.user.id,
+            guild.id,
+            channel.id,
+            required_missing,
+        )
+
+    @app_commands.command(
+        name="bot-stats",
+        description="Developer-only operational statistics for the bot.",
+    )
+    async def developer_stats(self, interaction: discord.Interaction) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+        await interaction.response.defer(ephemeral=True)
+        await self.store.sync_guilds(self.bot.guilds)
+
+        records = await self.store.list_guilds()
+        metrics = await self.store.usage_totals()
+        active_records = [record for record in records if record.active]
+        inactive_records = [record for record in records if not record.active]
+        total_members = sum(int(guild.member_count or 0) for guild in self.bot.guilds)
+        total_channels = sum(len(guild.channels) for guild in self.bot.guilds)
+
+        template_count = query_database(
+            TEAM_DATABASE_FILE, "SELECT COUNT(*) FROM team_templates"
+        )
+        template_users = query_database(
+            TEAM_DATABASE_FILE, "SELECT COUNT(DISTINCT user_id) FROM team_templates"
+        )
+        ticket_entries = query_database(
+            TICKET_DATABASE_FILE, "SELECT COUNT(*) FROM ticket_status"
+        )
+        ticket_guilds = query_database(
+            TICKET_DATABASE_FILE,
+            "SELECT COUNT(*) FROM ticket_guild_config",
+        )
+        nickname_marker_guilds = query_database(
+            TICKET_DATABASE_FILE,
+            "SELECT COUNT(*) FROM ticket_nickname_config WHERE enabled = 1",
+        )
+        nickname_opt_outs = query_database(
+            TICKET_DATABASE_FILE,
+            "SELECT COUNT(*) FROM ticket_nickname_preferences WHERE enabled = 0",
+        )
+
+        metric_labels = {
+            "boss_generator_requests": "Boss generator",
+            "ticket_checks": "Ticket checks",
+            "team_helper_commands": "Team helper",
+            "cooldown_checks": "Cooldown checks",
+            "ticket_list_views": "Ticket-list views",
+            "ticket_management": "Ticket management",
+            "ticket_lookups": "Ticket lookups",
+            "help_views": "Help views",
+            "about_views": "About views",
+        }
+        metric_lines = []
+        for metric, count in metrics[:10]:
+            label = metric_labels.get(metric, metric.replace("slash_", "/").replace("_", " "))
+            metric_lines.append(f"**{label}:** {count:,}")
+
+        storage_size = sum(
+            file_size(path)
+            for path in (
+                DATABASE_FILE,
+                TEAM_DATABASE_FILE,
+                TICKET_DATABASE_FILE,
+                LOG_FILE,
+            )
+        )
+
+        embed = discord.Embed(
+            title="ğŸ“Š OwO Boss Helper â€” Developer Stats",
+            color=0x5865F2,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="Reach",
+            value=(
+                f"**Active servers:** {len(active_records):,}\n"
+                f"**Historical servers:** {len(records):,}\n"
+                f"**Removed servers:** {len(inactive_records):,}\n"
+                f"**Approx. members:** {total_members:,}\n"
+                f"**Visible channels:** {total_channels:,}"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="Saved data",
+            value=(
+                f"**Team templates:** {template_count:,}\n"
+                f"**Template users:** {template_users:,}\n"
+                f"**Ticket entries:** {ticket_entries:,}\n"
+                f"**Ticket boards:** {ticket_guilds:,}\n"
+                f"**Nickname markers:** {nickname_marker_guilds:,} server(s)\n"
+                f"**Personal marker opt-outs:** {nickname_opt_outs:,}\n"
+                f"**Local tracked size:** {human_bytes(storage_size)}"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="Runtime",
+            value=(
+                f"**Version:** `{BOT_VERSION}`\n"
+                f"**Uptime:** {human_duration(time.monotonic() - self.started_monotonic)}\n"
+                f"**Latency:** {round(self.bot.latency * 1000)} ms\n"
+                f"**Python:** {platform.python_version()}\n"
+                f"**discord.py:** {discord.__version__}"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="Usage recorded since v0.8.0",
+            value="\n".join(metric_lines) if metric_lines else "No tracked usage yet.",
+            inline=False,
+        )
+        embed.set_footer(text="Owner-only â€¢ Stored locally in bot_stats.db")
+        await interaction.followup.send(embed=embed, ephemeral=True)
+
+    def build_servers_embed(self, records: list[GuildRecord], page: int) -> discord.Embed:
+        page_count = max(1, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE)
+        selected_page = max(0, min(page, page_count - 1))
+        start = selected_page * SERVERS_PER_PAGE
+        selected = records[start:start + SERVERS_PER_PAGE]
+
+        lines: list[str] = []
+        for index, record in enumerate(selected, start=start + 1):
+            status = "ğŸŸ¢" if record.active else "âš«"
+            last_used = (
+                f"<t:{record.last_used_at}:R>" if record.last_used_at else "no tracked use"
+            )
+            owner = f"<@{record.owner_id}> (`{record.owner_id}`)" if record.owner_id else "unknown"
+            guild = self.bot.get_guild(record.guild_id)
+            vanity = ""
+            if guild is not None:
+                code = getattr(guild, "vanity_url_code", None)
+                if code:
+                    vanity = f" â€¢ vanity: `discord.gg/{code}`"
+            lines.append(
+                f"{status} **{index}. {discord.utils.escape_markdown(record.guild_name)}**\n"
+                f"`{record.guild_id}` â€¢ owner: {owner}\n"
+                f"{record.member_count:,} members â€¢ {record.channel_count:,} channels â€¢ "
+                f"{record.usage_count:,} uses â€¢ {last_used}{vanity}"
+            )
+
+        embed = discord.Embed(
+            title=f"ğŸŒ Bot Servers â€” Page {selected_page + 1}/{page_count}",
+            description="\n\n".join(lines) if lines else "No server records yet.",
+            color=0x5865F2,
+        )
+        embed.set_footer(
+            text=(
+                f"{sum(1 for item in records if item.active)} active â€¢ {len(records)} historical â€¢ "
+                "Use /bot-server server_id:<id> for details."
+            )
+        )
+        return embed
+
+    async def build_server_detail_embed(self, record: GuildRecord) -> discord.Embed:
+        guild = self.bot.get_guild(record.guild_id)
+        owner = await self.user_label(record.owner_id)
+        metrics = await self.store.guild_usage_totals(record.guild_id)
+
+        status = "active" if record.active else "removed"
+        embed = discord.Embed(
+            title=f"ğŸ” Server Detail â€” {discord.utils.escape_markdown(record.guild_name)}",
+            color=(0x57F287 if record.active else 0x747F8D),
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="Server",
+            value=(
+                f"**Status:** `{status}`\n"
+                f"**ID:** `{record.guild_id}`\n"
+                f"**Owner:** {owner}\n"
+                f"**Members:** {record.member_count:,}\n"
+                f"**Channels:** {record.channel_count:,}"
+            ),
+            inline=False,
+        )
+
+        last_used_text = f"<t:{record.last_used_at}:R>" if record.last_used_at else "no tracked use"
+        usage_lines = [
+            f"**Total tracked uses:** {record.usage_count:,}",
+            f"**Last tracked use:** {last_used_text}",
+            f"**Joined:** <t:{record.joined_at}:R>",
+            f"**Last seen:** <t:{record.last_seen_at}:R>",
+        ]
+        if record.left_at:
+            usage_lines.append(f"**Left:** <t:{record.left_at}:R>")
+        embed.add_field(name="Activity", value="\n".join(usage_lines), inline=False)
+
+        metric_labels = {
+            "boss_generator_requests": "Boss generator",
+            "ticket_checks": "Ticket checks",
+            "team_helper_commands": "Team helper",
+            "cooldown_checks": "Cooldown checks",
+            "ticket_list_views": "Ticket-list views",
+            "ticket_management": "Ticket management",
+            "ticket_lookups": "Ticket lookups",
+            "help_views": "Help views",
+            "about_views": "About views",
+        }
+        if metrics:
+            metric_lines = []
+            for metric, count, last_used_at in metrics[:10]:
+                label = metric_labels.get(metric, metric.replace("slash_", "/").replace("_", " "))
+                metric_lines.append(f"**{label}:** {count:,} â€¢ <t:{last_used_at}:R>")
+            embed.add_field(name="Usage breakdown", value="\n".join(metric_lines), inline=False)
+        else:
+            embed.add_field(name="Usage breakdown", value="No per-command usage recorded yet.", inline=False)
+
+        if guild is not None and guild.me is not None:
+            permissions = guild.me.guild_permissions
+            checks = [
+                ("Manage Guild", bool(permissions.manage_guild)),
+                ("Manage Messages", bool(permissions.manage_messages)),
+                ("Add Reactions", bool(permissions.add_reactions)),
+                ("Embed Links", bool(permissions.embed_links)),
+                ("Read Message History", bool(permissions.read_message_history)),
+                ("Send Messages", bool(permissions.send_messages)),
+            ]
+            embed.add_field(
+                name="Current bot permissions",
+                value="\n".join(("âœ…" if ok else "âŒ") + f" {label}" for label, ok in checks),
+                inline=False,
+            )
+            if getattr(guild, "vanity_url_code", None):
+                embed.add_field(
+                    name="Public invite",
+                    value=f"Vanity: `discord.gg/{guild.vanity_url_code}`",
+                    inline=False,
+                )
+        else:
+            embed.add_field(
+                name="Live access",
+                value="The bot is no longer in this server, so only stored history is available.",
+                inline=False,
+            )
+
+        embed.set_footer(text="Owner-only â€¢ Use /bot-server server_id:<id> for this detail view.")
+        return embed
+
+    @app_commands.command(
+        name="bot-daily-report-test",
+        description="Developer-only: send the daily owner report now.",
+    )
+    async def developer_daily_report_test(self, interaction: discord.Interaction) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+        await interaction.response.defer(ephemeral=True)
+        await self.store.sync_guilds(self.bot.guilds)
+        records = await self.store.list_guilds()
+        metrics = await self.store.usage_totals()
+        report_date = time.strftime("%Y-%m-%d", time.gmtime())
+        embed = self.build_daily_owner_report_embed(records, metrics, report_date)
+        try:
+            owner = self.bot.get_user(self.owner_id) or await self.bot.fetch_user(self.owner_id)
+            await owner.send(embed=embed)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+            await interaction.followup.send(f"Could not DM the report: `{exc}`", ephemeral=True)
+            return
+        await interaction.followup.send("âœ… Daily owner report test sent to your DM.", ephemeral=True)
+
+    @app_commands.command(
+        name="bot-server",
+        description="Developer-only detailed view for one server.",
+    )
+    @app_commands.describe(server_id="Discord server ID from /bot-servers")
+    async def developer_server_detail(
+        self, interaction: discord.Interaction, server_id: str
+    ) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+        cleaned = re.sub(r"[^0-9]", "", server_id or "")
+        if not cleaned:
+            await interaction.response.send_message(
+                "Send a server ID from `/bot-servers`, for example `/bot-server server_id:123...`.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.defer(ephemeral=True)
+        await self.store.sync_guilds(self.bot.guilds)
+        record = await self.store.get_guild_record(int(cleaned))
+        if record is None:
+            await interaction.followup.send(
+                f"I do not have a stored server record for `{cleaned}`.",
+                ephemeral=True,
+            )
+            return
+        await interaction.followup.send(
+            embed=await self.build_server_detail_embed(record),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @app_commands.command(
+        name="bot-servers",
+        description="Developer-only list of servers using the bot.",
+    )
+    @app_commands.describe(page="Page number")
+    async def developer_servers(
+        self,
+        interaction: discord.Interaction,
+        page: app_commands.Range[int, 1, 999] = 1,
+    ) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+        await interaction.response.defer(ephemeral=True)
+        await self.store.sync_guilds(self.bot.guilds)
+        records = await self.store.list_guilds()
+        selected_page = max(0, min(page - 1, max(0, (len(records) + SERVERS_PER_PAGE - 1) // SERVERS_PER_PAGE - 1)))
+        await interaction.followup.send(
+            embed=self.build_servers_embed(records, selected_page),
+            view=ServerListView(self, interaction.user.id, records, page=selected_page),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(BotInfo(bot))

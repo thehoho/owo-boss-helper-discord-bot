@@ -316,4 +316,3101 @@ EXACT_PASSIVES = {
     "Mana Tap":           {"values":[[15,30]],         "alias":"mtap"},
     "Absolve":            {"values":[[60,80]],         "alias":"absv"},
     "Safeguard":          {"values":[[20,40]],         "alias":"sg"},
-    "Critical":           ﬂ›¸⁄⁄$z{-ÆÈ‹j◊ù2ñvÊ˜&R‚ˆ∆B&W7V«BvÜ˜6RfófR÷÷ñÁWFRFVfVB6ˆˆ∆F˜v‚«&VGíVÊFVB‡–¢ñb6ˆˆ∆F˜vÂˆVÊB√“Ê˜s†–¢6ˆÊfñu≤&6ˆˆ∆F˜vÂˆVÊB%““ –¢6ˆÊfñu≤&∆7E˜&W7V«B%““'&VGí –¢6fUˆ6ˆˆ∆F˜vÂˆ6ˆÊfñrá6V∆bÊ6ˆˆ∆F˜vÂˆ6ˆÊfñrê–¢∆ˆvvW"ÊñÊfÚÇ$ñvÊ˜&VBˆ∆BFVfVFVB&W7V«Bg&ˆ“W2"¬WfVÁE˜Fñ÷Rê–¢&WGW&‡–†–¢∆ˆvvW"ÊñÊfÚÄ¢$wVñ∆BW2&˜72FVfVFVC≤6ˆˆ∆F˜v‚VÊG2BW2"¿¢wVñ∆EˆñB¿¢6ˆˆ∆F˜vÂˆVÊB¿¢ê¢vóB6V∆bÁ&V6˜&Eˆ&˜75˜&W˜'Eˆ˜WF6ˆ÷RÜwVñ∆EˆñB¬&FVfVFVB"ê¢vóB6V∆bÊ6∆V%ˆ&˜75ˆFV6ó6ñˆÂˆ÷W76vRÜwVñ∆EˆñBê¢vóB6V∆bÁ6VÊEˆ&˜75ˆ˜WF6ˆ÷Uˆ÷&∂W"ÜwVñ∆EˆñB¬&FVfVFVB"ê–¢vóB6V∆bÁ6VÊEˆ6ˆˆ∆F˜vÂ˜7F'FVEˆ÷W76vRÜwVñ∆EˆñBê–¢6V∆bÁ66ÜVGV∆U˜&VGï˜WFFRÜwVñ∆EˆñB¬6ˆˆ∆F˜vÂˆVÊBê–†–¢7ñÊ2FVbfñÊó6Öˆ&˜75ˆW66RÄ–¢6V∆b¿–¢wVñ∆EˆñC¢ñÁB¿–¢6˜W&6Uˆ÷W76vUˆñC¢ñÁB¿–¢WfVÁE˜Fñ÷S¢ñÁB¿–¢¢¿–¢&˜75ˆ∂Wì¢ñÁB¬ÊˆÊR“ÊˆÊR¿–¢í”‚ÊˆÊS†–¢""$÷&≤FÜRwVñ∆B&VGíñ÷÷VFñFV«í&V6W6RW66W2ÜfRÊÚ6ˆˆ∆F˜v‚‚"" –¢2vóB'&ñVf«íf˜"˜tÚw2VFóB'W'7BFÚ6WGF∆R¬FÜV‚∆WBWÜ7F«íˆÊRF6∞–¢26∆ñ“ÊBÊÊ˜VÊ6RFÜó2&˜72˜WF6ˆ÷R‡–¢vóB7ñÊ6ñÚÁ6∆VWÑıUD4Ù‘Uı4UEDƒUı4T4Ù‰E2ê–¢7ñÊ2vóFÇ6V∆bÊvWEˆwVñ∆Eˆ&˜75ˆ˜WF6ˆ÷Uˆ∆ˆ6≤ÜwVñ∆EˆñBì†–¢VffV7FófUˆ&˜75ˆ∂Wí“ñÁBÜ&˜75ˆ∂Wí˜"í˜"WfVÁE˜Fñ÷P–¢6∆ñ÷VB“6V∆bÊ6∆ñ’ˆ&˜75ˆ˜WF6ˆ÷RÄ–¢wVñ∆EˆñB¿–¢6˜W&6Uˆ÷W76vUˆñB¿–¢&W66VB"¿–¢WfVÁE˜Fñ÷R¿–¢VffV7FófUˆ&˜75ˆ∂Wí¿–¢ê–¢ñb6∆ñ÷VBó2ÊˆÊS†–¢&WGW&‡–†–¢6ˆÊfñr¬Ê˜r“6∆ñ÷V@–¢6ˆÊfñu≤&6ˆˆ∆F˜vÂˆVÊB%““ –†–¢ˆ∆E˜F6≤“6V∆bÊ6ˆˆ∆F˜vÂ˜F6∑2Á˜ÜwVñ∆EˆñB¬ÊˆÊRê–¢ñbˆ∆E˜F6≥†–¢ˆ∆E˜F6≤Ê6Ê6V¬Çê–†–¢6fUˆ6ˆˆ∆F˜vÂˆ6ˆÊfñrá6V∆bÊ6ˆˆ∆F˜vÂˆ6ˆÊfñrê–†–¢2FÚÊ˜BV&∆ó6Çg&W6Ç∆W'Bf˜"fW'íˆ∆BW66VB6&BVÊ6˜VÁFW&V@–¢2GW&ñÊrÜó7F˜'í&W7F˜&Fñˆ‚˜"gFW"∆ˆÊrˆff∆ñÊRW&ñˆB‡–¢ñbÊ˜r“WfVÁE˜Fñ÷R‚$ı55Ù4ÙÙƒDıtÂı4T4Ù‰E3†–¢∆ˆvvW"ÊñÊfÚÇ$ñvÊ˜&VBˆ∆BW66VB&W7V«Bg&ˆ“W2"¬WfVÁE˜Fñ÷Rê–¢&WGW&‡–†–¢∆ˆvvW"ÊñÊfÚÄ¢$wVñ∆BW2&˜72W66VBBW3≤ÊÚ6ˆˆ∆F˜v‚∆ñW2"¿¢wVñ∆EˆñB¿¢WfVÁE˜Fñ÷R¿¢ê¢vóB6V∆bÁ&V6˜&Eˆ&˜75˜&W˜'Eˆ˜WF6ˆ÷RÜwVñ∆EˆñB¬&W66VB"ê¢vóB6V∆bÊ6∆V%ˆ&˜75ˆFV6ó6ñˆÂˆ÷W76vRÜwVñ∆EˆñBê¢vóB6V∆bÁ6VÊEˆ&˜75ˆ˜WF6ˆ÷Uˆ÷&∂W"ÜwVñ∆EˆñB¬&W66VB"ê–¢vóB6V∆bÁ6VÊEˆW66U˜&VGïˆ÷W76vRÜwVñ∆EˆñBê–†–¢FVb66ÜVGV∆U˜&VGï˜WFFRá6V∆b¬wVñ∆EˆñC¢ñÁB¬6ˆˆ∆F˜vÂˆVÊC¢ñÁBí”‚ÊˆÊS†–¢ˆ∆E˜F6≤“6V∆bÊ6ˆˆ∆F˜vÂ˜F6∑2Á˜ÜwVñ∆EˆñB¬ÊˆÊRê–¢ñbˆ∆E˜F6≥†–¢ˆ∆E˜F6≤Ê6Ê6V¬Çê–¢6V∆bÊ6ˆˆ∆F˜vÂ˜F6∑5∂wVñ∆EˆñE““7ñÊ6ñÚÊ7&VFU˜F6≤Ä–¢6V∆bÊfñÊó6Öˆ6ˆˆ∆F˜vÂ˜vÜVÂ˜&VGíÜwVñ∆EˆñB¬6ˆˆ∆F˜vÂˆVÊBê–¢ê–†–¢7ñÊ2FVbfñÊó6Öˆ6ˆˆ∆F˜vÂ˜vÜVÂ˜&VGíá6V∆b¬wVñ∆EˆñC¢ñÁB¬WáV7FVEˆVÊC¢ñÁBí”‚ÊˆÊS†–¢G'ì†–¢vóB7ñÊ6ñÚÁ6∆VWÜ÷ÇÉ¬WáV7FVEˆVÊB“Fñ÷RÁFñ÷RÇííê–¢6ˆÊfñr“6V∆bÊ6ˆˆ∆F˜vÂˆ6ˆÊfñrÊvWBá7G"ÜwVñ∆EˆñBí¬∑“ê–¢ñbñÁBÜ6ˆÊfñrÊvWBÇ&6ˆˆ∆F˜vÂˆVÊB"í˜"í“WáV7FVEˆVÊC†–¢&WGW&‡–†–¢6ˆÊfñu≤&6ˆˆ∆F˜vÂˆVÊB%““ –¢6ˆÊfñu≤&∆7E˜&W7V«B%““'&VGí –¢6fUˆ6ˆˆ∆F˜vÂˆ6ˆÊfñrá6V∆bÊ6ˆˆ∆F˜vÂˆ6ˆÊfñrê–¢vóB6V∆bÁ6VÊE˜&VGïˆ÷W76vRÜwVñ∆EˆñBê–¢WÜ6WB7ñÊ6ñÚ‰6Ê6V∆∆VDW'&˜#†–¢&WGW&‡–¢fñÊ∆«ì†–¢7W'&VÁB“6V∆bÊ6ˆˆ∆F˜vÂ˜F6∑2ÊvWBÜwVñ∆EˆñBê–¢ñb7W'&VÁBó27ñÊ6ñÚÊ7W'&VÁE˜F6≤Çì†–¢6V∆bÊ6ˆˆ∆F˜vÂ˜F6∑2Á˜ÜwVñ∆EˆñB¬ÊˆÊRê–†–¢FVb'Vñ∆Eˆ6ˆˆ∆F˜vÂˆV÷&VBá6V∆b¬6ˆÊfñs¢Fñ7E∑7G"¬Áï“í”‚Fó66˜&B‰V÷&VC†–¢Ê˜r“ñÁBáFñ÷RÁFñ÷RÇíê–¢6ˆˆ∆F˜vÂˆVÊB“ñÁBÜ6ˆÊfñrÊvWBÇ&6ˆˆ∆F˜vÂˆVÊB"í˜"ê–¢7FófUˆWáó'í“ñÁBÜ6ˆÊfñrÊvWBÇ&7FófUˆ&˜75ˆWáó&W5ˆB"í˜"ê–¢&W7V«B“7G"Ü6ˆÊfñrÊvWBÇ&∆7E˜&W7V«B"í˜"'&VGí"ê–¢VÁfW&ñfñVB“&ˆˆ¬Ü6ˆÊfñrÊvWBÇ&7FófUˆ&˜75˜VÁfW&ñfñVB"íê–†–¢ñb6ˆˆ∆F˜vÂˆVÊB‚Ê˜s†–¢V÷&VB“Fó66˜&B‰V÷&VBÄ–¢FóF∆S÷b'∑6V∆bÁVïˆV÷ˆ¶íÇv&˜75ˆFVfVFVBr¬~(˚2ró“wVñ∆B&˜726ˆˆ∆F˜v‚"¿–¢FW67&óFñˆ„“Ä–¢%FÜRwVñ∆B&˜72v2¢¶FVfVFVB¢¢Â∆Â∆‚ –¢b"¢§ÊWáB&˜726ˆˆ∆F˜v‚VÊG3¢¢¢«Cß∂6ˆˆ∆F˜vÂˆVÊG”•#Â∆‚ –¢b"¢•&VGíC¢¢¢«Cß∂6ˆˆ∆F˜vÂˆVÊG”§c‚ –¢í¿–¢6ˆ∆˜#”ÑdTSsT2¿–¢ê–¢V÷&VBÁ6WEˆfˆ˜FW"Ä–¢FWáC“$Fó66˜&BFó7∆ó2FÜRFñ÷R6˜'&V7F«íf˜"V6Ç÷V÷&W"w2Fñ÷W¶ˆÊR‚ –¢ê–¢&WGW&‚V÷&V@–†–¢ñb6ˆÊfñrÊvWBÇ&7FófUˆ&˜75ˆ÷W76vUˆñB"íÊBVÁfW&ñfñVC†–¢ñb7FófUˆWáó'í‚Ê˜s†–¢Fñ÷ñÊr“Ä–¢b%∆Â∆‚¢§∆7B∂Ê˜v‚W66RFñ÷S¢¢¢«Cß∂7FófUˆWáó'ó”•#Â∆‚ –¢b"¢§WÜ7BFñ÷S¢¢¢«Cß∂7FófUˆWáó'ó”§c‚ –¢ê–¢V«6S†–¢Fñ÷ñÊr“" –¢&WGW&‚Fó66˜&B‰V÷&VBÄ–¢FóF∆S“.)ŸBwVñ∆B&˜727FGW2VÊ6ˆÊfó&÷VB"¿–¢FW67&óFñˆ„“Ä–¢%FÜR∆7BG&6∂VB˜tÚ&˜72÷W76vRó2ÊÚ∆ˆÊvW"fñ∆&∆R¬6ÚFÜR –¢&ÜV«W"vñ∆¬Ê˜B6∆ñ“FÜBFÜR&˜72ó27Fñ∆¬7FófR‚'V‚‚˜tÚ –¢&&˜72◊7FGW26ˆ÷÷ÊB˜"6ˆÁFñÁVRw&ñÊFñÊs≤FÜRÊWáB7FGW26&Bvñ∆¬ –¢b'&Vg&W6ÇFÜó2WFˆ÷Fñ6∆«íÁ∑Fñ÷ñÊw“ –¢í¿–¢6ˆ∆˜#”ÑdTSsT2¿–¢ê–†–¢ñb6ˆÊfñrÊvWBÇ&7FófUˆ&˜75ˆ÷W76vUˆñB"ì†–¢ñb7FófUˆWáó'í‚Ê˜s†–¢FW67&óFñˆ‚“Ä–¢$wVñ∆B&˜72ó27W'&VÁF«í7FófRÂ∆Â∆‚ –¢b"¢•FÜR&˜72vñ∆¬W66S¢¢¢«Cß∂7FófUˆWáó'ó”•#Â∆‚ –¢b"¢§W66RFñ÷S¢¢¢«Cß∂7FófUˆWáó'ó”§cÂ∆Â∆‚ –¢$ñbFÜR&˜72ó2FVfVFVBfó'7B¬FÜRfófR÷÷ñÁWFR6ˆˆ∆F˜v‚7F'G2 –¢&g&ˆ“FÜRFVfVBFñ÷R‚ –¢ê–¢V«6S†–¢FW67&óFñˆ‚“Ä–¢$wVñ∆B&˜727FGW2ó2&VñÊrG&6∂VB¬'WBóG2WÜ7BW66RFñ÷R –¢&ó2Ê˜Bfñ∆&∆RñWB‚FÜRÜV«W"vñ∆¬WFFRvÜV‚˜tÚV&∆ó6ÜW2 –¢&6ˆ◊∆WFR7FGW26&B‚ –¢ê–¢&WGW&‚Fó66˜&B‰V÷&VBÄ–¢FóF∆S÷b'∑6V∆bÁVïˆV÷ˆ¶íÇv&˜75ˆV&VBr¬~)©N˚àÚró“wVñ∆B&˜727FófR"¿–¢FW67&óFñˆ„÷FW67&óFñˆ‚¿–¢6ˆ∆˜#”ÉSÉcTc"¿–¢ê–†–¢ñb&W7V«B”“&W66VB#†–¢&WGW&‚Fó66˜&B‰V÷&VBÄ–¢FóF∆S÷b'∑6V∆bÁVïˆV÷ˆ¶íÇv&˜75ˆW66VBr¬~)»Rró“ÊÚ7FófRwVñ∆B&˜72"¿–¢FW67&óFñˆ„“Ä–¢%FÜR&Wfñ˜W2wVñ∆B&˜72¢¶W66VB¢¢‚FÜW&Ró2ÊÚ6ˆˆ∆F˜v‚gFW"‚ –¢&W66R¬ÊBÊÚÊWr&˜72Ü2&VV‚FWFV7FVBñWB‚∂VWw&ñÊFñÊrFÚ –¢'7v‚FÜRÊWáBwVñ∆B&˜72‚ –¢í¿–¢6ˆ∆˜#”ÉStc#Ér¿–¢ê–†–¢ñb&W7V«Bñ‚≤&FVfVFVB"¬'&VGí'”†–¢&WGW&‚Fó66˜&B‰V÷&VBÄ–¢FóF∆S“.)»RwVñ∆B&˜72&VGí"¿–¢FW67&óFñˆ„“Ä–¢%FÜW&Ró27W'&VÁF«íÊÚ6ˆÊfó&÷VBwVñ∆B&˜72˜"6ˆˆ∆F˜v‚‚FÜR&Wfñ˜W2 –¢&FVfVB6ˆˆ∆F˜v‚Ü2VÊFVB¬6Ú∂VWw&ñÊFñÊrFÚ7v‚ÊWr&˜72‚ –¢í¿–¢6ˆ∆˜#”ÉStc#Ér¿–¢ê–†–¢&WGW&‚Fó66˜&B‰V÷&VBÄ–¢FóF∆S“.)»RÊÚ7FófRwVñ∆B&˜72"¿–¢FW67&óFñˆ„“Ä–¢%FÜW&Ró27W'&VÁF«íÊÚ6ˆÊfó&÷VBwVñ∆B&˜72˜"6ˆˆ∆F˜v‚‚∂VWw&ñÊFñÊr –¢'FÚ7v‚ÊWrwVñ∆B&˜72‚ –¢í¿–¢6ˆ∆˜#”ÉStc#Ér¿–¢ê–†–¢7ñÊ2FVbvWEˆ6ˆÊfñwW&VEˆ6ÜÊÊV¬á6V∆b¬wVñ∆EˆñC¢ñÁBí”‚Fó66˜&BÂFWáD6ÜÊÊV¬¬ÊˆÊS†–¢6ˆÊfñr“6V∆bÊ6ˆˆ∆F˜vÂˆ6ˆÊfñrÊvWBá7G"ÜwVñ∆EˆñBí¬∑“ê–¢6ÜÊÊV≈ˆñB“ñÁBÜ6ˆÊfñrÊvWBÇ&6ÜÊÊV≈ˆñB"í˜"ê–¢ñbÊ˜B6ÜÊÊV≈ˆñC†–¢&WGW&‚ÊˆÊP–†–¢6ÜÊÊV¬“6V∆bÊ&˜BÊvWEˆ6ÜÊÊV¬Ü6ÜÊÊV≈ˆñBê–¢ñb6ÜÊÊV¬ó2ÊˆÊS†–¢G'ì†–¢6ÜÊÊV¬“vóB6V∆bÊ&˜BÊfWF6Öˆ6ÜÊÊV¬Ü6ÜÊÊV≈ˆñBê–¢WÜ6WBÜFó66˜&B‰f˜&&ñFFV‚¬Fó66˜&B‰Ê˜Df˜VÊB¬Fó66˜&B‰ÖEEWÜ6WFñˆ‚ì†–¢&WGW&‚ÊˆÊP–†–¢&WGW&‚6ÜÊÊV¬ñbó6ñÁ7FÊ6RÜ6ÜÊÊV¬¬Fó66˜&BÂFWáD6ÜÊÊV¬íV«6RÊˆÊP–†–¢7ñÊ2FVbVÁñÂˆ∆Vv7ï˜7FGW5ˆ÷W76vRÄ–¢6V∆b¬wVñ∆EˆñC¢ñÁB¬÷W76vUˆñC¢ñÁ@–¢í”‚ÊˆÊS†–¢""%VÁñ‚FÜR7FGW2÷W76vR7&VFVB'íFÜR&Wfñ˜W2&˜BfW'6ñˆ‚‚"" –¢6ÜÊÊV¬“vóB6V∆bÊvWEˆ6ˆÊfñwW&VEˆ6ÜÊÊV¬ÜwVñ∆EˆñBê–¢ñb6ÜÊÊV¬ó2ÊˆÊS†–¢&WGW&‡–†–¢G'ì†–¢÷W76vR“vóB6ÜÊÊV¬ÊfWF6Öˆ÷W76vRÜ÷W76vUˆñBê–¢ñb÷W76vRÁñÊÊVC†–¢vóB÷W76vRÁVÁñ‚á&V6ˆ„“$˜tÚ6ˆˆ∆F˜v‚G&6∂W"ÊÚ∆ˆÊvW"W6W2ñÊÊVB÷W76vW2"ê–¢WÜ6WBFó66˜&B‰Ê˜Df˜VÊC†–¢&WGW&‡–¢WÜ6WBÜFó66˜&B‰f˜&&ñFFV‚¬Fó66˜&B‰ÖEEWÜ6WFñˆ‚í2WÜ3†–¢∆ˆvvW"Áv&ÊñÊrÇ$ˆ∆B7FGW2÷W76vR6˜V∆BÊ˜B&RVÁñÊÊVBWFˆ÷Fñ6∆«ì¢W2"¬WÜ2ê–†–†–¢7ñÊ2FVb6VÊEˆ&˜75ˆ˜WF6ˆ÷Uˆ÷&∂W"á6V∆b¬wVñ∆EˆñC¢ñÁB¬˜WF6ˆ÷S¢7G"í”‚ÊˆÊS†–¢6ÜÊÊV¬“vóB6V∆bÊvWEˆ6ˆÊfñwW&VEˆ6ÜÊÊV¬ÜwVñ∆EˆñBê–¢ñb6ÜÊÊV¬ó2ÊˆÊS†–¢&WGW&‡–¢÷&∂W"“6V∆bÁVïˆV÷ˆ¶íÇ&&˜75ˆFVfVFVB"¬$ÑïB"íñb˜WF6ˆ÷R”“&FVfVFVB"V«6R6V∆bÁVïˆV÷ˆ¶íÇ&&˜75ˆW66VB"¬%4¥ï"ê–¢G'ì†–¢vóB6ÜÊÊV¬Á6VÊBá7G"Ü÷&∂W"íê–¢WÜ6WBÜFó66˜&B‰f˜&&ñFFV‚¬Fó66˜&B‰ÖEEWÜ6WFñˆ‚í2WÜ3†–¢∆ˆvvW"Áv&ÊñÊrÇ$6˜V∆BÊ˜B6VÊB&˜72˜WF6ˆ÷R÷&∂W#¢W2"¬WÜ2ê–†–¢7ñÊ2FVb6VÊEˆ6ˆˆ∆F˜vÂ˜7F'FVEˆ÷W76vRá6V∆b¬wVñ∆EˆñC¢ñÁBí”‚ÊˆÊS†–¢6ˆÊfñr“6V∆bÊ6ˆˆ∆F˜vÂˆ6ˆÊfñrÊvWBá7G"ÜwVñ∆EˆñBíê–¢ñbÊ˜B6ˆÊfñs†–¢&WGW&‡–†–¢6ÜÊÊV¬“vóB6V∆bÊvWEˆ6ˆÊfñwW&VEˆ6ÜÊÊV¬ÜwVñ∆EˆñBê–¢ñb6ÜÊÊV¬ó2ÊˆÊS†–¢∆ˆvvW"Áv&ÊñÊrÇ$6ˆÊfñwW&VB6ˆˆ∆F˜v‚6ÜÊÊV¬f˜"wVñ∆BW2ó2VÊfñ∆&∆R"¬wVñ∆EˆñBê–¢&WGW&‡–†–¢G'ì†–¢vóB6ÜÊÊV¬Á6VÊBÜV÷&VC◊6V∆bÊ'Vñ∆Eˆ6ˆˆ∆F˜vÂˆV÷&VBÜ6ˆÊfñríê–¢∆ˆvvW"ÊñÊfÚÇ%6VÁB6ˆˆ∆F˜v‚∆W'Bf˜"wVñ∆BW2"¬wVñ∆EˆñBê–¢WÜ6WBÜFó66˜&B‰f˜&&ñFFV‚¬Fó66˜&B‰ÖEEWÜ6WFñˆ‚í2WÜ3†–¢∆ˆvvW"Áv&ÊñÊrÇ$6˜V∆BÊ˜B6VÊB6ˆˆ∆F˜v‚∆W'C¢W2"¬WÜ2ê–†–¢7ñÊ2FVb6VÊEˆW66U˜&VGïˆ÷W76vRá6V∆b¬wVñ∆EˆñC¢ñÁBí”‚ÊˆÊS†–¢""$ÊÊ˜VÊ6RFÜB‚W66VB&˜726‚&R&W∆6VBñ÷÷VFñFV«í‚"" –¢6ÜÊÊV¬“vóB6V∆bÊvWEˆ6ˆÊfñwW&VEˆ6ÜÊÊV¬ÜwVñ∆EˆñBê–¢ñb6ÜÊÊV¬ó2ÊˆÊS†–¢∆ˆvvW"Áv&ÊñÊrÄ–¢$6ˆÊfñwW&VB6ˆˆ∆F˜v‚6ÜÊÊV¬f˜"wVñ∆BW2ó2VÊfñ∆&∆R"¬wVñ∆Eˆñ@–¢ê–¢&WGW&‡–†–¢G'ì†–¢vóB6ÜÊÊV¬Á6VÊBÄ–¢V÷&VC÷Fó66˜&B‰V÷&VBÄ–¢FóF∆S÷b'∑6V∆bÁVïˆV÷ˆ¶íÇv&˜75ˆW66VBr¬u4¥ïró“wVñ∆B&˜72W66VB"¿–¢FW67&óFñˆ„“Ä–¢%FÜRwVñ∆B&˜72W66VB‚FÜW&Ró2¢¶ÊÚ6ˆˆ∆F˜v‚gFW"‚ –¢&W66R¢¢¬6ÚÊWrwVñ∆B&˜726‚V"ñ÷÷VFñFV«í‚ –¢í¿–¢6ˆ∆˜#”ÉStc#Ér¿–¢ê–¢ê–¢∆ˆvvW"ÊñÊfÚÇ%6VÁB&˜72÷W66VB&VGí∆W'Bf˜"wVñ∆BW2"¬wVñ∆EˆñBê–¢WÜ6WBÜFó66˜&B‰f˜&&ñFFV‚¬Fó66˜&B‰ÖEEWÜ6WFñˆ‚í2WÜ3†–¢∆ˆvvW"Áv&ÊñÊrÇ$6˜V∆BÊ˜B6VÊB&˜72÷W66VB∆W'C¢W2"¬WÜ2ê–†–¢7ñÊ2FVb6VÊEˆÊWuˆ&˜75ˆ÷W76vRá6V∆b¬wVñ∆EˆñC¢ñÁB¬Wáó'ì¢ñÁB¬ÊˆÊRí”‚ÊˆÊS†–¢""$ÊÊ˜VÊ6RÊWv«íFWFV7FVBwVñ∆B&˜72ˆÊ6Rñ‚FÜR6ˆÊfñwW&VB6ÜÊÊV¬‚"" –¢6ÜÊÊV¬“vóB6V∆bÊvWEˆ6ˆÊfñwW&VEˆ6ÜÊÊV¬ÜwVñ∆EˆñBê–¢ñb6ÜÊÊV¬ó2ÊˆÊS†–¢∆ˆvvW"Áv&ÊñÊrÇ$6ˆÊfñwW&VB6ˆˆ∆F˜v‚6ÜÊÊV¬f˜"wVñ∆BW2ó2VÊfñ∆&∆R"¬wVñ∆EˆñBê–¢&WGW&‡–†–¢˜vı˜&VfóÇ“vóBvWEˆwVñ∆Eˆ˜vı˜&VfóÇÜwVñ∆EˆñBê¢FV6ó6ñˆÂ˜&ˆ∆UˆñG2“6V∆bÊFV6ó6ñˆÂ˜&ˆ∆UˆñG2ÜwVñ∆EˆñBê¢wVñ∆B“6V∆bÊ&˜BÊvWEˆwVñ∆BÜwVñ∆EˆñBê¢7FófUˆ÷VÁFñˆÁ2“Ä¢6V∆bÊ7FófUˆ÷V÷&W%ˆ÷VÁFñˆÁ5ˆf˜%˜&ˆ∆W2ÜwVñ∆B¬FV6ó6ñˆÂ˜&ˆ∆UˆñG2ê¢ñbwVñ∆Bó2Ê˜BÊˆÊP¢V«6Rµ–¢ê¢÷VÁFñˆÂˆ∆ñÊW2“6V∆bÊ6áVÊµˆ÷VÁFñˆÁ2Ü7FófUˆ÷VÁFñˆÁ2ê¢V&VB“6V∆bÁVïˆV÷ˆ¶íÇ&&˜75ˆV&VB"¬.)©N˚àÚ"ê†¢FW67&óFñˆ‚“Ä¢b%W6R˜vÚ&˜72ñ˜"∂˜vıˆ6ˆ÷÷ÊBÜ˜vı˜&VfóÇ¬v&˜72író÷FÚ∆WBFÜRÜV«W" ¢'&VBFÜRFá&VR&˜72vW2Â∆Â∆‚ ¢$&˜72ÜV«W'26‚W6RÇ&˜72ÜóF¬Ç&˜726∂ó¬˜"&W«íFÚÊ˜FRvóFÇ ¢&Ç7Fñ6∑ñÂ∆‚ ¢%W6RÇ7Fñ6∑í6∆V&FÚ&V÷˜fRFÜR7W'&VÁB7Fñ6∑í‚W6RÇÜV«f˜" ¢&6ˆÊfñwW&Fñˆ‚6ˆ÷÷ÊG2‚ ¢ê¢ñbWáó'ì†¢FW67&óFñˆ‚≥“Ä¢b%∆Â∆‚¢§&˜72W66W3¢¢¢«Cß∂Wáó'ó”•#Â∆‚ ¢b"¢§WÜ7BFñ÷S¢¢¢«Cß∂Wáó'ó”§c‚ ¢ê†¢G'ì†¢vóB6ÜÊÊV¬Á6VÊBÄ¢V÷&VC÷Fó66˜&B‰V÷&VBÄ¢FóF∆S÷b'∂V&VG“ÊWrwVñ∆B&˜72V&VB"¿¢FW67&óFñˆ„÷FW67&óFñˆ‚¿¢6ˆ∆˜#”ÉSÉcTc"¿¢í¿¢ê¢f˜"÷VÁFñˆÂˆ∆ñÊRñ‚÷VÁFñˆÂˆ∆ñÊW3†¢vóB6ÜÊÊV¬Á6VÊBÄ¢6ˆÁFVÁC÷÷VÁFñˆÂˆ∆ñÊR¿¢∆∆˜vVEˆ÷VÁFñˆÁ3÷Fó66˜&B‰∆∆˜vVD÷VÁFñˆÁ2Ä¢&ˆ∆W3‘f«6R¿¢W6W'3’G'VR¿¢WfW'ñˆÊS‘f«6R¿¢í¿¢ê¢∆ˆvvW"ÊñÊfÚÇ$ÊÊ˜VÊ6VBÊWrwVñ∆B&˜72ñ‚wVñ∆BW2"¬wVñ∆EˆñBê¢WÜ6WBÜFó66˜&B‰f˜&&ñFFV‚¬Fó66˜&B‰ÖEEWÜ6WFñˆ‚í2WÜ3†–¢∆ˆvvW"Áv&ÊñÊrÇ$6˜V∆BÊ˜B6VÊBÊWr÷&˜72∆W'C¢W2"¬WÜ2ê–†–¢7ñÊ2FVb6VÊE˜&VGïˆ÷W76vRá6V∆b¬wVñ∆EˆñC¢ñÁBí”‚ÊˆÊS†–¢6ˆÊfñr“6V∆bÊ6ˆˆ∆F˜vÂˆ6ˆÊfñrÊvWBá7G"ÜwVñ∆EˆñBí¬∑“ê–¢ñb6ˆÊfñrÊvWBÇ&7FófUˆ&˜75ˆ÷W76vUˆñB"ì†–¢2ÊWr&˜72ó2«&VGí'VÊÊñÊr¬6ÚvVÊW&ñ2'&VGíFÚ7v‚"∆W'@–¢2v˜V∆B&R÷ó6∆VFñÊr‡–¢&WGW&‡–†–¢6ÜÊÊV¬“vóB6V∆bÊvWEˆ6ˆÊfñwW&VEˆ6ÜÊÊV¬ÜwVñ∆EˆñBê–¢ñb6ÜÊÊV¬ó2ÊˆÊS†–¢∆ˆvvW"Áv&ÊñÊrÇ$6ˆÊfñwW&VB6ˆˆ∆F˜v‚6ÜÊÊV¬f˜"wVñ∆BW2ó2VÊfñ∆&∆R"¬wVñ∆EˆñBê–¢&WGW&‡–†–¢G'ì†–¢vóB6ÜÊÊV¬Á6VÊBÄ–¢V÷&VC÷Fó66˜&B‰V÷&VBÄ–¢FóF∆S÷b'∑6V∆bÁVïˆV÷ˆ¶íÇv&˜75ˆFVfVFVBr¬~)»Rró“wVñ∆B&˜72&VGí"¿–¢FW67&óFñˆ„“Ä–¢%FÜRR÷÷ñÁWFR6ˆˆ∆F˜v‚Ü2VÊFVB‚ –¢$ÊWrwVñ∆B&˜726‚Ê˜rV"‚ –¢í¿–¢6ˆ∆˜#”ÉStc#Ér¿–¢ê–¢ê–¢∆ˆvvW"ÊñÊfÚÇ%6VÁB&˜72◊&VGí∆W'Bf˜"wVñ∆BW2"¬wVñ∆EˆñBê–¢WÜ6WBÜFó66˜&B‰f˜&&ñFFV‚¬Fó66˜&B‰ÖEEWÜ6WFñˆ‚í2WÜ3†–¢∆ˆvvW"Áv&ÊñÊrÇ$6˜V∆BÊ˜B6VÊB&VGí∆W'C¢W2"¬WÜ2ê–†–†–¶7ñÊ2FVb6WGWÜ&˜C¢6ˆ÷÷ÊG2‰&˜Bí”‚ÊˆÊS†–¢vóB&˜BÊFEˆ6ˆrÑ&˜74vVÊW&F˜"Ü&˜Bíê–
+    "Critical":           {"values":[[10,30],[25,50]], "alias":"crit"},
+    "Discharge":          {"values":[[110,150]],       "alias":"dc"},
+    "Kamikaze":           {"values":[[50,75]],         "alias":"kk"},
+    "Regeneration":       {"values":[[5,10]],          "alias":"hgen"},
+    "Energize":           {"values":[[20,40]],         "alias":"wgen"},
+    "Sprout":             {"values":[[20,40]],         "alias":"sprout"},
+    "Enrage":             {"values":[[2,5]],           "alias":"enrage"},
+    "Snail":              {"values":[[5,15]],          "alias":"snail"},
+    "Sacrifice":          {"values":[[25,50],[15,35]], "alias":"sac"},
+    "Knowledge":          {"values":[[5,15]],          "alias":"kno"},
+    "Giant Slayer":       {"values":[[10,25]],         "alias":"gslay"},
+    "Adaptation":         {"values":[[5,10],[5,10]],   "alias":"adapt"},
+    "Resonance":          {"values":[[5,10],[5,10]],   "alias":"res"},
+    "Living Hive":        {"values":[[8,2],[2,8]],     "alias":"swarm"},
+    "Lone Wolf":          {"values":[[10,30],[10,30]], "alias":"lwolf"},
+    "Double Strike":      {"values":[[10,25],[15,30],[35,20]],"alias":"ds"},
+    "Frost Armor":        {"values":[[10,20]],         "alias":"fr"},
+}
+
+
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+#  LOW-LEVEL HELPERS
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+def normalize_name(value: str) -> str:
+    value = value.lower().strip()
+    value = re.sub(r"<:[^>]+>"," ",value)
+    value = value.replace("\u2019","'").replace("`","")
+    value = re.sub(r"['\u2018]"," ",value)
+    value = re.sub(r"[^a-z0-9\s-]"," ",value)
+    value = value.replace("-"," ")
+    return re.sub(r"\s+"," ",value).strip()
+
+
+def normalize_hp(value: str) -> str:
+    value = value.strip().lower().replace(",","")
+    if not value: return DEFAULT_HP
+    if value.endswith("k"):
+        try: return str(int(float(value[:-1])*1000))
+        except ValueError: return DEFAULT_HP
+    try: int(value); return value
+    except ValueError: return DEFAULT_HP
+
+
+def clean_weapon_name(raw: str) -> tuple:
+    cleaned = normalize_name(raw)
+    for pat in [r"\bquality\b.*",r"\bwear\b.*",r"\btype\b.*",
+                r"\bkills\b.*",r"\bweapon cost\b.*"]:
+        cleaned = re.sub(pat,"",cleaned).strip()
+    words = [w for w in cleaned.split() if w not in RARITIES_SET and w not in REMOVE_WORDS]
+    name  = " ".join(words).strip()
+    if name in WEAPON_MAP: return WEAPON_MAP[name], None
+    fallback = name.replace(" ","")
+    return fallback, f"Unknown weapon: '{raw.strip()}' ‚Üí fallback: '{fallback}'"
+
+
+_EXACT_WEAPON_BY_NORM  = {normalize_name(k):k for k in EXACT_WEAPONS}
+_EXACT_PASSIVE_BY_NORM = {normalize_name(k):k for k in EXACT_PASSIVES}
+
+
+
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+# MESSAGE / COMPONENTS-V2 EXTRACTION
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+
+def _build_parse_text(boss_title: str, description: str) -> str:
+    if re.match(r"##\s*Lvl\s*\d+", (description or "").strip(), re.I):
+        return description
+    return f"## {boss_title}\n{description}"
+
+
+def extract_text_from_components(components: list) -> str:
+    """Recursively collect text from Discord components-v2 payloads."""
+    chunks: list[str] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            content = node.get("content")
+            if isinstance(content, str) and content:
+                chunks.append(content)
+            for key in ("components", "accessory"):
+                if key in node:
+                    walk(node[key])
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(components)
+    return "\n".join(chunks)
+
+
+def _find_boss_title_from_content(content: str) -> str:
+    for line in (content or "").split("\n")[:8]:
+        clean = re.sub(r"[#*_`]", "", line).strip()
+        if LVL_RE.search(clean):
+            return clean
+    return ""
+
+
+def _find_boss_title_dict(embed: dict[str, Any]) -> str:
+    title = str(embed.get("title") or "").strip()
+    if LVL_RE.search(title):
+        return title
+
+    author = embed.get("author") or {}
+    author_name = str(author.get("name") or "").strip()
+    if LVL_RE.search(author_name):
+        return author_name
+
+    description = str(embed.get("description") or "")
+    return _find_boss_title_from_content(description)
+
+
+async def fetch_raw_message(bot: commands.Bot, channel_id: int, message_id: int) -> dict[str, Any] | None:
+    """Fetch raw message JSON so components-v2 text is available."""
+    try:
+        route = discord.http.Route(
+            "GET",
+            "/channels/{channel_id}/messages/{message_id}",
+            channel_id=channel_id,
+            message_id=message_id,
+        )
+        return await bot.http.request(route)
+    except discord.NotFound:
+        logger.info("Raw message %s no longer exists", message_id)
+        return None
+    except (discord.Forbidden, discord.HTTPException) as exc:
+        logger.warning("Could not read raw message %s: %s", message_id, exc)
+        return None
+
+
+def message_to_raw_data(message: discord.Message) -> dict[str, Any]:
+    """Build raw-like data from the gateway Message without another API request.
+
+    Discord already sends message content, embeds, Components V2, and attachments
+    over the gateway. Using that payload for discovery prevents one REST GET for
+    every OwO response in busy grinding channels.
+    """
+    components: list[dict[str, Any]] = []
+    for component in getattr(message, "components", []) or []:
+        to_dict = getattr(component, "to_dict", None)
+        if callable(to_dict):
+            try:
+                components.append(to_dict())
+            except Exception:
+                continue
+
+    attachments: list[dict[str, Any]] = []
+    for attachment in getattr(message, "attachments", []) or []:
+        attachments.append(
+            {
+                "id": str(getattr(attachment, "id", "")),
+                "filename": getattr(attachment, "filename", ""),
+                "url": getattr(attachment, "url", ""),
+                "proxy_url": getattr(attachment, "proxy_url", ""),
+                "content_type": getattr(attachment, "content_type", None),
+            }
+        )
+
+    created_at = getattr(message, "created_at", None)
+    edited_at = getattr(message, "edited_at", None)
+    return {
+        "id": str(message.id),
+        "channel_id": str(message.channel.id),
+        "guild_id": str(message.guild.id) if message.guild else None,
+        "author": {"id": str(message.author.id)},
+        "content": message.content or "",
+        "embeds": [embed.to_dict() for embed in message.embeds],
+        "components": components,
+        "attachments": attachments,
+        "timestamp": created_at.isoformat() if created_at else None,
+        "edited_timestamp": edited_at.isoformat() if edited_at else None,
+    }
+
+
+def extract_all_text_from_raw(data: dict[str, Any]) -> str:
+    """Combine content, embed text, fields, and components-v2 text."""
+    chunks: list[str] = []
+
+    content = data.get("content")
+    if isinstance(content, str) and content:
+        chunks.append(content)
+
+    for embed in data.get("embeds", []):
+        for value in (
+            embed.get("title"),
+            embed.get("description"),
+            (embed.get("author") or {}).get("name"),
+            (embed.get("footer") or {}).get("text"),
+        ):
+            if isinstance(value, str) and value:
+                chunks.append(value)
+        for field in embed.get("fields", []):
+            name = field.get("name")
+            value = field.get("value")
+            if isinstance(name, str) and name:
+                chunks.append(name)
+            if isinstance(value, str) and value:
+                chunks.append(value)
+
+    component_text = extract_text_from_components(data.get("components", []))
+    if component_text:
+        chunks.append(component_text)
+
+    return "\n".join(chunks)
+
+
+def extract_boss_page_number(data: dict[str, Any]) -> int | None:
+    """Read OwO's visible `1/3`, `2/3`, or `3/3` page indicator.
+
+    OwO normally stores the page counter as a button label inside the message's
+    component tree. The recursive walk also supports nested components-v2 layouts.
+    A limited text fallback is included in case OwO moves the counter into message
+    content or an embed footer later.
+    """
+    component_matches: list[int] = []
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            # Button labels are the authoritative source. Check other short string
+            # values too because Discord component layouts can change over time.
+            for key, value in node.items():
+                if isinstance(value, str):
+                    match = PAGE_POSITION_RE.fullmatch(value)
+                    if match:
+                        component_matches.append(int(match.group(1)))
+                elif isinstance(value, (dict, list)):
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(data.get("components", []))
+    if component_matches:
+        return component_matches[0]
+
+    # Conservative fallback outside components.
+    fallback_chunks: list[str] = []
+    content = data.get("content")
+    if isinstance(content, str):
+        fallback_chunks.append(content)
+
+    for embed in data.get("embeds", []):
+        for value in (
+            embed.get("title"),
+            embed.get("description"),
+            (embed.get("footer") or {}).get("text"),
+        ):
+            if isinstance(value, str):
+                fallback_chunks.append(value)
+
+    for chunk in fallback_chunks:
+        match = PAGE_POSITION_SEARCH_RE.search(chunk)
+        if match:
+            return int(match.group(1))
+
+    return None
+
+
+
+def extract_media_urls(data: dict[str, Any]) -> list[str]:
+    """Collect image/media URLs from embeds and Components V2 payloads."""
+    urls: list[str] = []
+
+    def add(value: Any) -> None:
+        if isinstance(value, str) and value.startswith(("https://", "http://")):
+            if value not in urls:
+                urls.append(value)
+
+    for embed in data.get("embeds", []):
+        for key in ("image", "thumbnail"):
+            obj = embed.get(key) or {}
+            add(obj.get("url"))
+            add(obj.get("proxy_url"))
+
+    for attachment in data.get("attachments", []):
+        if isinstance(attachment, dict):
+            add(attachment.get("url"))
+            add(attachment.get("proxy_url"))
+
+    def walk(node: Any) -> None:
+        if isinstance(node, dict):
+            media = node.get("media")
+            if isinstance(media, dict):
+                add(media.get("url"))
+                add(media.get("proxy_url"))
+            attachment = node.get("attachment")
+            if isinstance(attachment, dict):
+                add(attachment.get("url"))
+                add(attachment.get("proxy_url"))
+            # Some payloads expose the URL directly on a media-gallery item.
+            if node.get("type") in (11, 12, 13):
+                add(node.get("url"))
+            for value in node.values():
+                if isinstance(value, (dict, list)):
+                    walk(value)
+        elif isinstance(node, list):
+            for item in node:
+                walk(item)
+
+    walk(data.get("components", []))
+    return urls
+
+
+def _normalize_glyph(mask: list[list[bool]]) -> Image.Image | None:
+    """Trim and center one binary glyph on the same canvas as our templates."""
+    if not mask or not mask[0]:
+        return None
+    h, w = len(mask), len(mask[0])
+    xs, ys = [], []
+    for y in range(h):
+        for x in range(w):
+            if mask[y][x]:
+                xs.append(x); ys.append(y)
+    if not xs:
+        return None
+    left, right, top, bottom = min(xs), max(xs), min(ys), max(ys)
+    glyph = Image.new("L", (right-left+1, bottom-top+1), 0)
+    px = glyph.load()
+    for y in range(top, bottom+1):
+        for x in range(left, right+1):
+            if mask[y][x]:
+                px[x-left, y-top] = 255
+    # Preserve pixel-art edges. Scale down only if an unexpected larger image appears.
+    if glyph.width > 14 or glyph.height > 18:
+        ratio = min(14/glyph.width, 18/glyph.height)
+        glyph = glyph.resize((max(1, round(glyph.width*ratio)), max(1, round(glyph.height*ratio))), Image.Resampling.NEAREST)
+    canvas = Image.new("L", (16, 20), 0)
+    canvas.paste(glyph, ((16-glyph.width)//2, (20-glyph.height)//2))
+    return canvas
+
+
+def load_hp_templates() -> dict[str, list[Image.Image]]:
+    templates: dict[str, list[Image.Image]] = {}
+    if not HP_TEMPLATE_DIR.exists():
+        return templates
+    for path in HP_TEMPLATE_DIR.glob("*.png"):
+        name = path.stem.split("_", 1)[0]
+        char = "/" if name == "slash" else "," if name == "comma" else name
+        try:
+            templates.setdefault(char, []).append(Image.open(path).convert("L"))
+        except OSError:
+            continue
+    return templates
+
+
+def _glyph_similarity(a: Image.Image, b: Image.Image) -> float:
+    ap = list(a.getdata()); bp = list(b.getdata())
+    both = union = 0
+    for av, bv in zip(ap, bp):
+        aa, bb = av > 127, bv > 127
+        both += int(aa and bb)
+        union += int(aa or bb)
+    return both / union if union else 0.0
+
+
+def _best_glyph_match(
+    glyph: Image.Image,
+    templates: dict[str, list[Image.Image]],
+    allowed_chars: set[str] | None = None,
+) -> tuple[str | None, float]:
+    """Return the best matching template character and its similarity score."""
+    best_char: str | None = None
+    best_score = -1.0
+    for char, options in templates.items():
+        if allowed_chars is not None and char not in allowed_chars:
+            continue
+        score = max(_glyph_similarity(glyph, template) for template in options)
+        if score > best_score:
+            best_char, best_score = char, score
+    return best_char, best_score
+
+
+def _recognize_hp_run(
+    glyph_mask: list[list[bool]],
+    templates: dict[str, list[Image.Image]],
+) -> list[tuple[str, float]]:
+    """Recognize one projected run, including several touching digits.
+
+    OwO's pixel font can join adjacent digits into one continuous horizontal run.
+    Earlier builds could split only two touching digits, so sequences such as
+    ``444`` or ``744`` were treated as one glyph and the HP reader fell back to
+    its default value. This version scores dynamic 2‚Äì6 digit segmentations.
+    """
+    glyph = _normalize_glyph(glyph_mask)
+    if glyph is None:
+        return []
+
+    single_char, single_score = _best_glyph_match(glyph, templates)
+    width = len(glyph_mask[0]) if glyph_mask else 0
+
+    # Normal OwO digits are roughly 3‚Äì8 pixels wide. Runs wider than eight
+    # columns may contain multiple touching digits and need segmentation.
+    if width <= 8:
+        return [(single_char, single_score)] if single_char is not None else []
+
+    digit_chars = set("0123456789")
+    min_segment_width = 3
+    max_segment_width = 10
+    max_digits = min(6, width // min_segment_width)
+    expected_digits = max(2, min(max_digits, round(width / 7.5)))
+
+    segment_cache: dict[tuple[int, int], tuple[str, float] | None] = {}
+
+    def match_segment(left: int, right: int) -> tuple[str, float] | None:
+        key = (left, right)
+        if key in segment_cache:
+            return segment_cache[key]
+
+        segment_mask = [row[left:right] for row in glyph_mask]
+        segment_glyph = _normalize_glyph(segment_mask)
+        if segment_glyph is None:
+            segment_cache[key] = None
+            return None
+
+        char, score = _best_glyph_match(
+            segment_glyph,
+            templates,
+            digit_chars,
+        )
+        result = (char, score) if char is not None else None
+        segment_cache[key] = result
+        return result
+
+    best_parts: list[tuple[str, float]] | None = None
+    best_quality = -1.0
+
+    # Dynamic programming keeps the search bounded even for four or more touching
+    # digits. Each state stores the strongest segmentation from this column.
+    for digit_count in range(2, max_digits + 1):
+        memo: dict[tuple[int, int], tuple[list[tuple[str, float]], float] | None] = {}
+
+        def solve(
+            position: int,
+            remaining: int,
+        ) -> tuple[list[tuple[str, float]], float] | None:
+            key = (position, remaining)
+            if key in memo:
+                return memo[key]
+
+            columns_left = width - position
+            if (
+                columns_left < remaining * min_segment_width
+                or columns_left > remaining * max_segment_width
+            ):
+                memo[key] = None
+                return None
+
+            if remaining == 1:
+                matched = match_segment(position, width)
+                if matched is None:
+                    memo[key] = None
+                    return None
+                char, score = matched
+                memo[key] = ([(char, score)], score)
+                return memo[key]
+
+            best: tuple[list[tuple[str, float]], float] | None = None
+            minimum_end = position + min_segment_width
+            maximum_end = min(
+                position + max_segment_width,
+                width - (remaining - 1) * min_segment_width,
+            )
+            for end_at in range(minimum_end, maximum_end + 1):
+                matched = match_segment(position, end_at)
+                if matched is None:
+                    continue
+                char, score = matched
+                tail = solve(end_at, remaining - 1)
+                if tail is None:
+                    continue
+                tail_parts, tail_score = tail
+                total_score = score + tail_score
+                if best is None or total_score > best[1]:
+                    best = ([(char, score), *tail_parts], total_score)
+
+            memo[key] = best
+            return best
+
+        candidate = solve(0, digit_count)
+        if candidate is None:
+            continue
+
+        parts, total_score = candidate
+        scores = [score for _, score in parts]
+        average_score = total_score / digit_count
+        minimum_score = min(scores)
+
+        # Prefer convincing glyph matches and a digit count that agrees with the
+        # physical width of the run. The width prior prevents a 23-pixel ``444``
+        # run from being over-segmented into four weak digits.
+        quality = (
+            average_score
+            + minimum_score * 0.20
+            - abs(digit_count - expected_digits) * 0.04
+            - abs((width / digit_count) - 7.5) * 0.01
+        )
+        if minimum_score >= 0.50 and average_score >= 0.58 and quality > best_quality:
+            best_parts = parts
+            best_quality = quality
+
+    if best_parts is not None:
+        return best_parts
+
+    return [(single_char, single_score)] if single_char is not None else []
+
+
+def read_hp_from_image_bytes(image_bytes: bytes, templates: dict[str, list[Image.Image]]) -> tuple[str | None, float]:
+    """Read the left/current HP from OwO's fixed 600x140 boss image."""
+    if not templates:
+        return None, 0.0
+    try:
+        image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    except OSError:
+        return None, 0.0
+
+    # OwO's HP text lives in the lower bar. Scale coordinates for equivalent sizes.
+    width, height = image.size
+    if width < 250 or height < 70:
+        return None, 0.0
+    y1, y2 = round(height * 118/140), round(height * 136/140)
+    x1, x2 = round(width * 0.25), round(width * 0.75)
+    crop = image.crop((x1, y1, x2, y2))
+    pixels = crop.load()
+    mask = [[False] * crop.width for _ in range(crop.height)]
+    for y in range(crop.height):
+        for x in range(crop.width):
+            r, g, b = pixels[x, y]
+            mask[y][x] = r > 175 and g > 175 and b > 175 and max(r, g, b) - min(r, g, b) < 45
+
+    projection = [sum(mask[y][x] for y in range(crop.height)) for x in range(crop.width)]
+    runs: list[tuple[int, int]] = []
+    start = None
+    for x, count in enumerate(projection):
+        if count and start is None:
+            start = x
+        if start is not None and (count == 0 or x == crop.width - 1):
+            end = x - 1 if count == 0 else x
+            runs.append((start, end)); start = None
+
+    chars: list[str] = []
+    scores: list[float] = []
+    for left, right in runs:
+        glyph_mask = [row[left:right+1] for row in mask]
+        for char, score in _recognize_hp_run(glyph_mask, templates):
+            chars.append(char)
+            scores.append(score)
+
+    text = "".join(chars)
+    match = re.fullmatch(r"([0-9][0-9,]*)/([0-9][0-9,]*)", text)
+    confidence = sum(scores) / len(scores) if scores else 0.0
+    minimum_score = min(scores) if scores else 0.0
+
+    # A high average must not hide one severely misread glyph.
+    if not match or confidence < 0.65 or minimum_score < 0.50:
+        return None, confidence
+
+    current = match.group(1).replace(",", "")
+    maximum = match.group(2).replace(",", "")
+
+    # HP values never contain unnecessary leading zeroes. Rejecting them prevents
+    # a weak merged-glyph guess such as ``0589`` from entering the final command.
+    if (current.startswith("0") and current != "0") or maximum.startswith("0"):
+        return None, confidence
+
+    try:
+        if int(current) < 0 or int(maximum) <= 0 or int(current) > int(maximum):
+            return None, confidence
+    except ValueError:
+        return None, confidence
+    return current, confidence
+
+
+def is_guild_boss_status(data: dict[str, Any]) -> bool:
+    """Recognize OwO's server-wide guild-boss status card, not inventory pages."""
+    text = re.sub(r"\s+", " ", extract_all_text_from_raw(data)).lower()
+    if "lvl " in text:
+        return False
+    return ("fighters" in text and "defeated" in text) or ("guild boss" in text and "fight" in text) or detect_boss_outcome(text) is not None
+
+
+def extract_discord_timestamps(data: dict[str, Any]) -> list[int]:
+    """Return every Discord timestamp embedded in an OwO status message."""
+    text = extract_all_text_from_raw(data)
+    return [int(value) for value in re.findall(r"<t:(\d{9,12})(?::[A-Za-z])?>", text)]
+
+
+def extract_future_boss_expiry(data: dict[str, Any], now: int | None = None) -> int | None:
+    """Return the active boss's future escape timestamp when OwO exposes one."""
+    now = now or int(time.time())
+    future = [value for value in extract_discord_timestamps(data) if value > now]
+    # The status card normally contains one future expiry. If it ever contains
+    # more than one, the latest future timestamp is the safest expiry candidate.
+    return max(future) if future else None
+
+
+def extract_relevant_timestamp(data: dict[str, Any], now: int | None = None) -> int | None:
+    """Extract OwO's real relative Discord timestamp, falling back to edit/create time."""
+    now = now or int(time.time())
+    candidates = extract_discord_timestamps(data)
+    past = [value for value in candidates if value <= now + 60]
+    if past:
+        return max(past)
+    for key in ("edited_timestamp", "timestamp"):
+        value = data.get(key)
+        if isinstance(value, str) and value:
+            try:
+                return int(datetime.fromisoformat(value.replace("Z", "+00:00")).timestamp())
+            except ValueError:
+                pass
+    return None
+
+def extract_boss_from_raw(data: dict[str, Any]) -> tuple[str, str]:
+    """Return (boss title, parser text) from content, embeds, or components-v2."""
+    content = str(data.get("content") or "")
+    title = _find_boss_title_from_content(content)
+    if title:
+        return title, content
+
+    for embed in data.get("embeds", []):
+        title = _find_boss_title_dict(embed)
+        if title:
+            description = str(embed.get("description") or "")
+            return title, _build_parse_text(title, description)
+
+    component_text = extract_text_from_components(data.get("components", []))
+    title = _find_boss_title_from_content(component_text)
+    if title:
+        return title, component_text
+
+    return "", ""
+
+
+def extract_hp_from_embed(description: str) -> str:
+    """Try to read the HP pool from 'X,XXX / X,XXX' text. Falls back to DEFAULT_HP."""
+    m = re.search(r"(\d[\d,]+)\s*/\s*(\d[\d,]+)", description)
+    if m:
+        max_hp = m.group(2).replace(",","")
+        try:
+            if int(max_hp) > 0: return max_hp
+        except ValueError:
+            pass
+    return DEFAULT_HP
+
+
+def split_boss_blocks(text: str) -> list:
+    text    = text.strip()
+    matches = list(re.finditer(r"##\s*Lvl\s*\d+", text, flags=re.I))
+    if not matches: return []
+    blocks  = []
+    for i, m in enumerate(matches):
+        end = matches[i+1].start() if i+1 < len(matches) else len(text)
+        blocks.append(text[m.start():end].strip())
+    return blocks
+
+
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+#  EXACT PARSER
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+def _exact_number_values(section: str) -> list:
+    vals, seen = [], []
+    section = re.sub(r"<:[^>]+>"," ",section)
+    for pat in [
+        r"[-+]?\s*\*\*\s*[-+]?\s*(\d+(?:\.\d+)?)\s*%?\s*\*\*",
+        r"\*\*\s*[-+]?\s*(\d+(?:\.\d+)?)\s*%?\s*\*\*",
+    ]:
+        for m in re.finditer(pat, section):
+            sp = m.span()
+            if any(not(sp[1]<=s[0] or sp[0]>=s[1]) for s in seen): continue
+            vals.append(float(m.group(1))); seen.append(sp)
+    return vals
+
+
+def _extract_exact_weapon_type(header: str) -> str:
+    words = header.strip().split()
+    while words and words[0] in EXACT_MODIFIER_WORDS: words.pop(0)
+    candidate = " ".join(words).strip()
+    key = _EXACT_WEAPON_BY_NORM.get(normalize_name(candidate))
+    if key: return key
+    words2 = [w for w in normalize_name(candidate).split()
+              if w not in RARITIES_SET and w not in {x.lower() for x in EXACT_MODIFIER_WORDS}]
+    key = _EXACT_WEAPON_BY_NORM.get(" ".join(words2))
+    if key: return key
+    raise ValueError(f"Unknown exact weapon: {candidate or header}")
+
+
+def _extract_exact_animal(block: str) -> str:
+    compact = " ".join(block.split())
+    m = re.search(r"##\s*Lvl\s*(\d+)\s+(.+?)(?=<:|###|-#|\*\*|$)", compact, re.I)
+    if not m: raise ValueError("Could not find exact boss level/name.")
+    level       = m.group(1)
+    title_words = m.group(2).strip().split()
+    while title_words and normalize_name(title_words[0]) in RARITIES_SET:
+        title_words.pop(0)
+    animal = "_".join(normalize_name(" ".join(title_words)).split()) or "unknown"
+    return f"{level} {animal}"
+
+
+def _exact_rarity_from_raw(value:float,low:float,high:float,wear:str)->int:
+    raw = 100.0*((value-low)/(high-low)-EXACT_WEAR_MULTIPLIER[wear]+1)
+    return max(0,min(100,round(raw)))
+
+
+def _exact_convert_values(wear,weapon_type,passive_types,w_values,p_values):
+    if wear not in EXACT_WEAR_MULTIPLIER: raise ValueError(f"Unknown wear: {wear}")
+    weapon_ranges = EXACT_WEAPONS[weapon_type]["values"]
+    if len(w_values)!=len(weapon_ranges):
+        raise ValueError(f"{weapon_type}: expected {len(weapon_ranges)} stats, got {len(w_values)}.")
+    w_rarities=[_exact_rarity_from_raw(float(v),lo,hi,wear) for v,(lo,hi) in zip(w_values,weapon_ranges)]
+    p_rarities=[]
+    for ptype,values in zip(passive_types,p_values):
+        ranges=EXACT_PASSIVES[ptype]["values"]
+        if ptype=="Living Hive" and len(values)==1: values=[values[0],round(10-values[0],2)]
+        if len(values)!=len(ranges):
+            raise ValueError(f"{ptype}: expected {len(ranges)} stats, got {len(values)}.")
+        p_rarities.append([_exact_rarity_from_raw(float(v),lo,hi,wear) for v,(lo,hi) in zip(values,ranges)])
+    return w_rarities,p_rarities
+
+
+def _parse_boss_exact(block: str) -> str:
+    text=block.strip(); compact=" ".join(text.split())
+    wear_m=re.search(r"\*\*Wear:\*\*\s*`?(\w+)`?",compact,re.I)
+    if not wear_m: raise ValueError("Exact parser could not find Wear.")
+    wear=wear_m.group(1).upper()
+    animal=_extract_exact_animal(text)
+    header_m=re.search(
+        r"###\s*(.*?)(?=\*\*Quality:\*\*|\*\*Wear:\*\*|\*\*Type:\*\*"
+        r"|\*\*Weapon Cost:\*\*|###\s+__Description__|$)",compact,re.I)
+    if not header_m: raise ValueError("Exact parser could not find weapon header.")
+    weapon_type=_extract_exact_weapon_type(header_m.group(1))
+    all_title_blocks=list(re.finditer(r"\*\*__(.*?)__\*\*",compact))
+    real_passive_blocks=[
+        (m,_EXACT_PASSIVE_BY_NORM[normalize_name(m.group(1).strip())])
+        for m in all_title_blocks if normalize_name(m.group(1).strip()) in _EXACT_PASSIVE_BY_NORM
+    ]
+    first_passive=real_passive_blocks[0][0] if real_passive_blocks else None
+    weapon_section=compact[:first_passive.start()] if first_passive else compact
+    wp_cost=None
+    if weapon_type not in {"Orb of Potency","Rune of the Forgotten"}:
+        wp_m=re.search(r"\*\*Weapon Cost:\*\*\s*(\d+(?:\.\d+)?)",weapon_section,re.I)
+        if not wp_m: raise ValueError(f"Exact parser could not find Weapon Cost for {weapon_type}.")
+        wp_cost=float(wp_m.group(1))
+    weapon_values=_exact_number_values(weapon_section)
+    q_m=re.search(r"\*\*Quality:\*\*.*?(\d+(?:\.\d+)?)%",weapon_section,re.I)
+    if q_m and weapon_values and abs(weapon_values[0]-float(q_m.group(1)))<0.0001:
+        weapon_values.pop(0)
+    # Bleeding Gaze now follows the same blueprint ordering as every other
+    # normal weapon: displayed weapon values first, Weapon Cost last.
+    if weapon_type=="Orb of Potency": w_values=[]
+    elif weapon_type=="Rune of the Forgotten": w_values=weapon_values
+    else: w_values=weapon_values+[wp_cost]
+    passive_types,passive_values=[],[]
+    for idx,(m,ptype) in enumerate(real_passive_blocks):
+        start=m.end()
+        end=real_passive_blocks[idx+1][0].start() if idx+1<len(real_passive_blocks) else len(compact)
+        passive_types.append(ptype); passive_values.append(_exact_number_values(compact[start:end]))
+    w_rarities,p_rarities=_exact_convert_values(wear,weapon_type,passive_types,w_values,passive_values)
+    parts=[animal.lower(), wear.lower(), EXACT_WEAPONS[weapon_type]["alias"]]
+    if w_rarities: parts.append(",".join(map(str,w_rarities)))
+    for ptype,rvals in zip(passive_types,p_rarities):
+        parts.append(EXACT_PASSIVES[ptype]["alias"])
+        if rvals: parts.append(",".join(map(str,rvals)))
+    return " ".join(p for p in parts if p).strip()
+
+
+def _parse_boss_fallback(block: str) -> dict:
+    compact=" ".join(block.split()); warnings=[]
+    header=re.search(r"##\s*Lvl\s*(\d+)\s+\w+\s+(.+?)(?=<:|###|-#|\*\*|$)",compact,re.I)
+    if not header: raise ValueError("Could not find boss level/name.")
+    level=header.group(1); animal=header.group(2).strip().lower()
+    wm=re.search(r"###\s+(?!__Description__)(.+?)(?=\*\*Quality:\*\*|\*\*Wear:\*\*|\*\*Type:\*\*|\*\*Kills:\*\*|###\s+__Description__|$)",compact,re.I)
+    if not wm: raise ValueError(f"Could not find weapon for Lvl {level} {animal}.")
+    weapon,warn=clean_weapon_name(wm.group(1))
+    if warn: warnings.append(warn)
+    wear_m=re.search(r"\*\*Wear:\*\*\s*`?(\w+)`?",compact,re.I)
+    wear_str=wear_m.group(1).lower() if wear_m else "worn"
+    qm=re.search(r"\*\*Quality:\*\*.*?([\d.]+)%",compact,re.I)
+    quality=float(qm.group(1)) if qm else 55.0
+    passives=[PASSIVE_MAP[normalize_name(t)] for t in re.findall(r"\*\*__([^_]+)__\*\*",compact)
+              if normalize_name(t) in PASSIVE_MAP]
+    passive_text=" "+" ".join(passives) if passives else ""
+    return {"part":f"{level} {animal} {wear_str} {weapon}{passive_text}","quality":quality,"warnings":warnings}
+
+
+def parse_boss(block: str) -> dict:
+    try:
+        return {"part":_parse_boss_exact(block),"quality":55.0,"warnings":[],"exact":True}
+    except Exception as e:
+        fallback=_parse_boss_fallback(block)
+        fallback["exact"]=False
+        fallback.setdefault("warnings",[]).append("Exact parser fallback: "+str(e))
+        return fallback
+
+
+def build_command(boss_results: list, hp_values: list) -> tuple:
+    all_exact=all(b.get("exact") for b in boss_results)
+    command=("neon b myself vs "+", ".join(b["part"] for b in boss_results)
+             +" -hp "+" ".join(hp_values)+" -m")
+    if not all_exact:
+        qe=max(0,min(100,round(sum(b["quality"] for b in boss_results)/len(boss_results))))
+        command+=f" -qe{qe}"
+    return command, [w for b in boss_results for w in b.get("warnings",[])]
+
+
+
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+# AUTO-READ SESSION
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+
+class BossSession:
+    def __init__(self, user_id: int, channel_id: int):
+        self.user_id = user_id
+        self.channel_id = channel_id
+        self.owo_message_id: int | None = None
+        # Store each boss by OwO's own page number, never by click/read order.
+        self.page_texts: dict[int, str] = {}
+        self.hp_by_page: dict[int, str] = {}
+        self.hp_confidence_by_page: dict[int, float] = {}
+        self.page_signatures: dict[int, str] = {}
+        self.created_at = time.monotonic()
+
+    @property
+    def step(self) -> int:
+        return len(self.page_texts)
+
+    @property
+    def expired(self) -> bool:
+        return time.monotonic() - self.created_at > SESSION_TIMEOUT_SECONDS
+
+
+# One active OwO inventory reader per channel. A new valid trigger replaces an old one.
+active_sessions: dict[int, BossSession] = {}
+STEP_EMOJI = {1: "1Ô∏è‚É£", 2: "2Ô∏è‚É£", 3: "3Ô∏è‚É£"}
+
+
+class BossDecisionView(discord.ui.View):
+    """Buttons for the current guild-boss hit/skip decision."""
+
+    def __init__(self, cog: "BossGenerator", guild_id: int) -> None:
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.guild_id = guild_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild_id != self.guild_id:
+            await interaction.response.send_message(
+                "This boss decision belongs to another server.", ephemeral=True
+            )
+            return False
+        if not self.cog.member_can_set_boss_decision(interaction.user, self.guild_id):
+            await interaction.response.send_message(
+                "You need the configured boss-decision role or **Manage Server** to set hit/skip.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Hit", emoji="‚öîÔ∏è", style=discord.ButtonStyle.success)
+    async def hit(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.cog.set_boss_decision_from_interaction(interaction, "hit")
+
+    @discord.ui.button(label="Skip", style=discord.ButtonStyle.secondary)
+    async def skip(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.cog.set_boss_decision_from_interaction(interaction, "skip")
+
+
+async def process_boss_page(
+    cog: "BossGenerator",
+    channel_id: int,
+    message_id: int,
+    boss_title: str,
+    description: str,
+    page_number: int | None,
+    detected_hp: str | None = None,
+    hp_confidence: float = 0.0,
+) -> None:
+    session = active_sessions.get(channel_id)
+    if session is None:
+        return
+    if session.expired:
+        active_sessions.pop(channel_id, None)
+        return
+
+    if session.owo_message_id is None:
+        session.owo_message_id = message_id
+    elif session.owo_message_id != message_id:
+        return
+
+    # Do not fall back to arrival order. Without OwO's page counter, ordering the
+    # generated command would be unsafe, so wait for another message update instead.
+    if page_number not in (1, 2, 3):
+        logger.warning("Could not read page position for %r; ignored", boss_title)
+        return
+
+    parse_text = _build_parse_text(boss_title, description)
+    signature = hashlib.sha1(parse_text.encode("utf-8", errors="ignore")).hexdigest()
+
+    # Repeated gateway edit events and revisiting a page are common. Ignore the
+    # page only when the exact same content is already stored in that slot.
+    if session.page_signatures.get(page_number) == signature:
+        return
+
+    is_new_page = page_number not in session.page_texts
+    session.page_texts[page_number] = parse_text
+    session.hp_by_page[page_number] = detected_hp or extract_hp_from_embed(description)
+    session.hp_confidence_by_page[page_number] = hp_confidence
+    session.page_signatures[page_number] = signature
+
+    action = "captured" if is_new_page else "updated"
+    logger.info(
+        "Boss page %s: page %s/3, %s (%s/3 unique pages)",
+        action, page_number, boss_title, session.step,
+    )
+
+    channel = cog.bot.get_channel(channel_id)
+    if channel is None:
+        return
+
+    # React with the actual OwO page number, not the order in which it was clicked.
+    if is_new_page:
+        try:
+            await channel.get_partial_message(message_id).add_reaction(
+                STEP_EMOJI[page_number]
+            )
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not add boss-page reaction: %s", exc)
+
+    if all(page in session.page_texts for page in (1, 2, 3)):
+        await cog.finish_generator(channel, session)
+
+
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+# COG
+# ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+
+class BossGenerator(commands.Cog):
+    def __init__(self, bot: commands.Bot):
+        self.bot = bot
+        self.cooldown_config = load_cooldown_config()
+        self.cooldown_tasks: dict[int, asyncio.Task] = {}
+        self.processed_outcome_messages: set[tuple[int, int]] = set()
+        self.guild_boss_watch_tasks: dict[int, asyncio.Task] = {}
+        self.guild_boss_fetch_locks: dict[int, asyncio.Lock] = {}
+        self.guild_boss_outcome_locks: dict[int, asyncio.Lock] = {}
+        self.http_session: aiohttp.ClientSession | None = None
+        self.hp_templates = load_hp_templates()
+        self.boss_sticky_refresh_tasks: dict[int, asyncio.Task[None]] = {}
+        self.boss_report_task: asyncio.Task[None] | None = None
+        self._restored = False
+
+    def ui_emoji(self, name: str, fallback: str) -> str:
+        return ui_emoji_text(self.bot, name, fallback)
+
+
+    def _configured_role_ids(
+        self,
+        config: dict[str, Any],
+        list_key: str,
+        legacy_key: str,
+    ) -> list[int]:
+        """Return unique configured role IDs, preserving older single-role keys."""
+        values: list[int] = []
+        raw_list = config.get(list_key)
+        if isinstance(raw_list, list):
+            candidates = raw_list
+        elif raw_list:
+            candidates = [raw_list]
+        else:
+            candidates = []
+        for value in candidates:
+            try:
+                role_id = int(value)
+            except (TypeError, ValueError):
+                continue
+            if role_id and role_id not in values:
+                values.append(role_id)
+        try:
+            legacy_id = int(config.get(legacy_key) or 0)
+        except (TypeError, ValueError):
+            legacy_id = 0
+        if legacy_id and legacy_id not in values:
+            values.append(legacy_id)
+        return values
+
+    def decision_role_ids(self, guild_id: int) -> list[int]:
+        config = self.cooldown_config.get(str(guild_id), {})
+        return self._configured_role_ids(config, "decision_role_ids", "decision_role_id")
+
+    def fighter_role_ids(self, guild_id: int) -> list[int]:
+        config = self.cooldown_config.get(str(guild_id), {})
+        return self._configured_role_ids(config, "fighter_role_ids", "fighter_role_id")
+
+    @staticmethod
+    def role_mentions(role_ids: list[int]) -> str:
+        return " ".join(f"<@&{role_id}>" for role_id in role_ids if role_id)
+
+    @staticmethod
+    def active_member_mentions_for_roles(
+        guild: discord.Guild,
+        role_ids: list[int],
+    ) -> list[str]:
+        """Mention unique non-bot members who are online or idle in any role."""
+        active_statuses = {discord.Status.online, discord.Status.idle}
+        member_ids: set[int] = set()
+        for role_id in role_ids:
+            role = guild.get_role(role_id)
+            if role is None:
+                continue
+            for member in role.members:
+                if (
+                    not member.bot
+                    and member.status in active_statuses
+                    and member.id not in member_ids
+                ):
+                    member_ids.add(member.id)
+        return [f"<@{member_id}>" for member_id in sorted(member_ids)]
+
+    @staticmethod
+    def chunk_mentions(
+        mentions: list[str],
+        max_mentions: int = 9,
+        limit: int = 1900,
+    ) -> list[str]:
+        chunks: list[str] = []
+        current: list[str] = []
+        current_length = 0
+        for mention in mentions:
+            added_length = len(mention) + (1 if current else 0)
+            if current and (
+                len(current) >= max_mentions
+                or current_length + added_length > limit
+            ):
+                chunks.append(" ".join(current))
+                current = []
+                current_length = 0
+                added_length = len(mention)
+            current.append(mention)
+            current_length += added_length
+        if current:
+            chunks.append(" ".join(current))
+        return chunks
+
+    def member_can_set_boss_decision(
+        self,
+        member: discord.abc.User | discord.Member,
+        guild_id: int,
+    ) -> bool:
+        permissions = getattr(member, "guild_permissions", None)
+        if permissions and (
+            getattr(permissions, "manage_guild", False)
+            or getattr(permissions, "administrator", False)
+        ):
+            return True
+        allowed_role_ids = set(self.decision_role_ids(guild_id))
+        if not allowed_role_ids:
+            return False
+        return any(
+            int(getattr(role, "id", 0) or 0) in allowed_role_ids
+            for role in getattr(member, "roles", [])
+        )
+
+    @app_commands.command(
+        name="boss-decision-role",
+        description="Add a role allowed to mark guild bosses as hit or skip.",
+    )
+    @app_commands.describe(role="Role allowed to use boss hit/skip and sticky controls. Leave empty to clear all.")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_decision_role(
+        self,
+        interaction: discord.Interaction,
+        role: discord.Role | None = None,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "‚ùå This command only works inside a server.", ephemeral=True
+            )
+            return
+        config = self.cooldown_config.setdefault(str(interaction.guild_id), {})
+        if role is None:
+            config.pop("decision_role_id", None)
+            config.pop("decision_role_ids", None)
+            save_cooldown_config(self.cooldown_config)
+            await interaction.response.send_message(
+                "‚úÖ Cleared all boss-decision roles. Controls are now limited to members with **Manage Server**.",
+                ephemeral=True,
+            )
+            return
+        if role.is_default():
+            await interaction.response.send_message(
+                "‚ùå Choose a normal role, not @everyone.", ephemeral=True
+            )
+            return
+        role_ids = self._configured_role_ids(config, "decision_role_ids", "decision_role_id")
+        if role.id not in role_ids:
+            role_ids.append(role.id)
+        config["decision_role_ids"] = role_ids
+        config.pop("decision_role_id", None)
+        save_cooldown_config(self.cooldown_config)
+        await interaction.response.send_message(
+            f"‚úÖ Added {role.mention} as a boss-decision role. Current roles: {self.role_mentions(role_ids)}.\n"
+            "Run this command again with another role to add more. Leave `role` empty to clear all.",
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(roles=False),
+        )
+
+    @app_commands.command(
+        name="boss-fighter-role",
+        description="Add a role pinged when helpers mark a guild boss as HIT.",
+    )
+    @app_commands.describe(role="Role to ping once when a boss is marked HIT. Leave empty to clear all.")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_fighter_role(
+        self,
+        interaction: discord.Interaction,
+        role: discord.Role | None = None,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "‚ùå This command only works inside a server.", ephemeral=True
+            )
+            return
+        config = self.cooldown_config.setdefault(str(interaction.guild_id), {})
+        if role is None:
+            config.pop("fighter_role_id", None)
+            config.pop("fighter_role_ids", None)
+            config.pop("fighter_role_pinged_boss_key", None)
+            config.pop("fighter_roles_pinged_boss_key", None)
+            save_cooldown_config(self.cooldown_config)
+            await interaction.response.send_message(
+                "‚úÖ Cleared all fighter ping roles. No role will be pinged when a boss is marked **HIT**.",
+                ephemeral=True,
+            )
+            return
+        if role.is_default():
+            await interaction.response.send_message(
+                "‚ùå Choose a normal role, not @everyone.", ephemeral=True
+            )
+            return
+        role_ids = self._configured_role_ids(config, "fighter_role_ids", "fighter_role_id")
+        if role.id not in role_ids:
+            role_ids.append(role.id)
+        config["fighter_role_ids"] = role_ids
+        config.pop("fighter_role_id", None)
+        config.pop("fighter_role_pinged_boss_key", None)
+        config.pop("fighter_roles_pinged_boss_key", None)
+        save_cooldown_config(self.cooldown_config)
+        mention_warning = ""
+        alert_channel = interaction.guild.get_channel(int(config.get("channel_id") or 0))
+        bot_member = interaction.guild.me
+        can_mention_all_roles = bool(
+            isinstance(alert_channel, discord.TextChannel)
+            and bot_member is not None
+            and alert_channel.permissions_for(bot_member).mention_everyone
+        )
+        if not role.mentionable and not can_mention_all_roles:
+            mention_warning = (
+                "\n‚ö†Ô∏è This role is not mentionable. Make it mentionable or grant the bot "
+                "**Mention @everyone, @here, and All Roles** in the boss-alert channel "
+                "so members receive a real notification."
+            )
+        await interaction.response.send_message(
+            f"‚úÖ Added {role.mention} as a fighter ping role. Current roles: {self.role_mentions(role_ids)}.\n"
+            "Run this command again with another role to add more. Leave `role` empty to clear all."
+            f"{mention_warning}",
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(roles=False),
+        )
+
+    async def handle_boss_decision_message(self, message: discord.Message, decision: str) -> None:
+        guild = message.guild
+        if guild is None:
+            return
+        config = self.cooldown_config.get(str(guild.id), {})
+        channel_id = int(config.get("channel_id") or 0)
+        if not channel_id:
+            await safe_reply(
+                message,
+                "‚ö†Ô∏è Boss alerts are not configured yet. A server manager can use `/boss-cooldown-channel` first.",
+                mention_author=False,
+            )
+            return
+        if channel_id != message.channel.id:
+            channel = guild.get_channel(channel_id)
+            where = channel.mention if isinstance(channel, discord.TextChannel) else "the configured boss alert channel"
+            await safe_reply(message, f"Use boss hit/skip controls in {where}.", mention_author=False)
+            return
+        if not self.member_can_set_boss_decision(message.author, guild.id):
+            roles = self.decision_role_ids(guild.id)
+            role_text = f"one of {self.role_mentions(roles)} or " if roles else ""
+            await safe_reply(
+                message,
+                f"You need {role_text}**Manage Server** to set the boss hit/skip decision.",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+        notice = await self.set_boss_decision(guild.id, decision, message.author.id)
+        await safe_reply(message, notice, mention_author=False, delete_after=20)
+
+    async def handle_boss_sticky_command(self, message: discord.Message, action: str) -> None:
+        guild = message.guild
+        if guild is None:
+            return
+        config = self.cooldown_config.setdefault(str(guild.id), {})
+        channel_id = int(config.get("channel_id") or 0)
+        if not channel_id:
+            await safe_reply(
+                message,
+                "‚ö†Ô∏è Boss alerts are not configured yet. A server manager can use `/boss-cooldown-channel` first.",
+                mention_author=False,
+            )
+            return
+        if channel_id != message.channel.id:
+            channel = guild.get_channel(channel_id)
+            where = channel.mention if isinstance(channel, discord.TextChannel) else "the configured boss alert channel"
+            await safe_reply(message, f"Use sticky controls in {where}.", mention_author=False)
+            return
+        if not self.member_can_set_boss_decision(message.author, guild.id):
+            roles = self.decision_role_ids(guild.id)
+            role_text = f"one of {self.role_mentions(roles)} or " if roles else ""
+            await safe_reply(
+                message,
+                f"You need {role_text}**Manage Server** to control boss stickies.",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+
+        if action == "clear":
+            await self.clear_boss_decision_message(guild.id)
+            await safe_reply(message, "‚úÖ Boss sticky cleared.", mention_author=False, delete_after=20)
+            return
+
+        if action == "off":
+            config["decision_sticky_disabled"] = True
+            save_cooldown_config(self.cooldown_config)
+            await self.clear_boss_decision_message(guild.id, preserve_disabled=True)
+            await safe_reply(message, "‚úÖ Boss stickies are now **off** for this server.", mention_author=False, delete_after=20)
+            return
+
+        if action == "on":
+            config.pop("decision_sticky_disabled", None)
+            save_cooldown_config(self.cooldown_config)
+            await safe_reply(message, "‚úÖ Boss stickies are now **on** for this server.", mention_author=False, delete_after=20)
+            return
+
+        if action != "set":
+            return
+
+        if not self.boss_sticky_enabled(config):
+            await safe_reply(message, "Boss stickies are off. Use `H sticky on` first.", mention_author=False)
+            return
+        if message.reference is None or message.reference.message_id is None:
+            await safe_reply(
+                message,
+                "Reply to the note/message you want to keep sticky, then send `H sticky`.",
+                mention_author=False,
+            )
+            return
+        try:
+            referenced = await message.channel.fetch_message(int(message.reference.message_id))
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            await safe_reply(message, "I could not read the replied message.", mention_author=False)
+            return
+
+        note = (referenced.content or "").strip()
+        if not note and referenced.embeds:
+            parts: list[str] = []
+            for embed in referenced.embeds[:2]:
+                if embed.title:
+                    parts.append(str(embed.title))
+                if embed.description:
+                    parts.append(str(embed.description))
+                for field in embed.fields[:3]:
+                    parts.append(f"{field.name}: {field.value}")
+            note = "\n".join(part.strip() for part in parts if part and part.strip())
+        if not note:
+            await safe_reply(message, "That message does not have readable text to stick.", mention_author=False)
+            return
+        if len(note) > 1800:
+            note = note[:1797].rstrip() + "..."
+
+        config["sticky_custom_text"] = note
+        config["boss_decision"] = "custom"
+        config["boss_decision_by"] = message.author.id
+        config["boss_decision_at"] = int(time.time())
+        save_cooldown_config(self.cooldown_config)
+        await self.upsert_boss_decision_message(guild.id, force_repost=True)
+        await safe_reply(message, "‚úÖ Custom sticky note saved.", mention_author=False, delete_after=20)
+
+    async def set_boss_decision_from_interaction(
+        self,
+        interaction: discord.Interaction,
+        decision: str,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message("This only works in a server.", ephemeral=True)
+            return
+        notice = await self.set_boss_decision(interaction.guild_id, decision, interaction.user.id)
+        if interaction.response.is_done():
+            await interaction.followup.send(notice, ephemeral=True)
+        else:
+            await interaction.response.send_message(notice, ephemeral=True)
+
+    async def set_boss_decision(self, guild_id: int, decision: str, user_id: int) -> str:
+        if decision not in {"hit", "skip"}:
+            return "Unknown boss decision."
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        if not config.get("active_boss_message_id"):
+            return "There is no active guild boss to mark right now."
+        now = int(time.time())
+        config["boss_decision"] = decision
+        config["boss_decision_by"] = user_id
+        config["boss_decision_at"] = now
+        config.pop("sticky_custom_text", None)
+
+        ping_role_ids: list[int] = []
+        boss_key = int(config.get("active_boss_expires_at") or config.get("active_boss_message_id") or 0)
+        if decision == "hit":
+            fighter_ids = self.fighter_role_ids(guild_id)
+            if fighter_ids and int(config.get("fighter_roles_pinged_boss_key") or 0) != boss_key:
+                ping_role_ids = fighter_ids
+
+        save_cooldown_config(self.cooldown_config)
+        if ping_role_ids and await self.send_fighter_ping_message(guild_id, ping_role_ids):
+            config["fighter_roles_pinged_boss_key"] = boss_key
+            config["fighter_role_pinged_boss_key"] = boss_key
+            save_cooldown_config(self.cooldown_config)
+        if self.boss_sticky_enabled(config):
+            await self.upsert_boss_decision_message(guild_id, force_repost=True)
+            sticky_note = ""
+        else:
+            sticky_note = " Sticky is currently off for this server."
+        label = "HIT" if decision == "hit" else "SKIP"
+        return f"‚úÖ Boss decision set to **{label}**.{sticky_note}"
+
+    @staticmethod
+    def boss_sticky_enabled(config: dict[str, Any]) -> bool:
+        return not bool(config.get("decision_sticky_disabled"))
+
+    def boss_decision_default_content(self, config: dict[str, Any]) -> str:
+        decision = str(config.get("boss_decision") or "pending")
+        custom_text = str(config.get("sticky_custom_text") or "").strip()
+        if custom_text:
+            return custom_text
+        if decision == "hit":
+            return "# HIT"
+        if decision == "skip":
+            return "# SKIP"
+        return "# Boss decision needed"
+
+    async def send_fighter_ping_message(
+        self,
+        guild_id: int,
+        role_ids: list[int],
+    ) -> bool:
+        """Send a real, persistent fighter-role alert separate from the sticky."""
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            return False
+        mentions = self.role_mentions(role_ids)
+        if not mentions:
+            return False
+        try:
+            await channel.send(
+                f"{mentions}\nThe guild boss was marked **HIT**. Fighters can start attacking.",
+                allowed_mentions=discord.AllowedMentions(
+                    roles=True,
+                    users=False,
+                    everyone=False,
+                ),
+            )
+            return True
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send fighter-role alert for guild %s: %s", guild_id, exc)
+            return False
+
+    async def upsert_boss_decision_message(
+        self,
+        guild_id: int,
+        *,
+        force_repost: bool = False,
+    ) -> None:
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        if not self.boss_sticky_enabled(config):
+            return
+        if not (
+            str(config.get("boss_decision") or "") in {"hit", "skip", "custom"}
+            or str(config.get("sticky_custom_text") or "").strip()
+        ):
+            return
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            return
+
+        content = self.boss_decision_default_content(config)
+        allowed_mentions = discord.AllowedMentions.none()
+
+        message_id = int(config.get("decision_message_id") or 0)
+        if force_repost and message_id:
+            try:
+                await channel.get_partial_message(message_id).delete()
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+            config.pop("decision_message_id", None)
+            message_id = 0
+
+        try:
+            if message_id:
+                message = await channel.fetch_message(message_id)
+                await message.edit(content=content, embed=None, view=None, allowed_mentions=allowed_mentions)
+                return
+        except discord.NotFound:
+            config.pop("decision_message_id", None)
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not edit boss decision sticky for guild %s: %s", guild_id, exc)
+            return
+
+        try:
+            message = await channel.send(
+                content=content,
+                allowed_mentions=allowed_mentions,
+            )
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send boss decision sticky for guild %s: %s", guild_id, exc)
+            return
+        config["decision_message_id"] = message.id
+        save_cooldown_config(self.cooldown_config)
+
+    async def clear_boss_decision_message(self, guild_id: int, *, preserve_disabled: bool = False) -> None:
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        message_id = int(config.get("decision_message_id") or 0)
+        channel = await self.get_configured_channel(guild_id)
+        if channel is not None and message_id:
+            try:
+                await channel.get_partial_message(message_id).delete()
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+        changed = False
+        keys = (
+            "decision_message_id",
+            "boss_decision",
+            "boss_decision_by",
+            "boss_decision_at",
+            "sticky_custom_text",
+            "fighter_role_pinged_boss_key",
+            "fighter_roles_pinged_boss_key",
+        )
+        for key in keys:
+            if key in config:
+                config.pop(key, None)
+                changed = True
+        if changed:
+            save_cooldown_config(self.cooldown_config)
+
+    def should_refresh_boss_sticky_on_message(self, message: discord.Message) -> bool:
+        if message.guild is None:
+            return False
+        config = self.cooldown_config.get(str(message.guild.id), {})
+        if not self.boss_sticky_enabled(config):
+            return False
+        if int(config.get("channel_id") or 0) != message.channel.id:
+            return False
+        sticky_id = int(config.get("decision_message_id") or 0)
+        if not sticky_id or sticky_id == message.id:
+            return False
+        return bool(
+            str(config.get("boss_decision") or "") in {"hit", "skip", "custom"}
+            or str(config.get("sticky_custom_text") or "").strip()
+        )
+
+    def queue_boss_sticky_refresh(self, guild_id: int) -> None:
+        existing = self.boss_sticky_refresh_tasks.get(guild_id)
+        if existing and not existing.done():
+            return
+        self.boss_sticky_refresh_tasks[guild_id] = asyncio.create_task(
+            self.refresh_boss_sticky_after_chat(guild_id)
+        )
+
+    async def refresh_boss_sticky_after_chat(self, guild_id: int) -> None:
+        try:
+            await asyncio.sleep(0.75)
+            await self.upsert_boss_decision_message(guild_id, force_repost=True)
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception("Could not refresh boss decision sticky for guild %s", guild_id)
+        finally:
+            current = self.boss_sticky_refresh_tasks.get(guild_id)
+            if current is asyncio.current_task():
+                self.boss_sticky_refresh_tasks.pop(guild_id, None)
+
+    def cog_unload(self) -> None:
+        for task in self.cooldown_tasks.values():
+            task.cancel()
+        self.cooldown_tasks.clear()
+        for task in self.guild_boss_watch_tasks.values():
+            task.cancel()
+        self.guild_boss_watch_tasks.clear()
+        for task in self.boss_sticky_refresh_tasks.values():
+            task.cancel()
+        self.boss_sticky_refresh_tasks.clear()
+        if self.boss_report_task:
+            self.boss_report_task.cancel()
+            self.boss_report_task = None
+        if self.http_session and not self.http_session.closed:
+            asyncio.create_task(self.http_session.close())
+
+    # ‚îÄ‚îÄ Cooldown channel setup + status check ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+    @app_commands.command(
+        name="boss-cooldown-channel",
+        description="Choose where automatic guild-boss cooldown alerts are sent.",
+    )
+    @app_commands.describe(channel="The channel that should receive cooldown and ready alerts")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_cooldown_channel(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel,
+    ) -> None:
+        await interaction.response.defer(ephemeral=True)
+
+        guild = interaction.guild
+        if guild is None:
+            await interaction.followup.send("‚ùå This command only works inside a server.", ephemeral=True)
+            return
+
+        bot_member = guild.me or guild.get_member(self.bot.user.id)
+        if bot_member is None:
+            await interaction.followup.send("‚ùå I could not check my channel permissions.", ephemeral=True)
+            return
+
+        permissions = channel.permissions_for(bot_member)
+        missing: list[str] = []
+        if not permissions.view_channel:
+            missing.append("View Channel")
+        if not permissions.send_messages:
+            missing.append("Send Messages")
+        if not permissions.embed_links:
+            missing.append("Embed Links")
+
+        if missing:
+            await interaction.followup.send(
+                "‚ùå I need these permissions in that channel: " + ", ".join(missing),
+                ephemeral=True,
+            )
+            return
+
+        guild_key = str(guild.id)
+        config = self.cooldown_config.setdefault(guild_key, {})
+        config["channel_id"] = channel.id
+        config.setdefault("cooldown_end", 0)
+        config.setdefault("last_result", "ready")
+        # Remove the old persistent-message field from earlier versions.
+        config.pop("message_id", None)
+        save_cooldown_config(self.cooldown_config)
+
+        logger.info(
+            "Cooldown channel configured for guild %s: #%s (%s)",
+            guild.id,
+            channel.name,
+            channel.id,
+        )
+
+        await interaction.followup.send(
+            f"‚úÖ Automatic boss cooldown alerts will be sent in {channel.mention}. "
+            "Boss helpers can use `H boss hit`, `H boss skip`, or `H sticky` there.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(
+        name="boss-report-channel",
+        description="Choose where the daily guild-boss HIT/SKIP report is sent.",
+    )
+    @app_commands.describe(
+        channel="Daily report channel. Leave empty to disable daily reports."
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_report_channel(
+        self,
+        interaction: discord.Interaction,
+        channel: discord.TextChannel | None = None,
+    ) -> None:
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message(
+                "‚ùå This command only works inside a server.", ephemeral=True
+            )
+            return
+
+        config = self.cooldown_config.setdefault(str(guild.id), {})
+        if channel is None:
+            config.pop("boss_report_channel_id", None)
+            save_cooldown_config(self.cooldown_config)
+            await interaction.response.send_message(
+                "‚úÖ Daily guild-boss reports are now disabled. Current counters were preserved.",
+                ephemeral=True,
+            )
+            return
+
+        bot_member = guild.me or guild.get_member(self.bot.user.id)
+        if bot_member is None:
+            await interaction.response.send_message(
+                "‚ùå I could not check my channel permissions.", ephemeral=True
+            )
+            return
+        permissions = channel.permissions_for(bot_member)
+        missing: list[str] = []
+        if not permissions.view_channel:
+            missing.append("View Channel")
+        if not permissions.send_messages:
+            missing.append("Send Messages")
+        if not permissions.embed_links:
+            missing.append("Embed Links")
+        if missing:
+            await interaction.response.send_message(
+                "‚ùå I need these permissions in that channel: " + ", ".join(missing),
+                ephemeral=True,
+            )
+            return
+
+        self.ensure_boss_report_cycle(config)
+        config["boss_report_channel_id"] = channel.id
+        save_cooldown_config(self.cooldown_config)
+        await interaction.response.send_message(
+            f"‚úÖ Daily guild-boss reports will be sent in {channel.mention} at the "
+            "Pacific-midnight reset. Reports count confirmed defeats as HIT and "
+            "confirmed escapes as SKIP.",
+            ephemeral=True,
+        )
+
+    @app_commands.command(
+        name="boss-cooldown",
+        description="Check the current guild boss and cooldown status.",
+    )
+    @app_commands.guild_only()
+    async def boss_cooldown(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message(
+                "‚ùå This command only works inside a server.", ephemeral=True
+            )
+            return
+
+        config = self.cooldown_config.get(str(guild.id), {})
+        if not config.get("channel_id"):
+            await interaction.response.send_message(
+                "‚ö†Ô∏è No cooldown channel is configured yet. A server manager can use "
+                "`/boss-cooldown-channel`.",
+                ephemeral=True,
+            )
+            return
+
+        # Refresh the tracked OwO message immediately so this command does not have
+        # to wait for the next 15-second watcher cycle after a defeat or escape.
+        await self.refresh_tracked_guild_boss_status(guild.id)
+        config = self.cooldown_config.get(str(guild.id), {})
+
+        await interaction.response.send_message(
+            embed=self.build_cooldown_embed(config),
+            ephemeral=True,
+        )
+
+    async def send_prefix_cooldown_status(self, message: discord.Message) -> None:
+        """Reply publicly to `H boss cd` / `H boss cooldown`."""
+        guild = message.guild
+        if guild is None:
+            return
+
+        config = self.cooldown_config.get(str(guild.id), {})
+        if not config.get("channel_id"):
+            await safe_reply(message,
+                "‚ö†Ô∏è Boss tracking has not been configured in this server yet. "
+                "A server manager can use `/boss-cooldown-channel`.",
+                mention_author=False,
+            )
+            return
+
+        await self.refresh_tracked_guild_boss_status(guild.id)
+        config = self.cooldown_config.get(str(guild.id), {})
+        await safe_reply(message,
+            embed=self.build_cooldown_embed(config),
+            mention_author=False,
+        )
+        logger.info(
+            "Prefix cooldown status requested by %s in guild %s",
+            message.author,
+            guild.id,
+        )
+
+    async def send_prefix_help(self, message: discord.Message) -> None:
+        """Reply to `H help` with the current command guide."""
+        if message.guild is None:
+            return
+
+        owo_prefix = await get_guild_owo_prefix(message.guild.id)
+
+        embed = discord.Embed(
+            title="üêæ OwO Boss Helper",
+            description=(
+                "`H` stands for **Helper** ‚Äî and it is also the first letter of "
+                "Hassaan's name. This guide lists the commands currently supported."
+            ),
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name=f"{self.ui_emoji('boss_appeared', '‚öîÔ∏è')} Boss command generator",
+            value=(
+                f"Send `owo boss i` or `{owo_command(owo_prefix, 'boss i')}`, then open pages `1/3`, `2/3`, "
+                "and `3/3`."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="‚è±Ô∏è Guild-boss status",
+            value=(
+                "Use `H boss cd`, `H boss cooldown`, or `/boss-cooldown`. Managers "
+                "configure alerts with `/boss-cooldown-channel`, decision helpers with "
+                "`/boss-decision-role`, fighter pings with `/boss-fighter-role`, and "
+                "daily reset reports with `/boss-report-channel`."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="üéüÔ∏è Boss tickets",
+            value=(
+                f"Update manually with `owo boss t` / `{owo_command(owo_prefix, 'boss t')}`; view with `H boss t`, "
+                "`H boss list`, `HBL`, or `/boss-ticket-list`, and look up one "
+                "tracked member with `HBT <name/mention/ID>`. Public Top 10 battle "
+                "logs automatically subtract confirmed hits for already-tracked "
+                "members; fighters outside the Top 10 should update manually. "
+                "Inactive entries expire after 48 hours. Ticket boards include "
+                "**Text view** and clickable **Ping view** controls. Managers use "
+                "`HBS` / `H boss settings` / `/boss-ticket-manage` to remove or "
+                "block users and optionally enable nickname markers. Members control "
+                "their own marker, board entry, and tracking preference with the "
+                "board's **My settings** button, `/boss-ticket-nickname`, "
+                "`H boss nickname`, or `HBN`. A `üè∑Ô∏è` reaction "
+                "means the marker was applied; `üîï` means that member chose to hide it. "
+                "Nickname markers require **Manage Nicknames** and proper role order."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="üíæ Team templates",
+            value=(
+                "Use `HT C <name>` to save, `HT` or `HT<number>` to open, "
+                "`HT U <slot/name>` to update, `HT D <slot/name>` to delete, and "
+                "`HT help` for the full guide."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="üßæ Neon weapon dex",
+            value=(
+                "Use `HW` or `H weapons` for Pencilvester's Neon setup guide, including clicking Neon‚Äôs reaction on the `ww` message. "
+                "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` to show queued "
+                "alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon pages. Helpers can target another member with "
+                "`HWD @member` or `HWD @member dagger mtap sg`. Click **Start dexing session** "
+                "for mobile-friendly one-command prompts labelled with the weapon owner's name. "
+                "The helper advances only after Neon confirms the shown weapon, then waits about two seconds, "
+                "removes the old prompt, and posts the next one. Any confirmed Neon blueprint marks that weapon "
+                "dexed for every matching owner queue. Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Use `H stop`, `Hstop`, or `HS` to pause. "
+                "`HW stats` / `H weapon stats` shows scanned, queued, saved, and no-action counts. Rows without a green tick are queued too, including orb/empowered rows that Neon does not mark with M."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="‚ÑπÔ∏è Project",
+            value=(
+                "Use `H about` or `/about` for developer and project information. "
+                "Server managers can run `/channel-diagnostics` inside a problem "
+                "channel or thread."
+            ),
+            inline=False,
+        )
+        embed.set_footer(text="Use H help anytime to show this current command guide.")
+
+        await safe_reply(message,embed=embed, mention_author=False)
+        logger.info(
+            "Prefix help requested by %s in guild %s",
+            message.author,
+            message.guild.id,
+        )
+
+    @boss_cooldown_channel.error
+    async def boss_cooldown_channel_error(
+        self,
+        interaction: discord.Interaction,
+        error: app_commands.AppCommandError,
+    ) -> None:
+        message = f"‚ùå Could not set the cooldown channel: {error}"
+        if interaction.response.is_done():
+            await interaction.followup.send(message, ephemeral=True)
+        else:
+            await interaction.response.send_message(message, ephemeral=True)
+
+    # ‚îÄ‚îÄ Startup / restoration ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+    @commands.Cog.listener()
+    async def on_ready(self) -> None:
+        if self._restored:
+            return
+        self._restored = True
+        await ensure_ui_emojis(self.bot)
+        if self.http_session is None or self.http_session.closed:
+            self.http_session = aiohttp.ClientSession()
+        await self.restore_cooldowns()
+        self.restore_guild_boss_watchers()
+        await self.rollover_all_boss_reports()
+        self.boss_report_task = asyncio.create_task(self.boss_report_loop())
+        logger.info(
+            "Restored cooldown state for %s configured guild(s)",
+            len(self.cooldown_config),
+        )
+
+    async def restore_cooldowns(self) -> None:
+        """Resume active timers and announce readiness once if one ended offline."""
+        now = int(time.time())
+        changed = False
+
+        for guild_key, config in list(self.cooldown_config.items()):
+            try:
+                guild_id = int(guild_key)
+                cooldown_end = int(config.get("cooldown_end") or 0)
+            except (TypeError, ValueError):
+                continue
+
+            # Clean up and unpin the old persistent status message from earlier versions.
+            legacy_message_id = int(config.get("message_id") or 0)
+            if legacy_message_id:
+                try:
+                    await self.unpin_legacy_status_message(guild_id, legacy_message_id)
+                except Exception as exc:
+                    logger.warning("Could not unpin old status message: %s", exc)
+            if "message_id" in config:
+                config.pop("message_id", None)
+                changed = True
+
+            # Older builds incorrectly created a five-minute cooldown after an
+            # escape. Migrate that state to immediately ready without sending a
+            # delayed or misleading cooldown-complete alert.
+            if str(config.get("last_result") or "") == "escaped" and cooldown_end > 0:
+                config["cooldown_end"] = 0
+                changed = True
+                logger.info("Removed legacy escape cooldown for guild %s", guild_id)
+            elif cooldown_end > now:
+                self.schedule_ready_update(guild_id, cooldown_end)
+            elif cooldown_end > 0:
+                # The bot was offline when a defeat cooldown ended. Mark it ready
+                # and send the missed ready alert once after reconnecting.
+                config["cooldown_end"] = 0
+                config["last_result"] = "ready"
+                changed = True
+                try:
+                    await self.send_ready_message(guild_id)
+                except Exception as exc:
+                    logger.warning("Could not restore cooldown for guild %s: %s", guild_id, exc)
+
+        if changed:
+            save_cooldown_config(self.cooldown_config)
+
+    @staticmethod
+    def ensure_boss_report_cycle(
+        config: dict[str, Any],
+        cycle: str | None = None,
+    ) -> bool:
+        target_cycle = cycle or current_boss_report_cycle()
+        if str(config.get("boss_report_cycle") or "") == target_cycle:
+            return False
+        config["boss_report_cycle"] = target_cycle
+        config["boss_report_defeated"] = 0
+        config["boss_report_escaped"] = 0
+        return True
+
+    async def get_boss_report_channel(
+        self,
+        guild_id: int,
+    ) -> discord.TextChannel | None:
+        config = self.cooldown_config.get(str(guild_id), {})
+        channel_id = int(config.get("boss_report_channel_id") or 0)
+        if not channel_id:
+            return None
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(channel_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                return None
+        return channel if isinstance(channel, discord.TextChannel) else None
+
+    async def send_boss_daily_report(
+        self,
+        guild_id: int,
+        cycle: str,
+        defeated: int,
+        escaped: int,
+    ) -> bool:
+        channel = await self.get_boss_report_channel(guild_id)
+        if channel is None:
+            return False
+        start, end = boss_report_cycle_bounds(cycle)
+        embed = discord.Embed(
+            title="Daily Guild Boss Report",
+            description=f"Reporting period: <t:{start}:F> to <t:{end}:F>",
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name="Total bosses",
+            value=str(defeated + escaped),
+            inline=False,
+        )
+        embed.add_field(name="Defeated (HIT)", value=str(defeated), inline=True)
+        embed.add_field(name="Escaped (SKIP)", value=str(escaped), inline=True)
+        try:
+            await channel.send(embed=embed)
+            return True
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning(
+                "Could not send daily boss report for guild %s: %s",
+                guild_id,
+                exc,
+            )
+            return False
+
+    @staticmethod
+    def queue_pending_boss_report(
+        config: dict[str, Any],
+        cycle: str,
+        defeated: int,
+        escaped: int,
+    ) -> None:
+        raw_pending = config.get("boss_report_pending")
+        pending = raw_pending if isinstance(raw_pending, list) else []
+        if not any(
+            isinstance(item, dict) and str(item.get("cycle") or "") == cycle
+            for item in pending
+        ):
+            pending.append(
+                {
+                    "cycle": cycle,
+                    "defeated": defeated,
+                    "escaped": escaped,
+                }
+            )
+        config["boss_report_pending"] = pending[-7:]
+
+    async def retry_pending_boss_reports(
+        self,
+        guild_id: int,
+        config: dict[str, Any],
+    ) -> None:
+        raw_pending = config.get("boss_report_pending")
+        if not isinstance(raw_pending, list) or not raw_pending:
+            return
+        remaining: list[dict[str, Any]] = []
+        for item in raw_pending:
+            if not isinstance(item, dict):
+                continue
+            cycle = str(item.get("cycle") or "")
+            try:
+                defeated = int(item.get("defeated") or 0)
+                escaped = int(item.get("escaped") or 0)
+                boss_report_cycle_bounds(cycle)
+            except (TypeError, ValueError):
+                continue
+            if not await self.send_boss_daily_report(
+                guild_id,
+                cycle,
+                defeated,
+                escaped,
+            ):
+                remaining.append(item)
+        if remaining:
+            config["boss_report_pending"] = remaining[-7:]
+        else:
+            config.pop("boss_report_pending", None)
+        save_cooldown_config(self.cooldown_config)
+
+    async def rollover_boss_report(
+        self,
+        guild_id: int,
+        target_cycle: str | None = None,
+    ) -> None:
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        target = target_cycle or current_boss_report_cycle()
+        previous = str(config.get("boss_report_cycle") or "")
+        if not previous:
+            self.ensure_boss_report_cycle(config, target)
+            save_cooldown_config(self.cooldown_config)
+            return
+        if previous == target:
+            if config.get("boss_report_channel_id"):
+                await self.retry_pending_boss_reports(guild_id, config)
+            return
+
+        if config.get("boss_report_channel_id"):
+            await self.retry_pending_boss_reports(guild_id, config)
+        defeated = int(config.get("boss_report_defeated") or 0)
+        escaped = int(config.get("boss_report_escaped") or 0)
+        if config.get("boss_report_channel_id"):
+            sent = await self.send_boss_daily_report(
+                guild_id,
+                previous,
+                defeated,
+                escaped,
+            )
+            if not sent:
+                self.queue_pending_boss_report(
+                    config,
+                    previous,
+                    defeated,
+                    escaped,
+                )
+        self.ensure_boss_report_cycle(config, target)
+        save_cooldown_config(self.cooldown_config)
+
+    async def rollover_all_boss_reports(self) -> None:
+        target = current_boss_report_cycle()
+        for guild_key in list(self.cooldown_config):
+            try:
+                guild_id = int(guild_key)
+            except (TypeError, ValueError):
+                continue
+            await self.rollover_boss_report(guild_id, target)
+
+    async def boss_report_loop(self) -> None:
+        try:
+            while not self.bot.is_closed():
+                reset_at = next_boss_report_reset_timestamp()
+                await asyncio.sleep(max(1, reset_at - time.time() + 1))
+                await self.rollover_all_boss_reports()
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception("Daily boss report loop stopped unexpectedly")
+
+    async def record_boss_report_outcome(self, guild_id: int, outcome: str) -> None:
+        if outcome not in {"defeated", "escaped"}:
+            return
+        await self.rollover_boss_report(guild_id)
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        key = f"boss_report_{outcome}"
+        config[key] = int(config.get(key) or 0) + 1
+        save_cooldown_config(self.cooldown_config)
+
+    async def detect_hp_from_raw(self, data: dict[str, Any]) -> tuple[str | None, float]:
+        if self.http_session is None or self.http_session.closed:
+            self.http_session = aiohttp.ClientSession()
+        for url in extract_media_urls(data):
+            try:
+                async with self.http_session.get(url, timeout=aiohttp.ClientTimeout(total=10)) as response:
+                    if response.status != 200:
+                        continue
+                    body = await response.read()
+                hp, confidence = read_hp_from_image_bytes(body, self.hp_templates)
+                if hp is not None:
+                    logger.info("HP image detected %s (confidence %.2f)", hp, confidence)
+                    return hp, confidence
+            except (aiohttp.ClientError, asyncio.TimeoutError):
+                continue
+        return None, 0.0
+
+    def is_spawn_window_open(self, guild_id: int) -> bool:
+        """True only when the guild can legitimately receive a new boss."""
+        if not self.is_cooldown_configured(guild_id):
+            return False
+        config = self.cooldown_config.get(str(guild_id), {})
+        if config.get("active_boss_message_id"):
+            return False
+        return int(config.get("cooldown_end") or 0) <= int(time.time())
+
+    def should_inspect_guild_boss_gateway(self, guild_id: int) -> bool:
+        """Inspect gateway payloads only while active or able to spawn.
+
+        During a defeat cooldown no boss can appear, so unrelated OwO traffic is
+        ignored completely. While a boss is active, gateway payloads are still
+        inspected cheaply so a newer status card can replace the tracked one.
+        """
+        if not self.is_cooldown_configured(guild_id):
+            return False
+        config = self.cooldown_config.get(str(guild_id), {})
+        if config.get("active_boss_message_id"):
+            return True
+        return self.is_spawn_window_open(guild_id)
+
+    def is_tracked_boss_message(
+        self, guild_id: int, channel_id: int, message_id: int
+    ) -> bool:
+        config = self.cooldown_config.get(str(guild_id), {})
+        return (
+            int(config.get("active_boss_channel_id") or 0) == channel_id
+            and int(config.get("active_boss_message_id") or 0) == message_id
+        )
+
+    def get_guild_boss_fetch_lock(self, guild_id: int) -> asyncio.Lock:
+        return self.guild_boss_fetch_locks.setdefault(guild_id, asyncio.Lock())
+
+    def get_guild_boss_outcome_lock(self, guild_id: int) -> asyncio.Lock:
+        """Serialize defeat/escape handling so one boss emits one alert."""
+        return self.guild_boss_outcome_locks.setdefault(guild_id, asyncio.Lock())
+
+    def clear_active_boss_tracking(self, guild_id: int, reason: str) -> None:
+        """Clear stale active-message fields without changing the known outcome."""
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        changed = False
+        for key in (
+            "active_boss_channel_id",
+            "active_boss_message_id",
+            "active_boss_expires_at",
+            "active_boss_unverified",
+        ):
+            if key in config:
+                config.pop(key, None)
+                changed = True
+        watcher = self.guild_boss_watch_tasks.get(guild_id)
+        if watcher and watcher is not asyncio.current_task():
+            watcher.cancel()
+        if changed:
+            save_cooldown_config(self.cooldown_config)
+            logger.info("Cleared guild %s stale active boss state: %s", guild_id, reason)
+
+    async def refresh_tracked_guild_boss_status(self, guild_id: int) -> None:
+        """Reconcile the tracked boss before displaying a manual status check."""
+        config = self.cooldown_config.get(str(guild_id), {})
+        channel_id = int(config.get("active_boss_channel_id") or 0)
+        message_id = int(config.get("active_boss_message_id") or 0)
+        if not channel_id or not message_id:
+            return
+
+        now = int(time.time())
+        expiry = int(config.get("active_boss_expires_at") or 0)
+        last_boss_key = int(config.get("last_boss_key") or 0)
+        last_result = str(config.get("last_result") or "")
+
+        # A late copy of the completed boss card must never reactivate the boss.
+        if (
+            expiry
+            and expiry == last_boss_key
+            and last_result in {"defeated", "escaped", "ready"}
+        ):
+            self.clear_active_boss_tracking(
+                guild_id,
+                f"completed boss {expiry} was still marked active",
+            )
+            return
+
+        # The watcher, H command, and slash command can fire close together. One
+        # per-guild lock prevents duplicate GETs for the same tracked message.
+        async with self.get_guild_boss_fetch_lock(guild_id):
+            data = await fetch_raw_message(self.bot, channel_id, message_id)
+
+        if not data:
+            if expiry and expiry <= now:
+                await self.finish_boss_escape(
+                    guild_id,
+                    message_id,
+                    expiry,
+                    boss_key=expiry,
+                )
+                return
+            config = self.cooldown_config.setdefault(str(guild_id), {})
+            if not config.get("active_boss_unverified"):
+                config["active_boss_unverified"] = True
+                save_cooldown_config(self.cooldown_config)
+            return
+
+        if int((data.get("author") or {}).get("id", 0)) != OWO_BOT_ID:
+            config = self.cooldown_config.setdefault(str(guild_id), {})
+            config["active_boss_unverified"] = True
+            save_cooldown_config(self.cooldown_config)
+            return
+
+        await self.track_latest_guild_boss_message(
+            guild_id,
+            channel_id,
+            message_id,
+            data,
+        )
+
+        config = self.cooldown_config.get(str(guild_id), {})
+        expiry = int(config.get("active_boss_expires_at") or 0)
+        if expiry and expiry <= int(time.time()) and config.get("active_boss_message_id"):
+            await self.finish_boss_escape(
+                guild_id,
+                message_id,
+                expiry,
+                boss_key=expiry,
+            )
+
+    async def track_latest_guild_boss_message(self, guild_id: int, channel_id: int, message_id: int, data: dict[str, Any]) -> None:
+        if not self.is_cooldown_configured(guild_id) or not is_guild_boss_status(data):
+            return
+
+        ticket_tracker = self.bot.get_cog("TicketTracker")
+        queue_snapshot_data = getattr(ticket_tracker, "queue_boss_snapshot_data", None)
+        if callable(queue_snapshot_data):
+            queue_snapshot_data(guild_id, channel_id, message_id, data)
+
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        old_id = int(config.get("active_boss_message_id") or 0)
+        old_channel_id = int(config.get("active_boss_channel_id") or 0)
+        if old_id and message_id < old_id:
+            return
+
+        outcome = detect_boss_outcome(extract_all_text_from_raw(data))
+        if outcome is not None:
+            # A completed status may be a newer replacement message. Let the
+            # outcome handler apply the correct rule from OwO's timestamp: five
+            # minutes after defeat, or immediate readiness after escape.
+            await self.maybe_handle_outcome(guild_id, message_id, data)
+            return
+
+        now = int(time.time())
+        expiry = extract_future_boss_expiry(data, now)
+        previous_expiry = int(config.get("active_boss_expires_at") or 0)
+        last_boss_key = int(config.get("last_boss_key") or 0)
+        last_result = str(config.get("last_result") or "")
+
+        # Ignore late active cards belonging to a boss whose defeat/escape was
+        # already processed. Without this guard, an old status edit can make
+        # `H boss cd` incorrectly report an active boss again.
+        if (
+            expiry
+            and expiry == last_boss_key
+            and last_result in {"defeated", "escaped", "ready"}
+        ):
+            logger.info(
+                "Ignored late active card %s for completed guild %s boss %s",
+                message_id,
+                guild_id,
+                expiry,
+            )
+            return
+
+        if expiry and expiry <= now:
+            await self.finish_boss_escape(
+                guild_id,
+                message_id,
+                expiry,
+                boss_key=expiry,
+            )
+            return
+        is_new_boss = bool(expiry and expiry != previous_expiry)
+        tracking_changed = (
+            old_id != message_id
+            or old_channel_id != channel_id
+            or bool(expiry and expiry != previous_expiry)
+        )
+
+        config["active_boss_channel_id"] = channel_id
+        config["active_boss_message_id"] = message_id
+        config.pop("active_boss_unverified", None)
+        if expiry:
+            config["active_boss_expires_at"] = expiry
+
+        # A newly active boss supersedes any stale ready/cooldown state.
+        if is_new_boss:
+            config["cooldown_end"] = 0
+            config["last_result"] = "active"
+            config["boss_decision"] = "pending"
+            config.pop("boss_decision_by", None)
+            config.pop("boss_decision_at", None)
+            config.pop("sticky_custom_text", None)
+            config.pop("decision_message_id", None)
+            config.pop("fighter_role_pinged_boss_key", None)
+            config.pop("fighter_roles_pinged_boss_key", None)
+            old_task = self.cooldown_tasks.pop(guild_id, None)
+            if old_task:
+                old_task.cancel()
+
+        if tracking_changed or is_new_boss:
+            save_cooldown_config(self.cooldown_config)
+        self.start_guild_boss_watcher(guild_id)
+
+        if tracking_changed:
+            logger.info(
+                "Tracking guild %s boss message %s in channel %s%s",
+                guild_id,
+                message_id,
+                channel_id,
+                f"; escapes at {expiry}" if expiry else "",
+            )
+
+        if is_new_boss and int(config.get("announced_boss_expires_at") or 0) != expiry:
+            config["announced_boss_expires_at"] = expiry
+            save_cooldown_config(self.cooldown_config)
+            await self.send_new_boss_message(guild_id, expiry)
+
+    def restore_guild_boss_watchers(self) -> None:
+        for guild_key, config in self.cooldown_config.items():
+            if config.get("active_boss_channel_id") and config.get("active_boss_message_id"):
+                self.start_guild_boss_watcher(int(guild_key))
+
+    def start_guild_boss_watcher(self, guild_id: int) -> None:
+        existing = self.guild_boss_watch_tasks.get(guild_id)
+        if existing and not existing.done():
+            return
+        self.guild_boss_watch_tasks[guild_id] = asyncio.create_task(self.watch_latest_guild_boss(guild_id))
+
+    async def watch_latest_guild_boss(self, guild_id: int) -> None:
+        try:
+            # Restored guilds otherwise begin polling in the same millisecond. A
+            # small deterministic stagger spreads those first requests out.
+            await asyncio.sleep((guild_id % 7) * 0.35)
+            while True:
+                config = self.cooldown_config.get(str(guild_id), {})
+                channel_id = int(config.get("active_boss_channel_id") or 0)
+                message_id = int(config.get("active_boss_message_id") or 0)
+                if not channel_id or not message_id:
+                    return
+                async with self.get_guild_boss_fetch_lock(guild_id):
+                    data = await fetch_raw_message(self.bot, channel_id, message_id)
+
+                if not data:
+                    # OwO status cards can be deleted or replaced. Do not keep
+                    # requesting a missing message every 15 seconds. Pause REST
+                    # polling while gateway events remain able to replace the
+                    # tracked ID, and fall back to the stored escape timestamp.
+                    logger.info(
+                        "Tracked guild %s boss message %s is unavailable; "
+                        "pausing REST polling until replacement or expiry",
+                        guild_id,
+                        message_id,
+                    )
+                    while True:
+                        await asyncio.sleep(BOSS_WATCH_INTERVAL_SECONDS)
+                        current_config = self.cooldown_config.get(str(guild_id), {})
+                        current_message_id = int(
+                            current_config.get("active_boss_message_id") or 0
+                        )
+                        if not current_message_id:
+                            return
+                        if current_message_id != message_id:
+                            break
+                        expiry = int(
+                            current_config.get("active_boss_expires_at") or 0
+                        )
+                        if expiry and expiry <= int(time.time()):
+                            await self.finish_boss_escape(
+                                guild_id,
+                                message_id,
+                                expiry,
+                                boss_key=expiry,
+                            )
+                            return
+                    continue
+
+                if int((data.get("author") or {}).get("id", 0)) == OWO_BOT_ID:
+                    await self.track_latest_guild_boss_message(
+                        guild_id,
+                        channel_id,
+                        message_id,
+                        data,
+                    )
+                    config = self.cooldown_config.get(str(guild_id), {})
+                    if not config.get("active_boss_message_id"):
+                        return
+
+                    # If OwO has not edited the card yet, the stored future expiry
+                    # still gives us an authoritative escape time. Mark the guild
+                    # ready immediately at that time instead of waiting for another
+                    # user to request the boss status.
+                    expiry = int(config.get("active_boss_expires_at") or 0)
+                    if expiry and expiry <= int(time.time()):
+                        await self.finish_boss_escape(
+                            guild_id,
+                            message_id,
+                            expiry,
+                            boss_key=expiry,
+                        )
+                        return
+                await asyncio.sleep(BOSS_WATCH_INTERVAL_SECONDS)
+        except asyncio.CancelledError:
+            return
+        finally:
+            current = self.guild_boss_watch_tasks.get(guild_id)
+            if current is asyncio.current_task():
+                self.guild_boss_watch_tasks.pop(guild_id, None)
+
+    # ‚îÄ‚îÄ Gateway listeners ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+    @commands.Cog.listener()
+    async def on_message(self, message: discord.Message) -> None:
+        try:
+            # Human trigger: helper commands and configured OwO boss-inventory forms.
+            if not message.author.bot:
+                if message.guild:
+                    decision = parse_boss_decision_command(message.content or "")
+                    if decision is not None:
+                        await self.handle_boss_decision_message(message, decision)
+                        return
+
+                    sticky_action = parse_boss_sticky_command(message.content or "")
+                    if sticky_action is not None:
+                        await self.handle_boss_sticky_command(message, sticky_action)
+                        return
+
+                    if is_prefix_help_trigger(message.content):
+                        await self.send_prefix_help(message)
+                        return
+
+                    if is_prefix_cooldown_trigger(message.content):
+                        await self.send_prefix_cooldown_status(message)
+                        return
+
+                    owo_prefix = await get_guild_owo_prefix(message.guild.id)
+                    if is_boss_trigger(message.content, owo_prefix):
+                        active_sessions[message.channel.id] = BossSession(
+                            user_id=message.author.id,
+                            channel_id=message.channel.id,
+                        )
+                        logger.info(
+                            "Boss reader armed by %s in #%s with OwO prefix %s",
+                            message.author,
+                            getattr(message.channel, "name", message.channel.id),
+                            owo_prefix,
+                        )
+
+                    if self.should_refresh_boss_sticky_on_message(message):
+                        self.queue_boss_sticky_refresh(message.guild.id)
+                return
+
+            if message.author.id != OWO_BOT_ID or message.guild is None:
+                return
+
+            generator_needed = message.channel.id in active_sessions
+            cooldown_gateway_needed = self.should_inspect_guild_boss_gateway(
+                message.guild.id
+            )
+            if not generator_needed and not cooldown_gateway_needed:
+                return
+
+            # Message-create events already contain Components V2. Build raw-like
+            # data locally rather than GETting every OwO response from Discord.
+            data = message_to_raw_data(message)
+
+            if cooldown_gateway_needed and is_guild_boss_status(data):
+                await self.track_latest_guild_boss_message(
+                    message.guild.id, message.channel.id, message.id, data
+                )
+
+            if generator_needed:
+                boss_title, description = extract_boss_from_raw(data)
+                page_number = extract_boss_page_number(data)
+
+                # Older discord.py builds may not expose every Components V2 field
+                # on Message. Fall back to one REST fetch only for an explicitly
+                # armed three-page generator session, never for general grinding.
+                if not boss_title or page_number is None:
+                    fetched = await fetch_raw_message(
+                        self.bot, message.channel.id, message.id
+                    )
+                    if fetched:
+                        data = fetched
+                        boss_title, description = extract_boss_from_raw(data)
+                        page_number = extract_boss_page_number(data)
+
+                if boss_title:
+                    detected_hp, hp_confidence = await self.detect_hp_from_raw(data)
+                    await process_boss_page(
+                        self,
+                        message.channel.id,
+                        message.id,
+                        boss_title,
+                        description,
+                        page_number,
+                        detected_hp,
+                        hp_confidence,
+                    )
+
+        except Exception as exc:
+            logger.exception("Unhandled error in on_message: %s", exc)
+
+    @commands.Cog.listener()
+    async def on_raw_message_edit(self, payload: discord.RawMessageUpdateEvent) -> None:
+        try:
+            if payload.guild_id is None:
+                return
+
+            generator_needed = payload.channel_id in active_sessions
+            cooldown_gateway_needed = self.should_inspect_guild_boss_gateway(
+                payload.guild_id
+            )
+            if not generator_needed and not cooldown_gateway_needed:
+                return
+
+            # For cooldown discovery/tracking, use the edit payload directly. If an
+            # update is partial, the single-message 15-second watcher will read the
+            # final state. We deliberately do not REST-fetch every OwO edit.
+            if cooldown_gateway_needed:
+                data = dict(payload.data)
+                author_id = int((data.get("author") or {}).get("id", 0) or 0)
+                tracked = self.is_tracked_boss_message(
+                    payload.guild_id, payload.channel_id, payload.message_id
+                )
+                if (tracked or author_id == OWO_BOT_ID) and is_guild_boss_status(data):
+                    await self.track_latest_guild_boss_message(
+                        payload.guild_id,
+                        payload.channel_id,
+                        payload.message_id,
+                        data,
+                    )
+
+            # Page navigation edits are intentionally fetched because the user has
+            # explicitly armed a short generator session. This is a tiny, bounded
+            # request count and is unrelated to server-wide grinding traffic.
+            if generator_needed:
+                data = await fetch_raw_message(
+                    self.bot, payload.channel_id, payload.message_id
+                )
+                if not data:
+                    return
+                if int((data.get("author") or {}).get("id", 0)) != OWO_BOT_ID:
+                    return
+
+                boss_title, description = extract_boss_from_raw(data)
+                if boss_title:
+                    page_number = extract_boss_page_number(data)
+                    detected_hp, hp_confidence = await self.detect_hp_from_raw(data)
+                    await process_boss_page(
+                        self,
+                        payload.channel_id,
+                        payload.message_id,
+                        boss_title,
+                        description,
+                        page_number,
+                        detected_hp,
+                        hp_confidence,
+                    )
+
+        except Exception as exc:
+            logger.exception("Unhandled error in on_raw_message_edit: %s", exc)
+
+    # ‚îÄ‚îÄ Generator result ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+    async def finish_generator(self, channel: discord.abc.Messageable, session: BossSession) -> None:
+        active_sessions.pop(session.channel_id, None)
+
+        blocks: list[str] = []
+        missing_pages: list[int] = []
+        for page_number in (1, 2, 3):
+            text = session.page_texts.get(page_number)
+            if not text:
+                missing_pages.append(page_number)
+                continue
+            found = split_boss_blocks(text)
+            if found:
+                blocks.append(found[0])
+            else:
+                missing_pages.append(page_number)
+
+        if missing_pages or len(blocks) != 3:
+            missing_text = ", ".join(f"{page}/3" for page in missing_pages) or "unknown"
+            guild_id = int(getattr(getattr(channel, "guild", None), "id", 0) or 0)
+            owo_prefix = await get_guild_owo_prefix(guild_id)
+            await channel.send(
+                f"‚ö†Ô∏è I could not capture every boss page. Missing: **{missing_text}**. "
+                f"Run `owo boss i` or `{owo_command(owo_prefix, 'boss i')}` again and open all three pages."
+            )
+            return
+
+        try:
+            # Both bosses and HP values are always emitted in OwO's 1/3 ‚Üí 2/3 ‚Üí 3/3 order.
+            boss_results = [parse_boss(block) for block in blocks]
+            hp_values = [session.hp_by_page.get(page, DEFAULT_HP) for page in (1, 2, 3)]
+            command, warnings = build_command(boss_results, hp_values)
+        except Exception as exc:
+            await channel.send(f"‚ùå I could not build the boss command: `{exc}`")
+            return
+
+        # Send the command as normal message content rather than inside an embed.
+        # Inline code in a regular message is much easier to copy on Discord mobile.
+        await channel.send(f"`{command}`")
+        if warnings:
+            await channel.send(
+                "‚ö†Ô∏è **Parser note**\n"
+                + "\n".join(f"‚Ä¢ {warning}" for warning in warnings[:4])
+            )
+        logger.info(
+            "Generated boss command for user %s in channel %s with HP %s",
+            session.user_id,
+            session.channel_id,
+            ",".join(hp_values),
+        )
+
+    # ‚îÄ‚îÄ Cooldown detection / persistence ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ‚îÄ
+
+    def is_cooldown_configured(self, guild_id: int) -> bool:
+        config = self.cooldown_config.get(str(guild_id), {})
+        return bool(config.get("channel_id"))
+
+    async def maybe_handle_outcome(
+        self,
+        guild_id: int,
+        source_message_id: int,
+        data: dict[str, Any],
+    ) -> None:
+        message_key = (guild_id, source_message_id)
+        if message_key in self.processed_outcome_messages:
+            return
+
+        outcome = detect_boss_outcome(extract_all_text_from_raw(data))
+        if outcome is None:
+            return
+
+        now = int(time.time())
+        event_time = extract_relevant_timestamp(data, now) or now
+
+        # The tracked escape timestamp is a stable identity for the current boss.
+        # OwO can publish/edit more than one result message for the same boss, and
+        # those messages do not always expose exactly the same result timestamp.
+        config = self.cooldown_config.get(str(guild_id), {})
+        boss_key = int(config.get("active_boss_expires_at") or 0) or event_time
+
+        if outcome == "escaped":
+            await self.finish_boss_escape(
+                guild_id,
+                source_message_id,
+                event_time,
+                boss_key=boss_key,
+            )
+        else:
+            await self.start_defeat_cooldown(
+                guild_id,
+                source_message_id,
+                event_time,
+                boss_key=boss_key,
+            )
+
+    def claim_boss_outcome(
+        self,
+        guild_id: int,
+        source_message_id: int,
+        outcome: str,
+        event_time: int,
+        boss_key: int,
+    ) -> tuple[dict[str, Any], int] | None:
+        """Deduplicate an outcome, clear the active boss, and persist its result."""
+        message_key = (guild_id, source_message_id)
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        now = int(time.time())
+
+        if int(config.get("last_source_message_id") or 0) == source_message_id:
+            self.processed_outcome_messages.add(message_key)
+            return None
+
+        previous_boss_key = int(config.get("last_boss_key") or 0)
+        if boss_key and previous_boss_key == boss_key:
+            self.processed_outcome_messages.add(message_key)
+            logger.info(
+                "Ignored duplicate %s result for guild %s boss key %s",
+                outcome,
+                guild_id,
+                boss_key,
+            )
+            return None
+
+        # If a new boss appeared while an older result was settling, never clear
+        # or announce the stale result over the newer active boss.
+        current_boss_key = int(config.get("active_boss_expires_at") or 0)
+        if current_boss_key and boss_key and current_boss_key != boss_key:
+            self.processed_outcome_messages.add(message_key)
+            logger.info(
+                "Ignored stale %s result for guild %s boss key %s; current key is %s",
+                outcome,
+                guild_id,
+                boss_key,
+                current_boss_key,
+            )
+            return None
+
+        # OwO can publish the same result through more than one replacement
+        # message. Deduplicate only the same outcome at essentially the same event
+        # time. Do not use a global time lock: after an escape, a new boss may
+        # appear immediately and could legitimately end within a few seconds.
+        previous_outcome = str(config.get("last_result") or "")
+        previous_event_time = int(config.get("last_outcome_event_time") or 0)
+        if (
+            previous_outcome == outcome
+            and previous_event_time
+            and abs(event_time - previous_event_time) <= OUTCOME_DEDUP_SECONDS
+        ):
+            self.processed_outcome_messages.add(message_key)
+            return None
+
+        self.processed_outcome_messages.add(message_key)
+        if len(self.processed_outcome_messages) > 2000:
+            self.processed_outcome_messages.clear()
+            self.processed_outcome_messages.add(message_key)
+
+        config["last_result"] = outcome
+        config["last_detected_at"] = now
+        config["last_outcome_event_time"] = event_time
+        config["last_source_message_id"] = source_message_id
+        config["last_boss_key"] = boss_key
+        config.pop("message_id", None)
+        config.pop("active_boss_channel_id", None)
+        config.pop("active_boss_message_id", None)
+        config.pop("active_boss_expires_at", None)
+        config.pop("active_boss_unverified", None)
+
+        watcher = self.guild_boss_watch_tasks.get(guild_id)
+        if watcher and watcher is not asyncio.current_task():
+            watcher.cancel()
+
+        return config, now
+
+    async def start_defeat_cooldown(
+        self,
+        guild_id: int,
+        source_message_id: int,
+        event_time: int,
+        *,
+        boss_key: int | None = None,
+    ) -> None:
+        """Start the five-minute cooldown that follows a defeated guild boss."""
+        # OwO can emit several edits/replacement messages almost simultaneously.
+        # Let that burst settle, then serialize the final outcome per guild.
+        await asyncio.sleep(OUTCOME_SETTLE_SECONDS)
+        async with self.get_guild_boss_outcome_lock(guild_id):
+            effective_boss_key = int(boss_key or 0) or event_time
+            claimed = self.claim_boss_outcome(
+                guild_id,
+                source_message_id,
+                "defeated",
+                event_time,
+                effective_boss_key,
+            )
+            if claimed is None:
+                return
+
+            config, now = claimed
+            cooldown_end = event_time + BOSS_COOLDOWN_SECONDS
+            config["cooldown_end"] = cooldown_end
+            save_cooldown_config(self.cooldown_config)
+
+            # Ignore an old result whose five-minute defeat cooldown already ended.
+            if cooldown_end <= now:
+                config["cooldown_end"] = 0
+                config["last_result"] = "ready"
+                save_cooldown_config(self.cooldown_config)
+                logger.info("Ignored old defeated result from %s", event_time)
+                return
+
+            logger.info(
+                "Guild %s boss defeated; cooldown ends at %s",
+                guild_id,
+                cooldown_end,
+            )
+            await self.record_boss_report_outcome(guild_id, "defeated")
+            await self.clear_boss_decision_message(guild_id)
+            await self.send_boss_outcome_marker(guild_id, "defeated")
+            await self.send_cooldown_started_message(guild_id)
+            self.schedule_ready_update(guild_id, cooldown_end)
+
+    async def finish_boss_escape(
+        self,
+        guild_id: int,
+        source_message_id: int,
+        event_time: int,
+        *,
+        boss_key: int | None = None,
+    ) -> None:
+        """Mark the guild ready immediately because escapes have no cooldown."""
+        # Wait briefly for OwO's edit burst to settle, then let exactly one task
+        # claim and announce this boss outcome.
+        await asyncio.sleep(OUTCOME_SETTLE_SECONDS)
+        async with self.get_guild_boss_outcome_lock(guild_id):
+            effective_boss_key = int(boss_key or 0) or event_time
+            claimed = self.claim_boss_outcome(
+                guild_id,
+                source_message_id,
+                "escaped",
+                event_time,
+                effective_boss_key,
+            )
+            if claimed is None:
+                return
+
+            config, now = claimed
+            config["cooldown_end"] = 0
+
+            old_task = self.cooldown_tasks.pop(guild_id, None)
+            if old_task:
+                old_task.cancel()
+
+            save_cooldown_config(self.cooldown_config)
+
+            # Do not publish a fresh alert for a very old escaped card encountered
+            # during history restoration or after a long offline period.
+            if now - event_time > BOSS_COOLDOWN_SECONDS:
+                logger.info("Ignored old escaped result from %s", event_time)
+                return
+
+            logger.info(
+                "Guild %s boss escaped at %s; no cooldown applies",
+                guild_id,
+                event_time,
+            )
+            await self.record_boss_report_outcome(guild_id, "escaped")
+            await self.clear_boss_decision_message(guild_id)
+            await self.send_boss_outcome_marker(guild_id, "escaped")
+            await self.send_escape_ready_message(guild_id)
+
+    def schedule_ready_update(self, guild_id: int, cooldown_end: int) -> None:
+        old_task = self.cooldown_tasks.pop(guild_id, None)
+        if old_task:
+            old_task.cancel()
+        self.cooldown_tasks[guild_id] = asyncio.create_task(
+            self.finish_cooldown_when_ready(guild_id, cooldown_end)
+        )
+
+    async def finish_cooldown_when_ready(self, guild_id: int, expected_end: int) -> None:
+        try:
+            await asyncio.sleep(max(0, expected_end - time.time()))
+            config = self.cooldown_config.get(str(guild_id), {})
+            if int(config.get("cooldown_end") or 0) != expected_end:
+                return
+
+            config["cooldown_end"] = 0
+            config["last_result"] = "ready"
+            save_cooldown_config(self.cooldown_config)
+            await self.send_ready_message(guild_id)
+        except asyncio.CancelledError:
+            return
+        finally:
+            current = self.cooldown_tasks.get(guild_id)
+            if current is asyncio.current_task():
+                self.cooldown_tasks.pop(guild_id, None)
+
+    def build_cooldown_embed(self, config: dict[str, Any]) -> discord.Embed:
+        now = int(time.time())
+        cooldown_end = int(config.get("cooldown_end") or 0)
+        active_expiry = int(config.get("active_boss_expires_at") or 0)
+        result = str(config.get("last_result") or "ready")
+        unverified = bool(config.get("active_boss_unverified"))
+
+        if cooldown_end > now:
+            embed = discord.Embed(
+                title=f"{self.ui_emoji('boss_defeated', '‚è≥')} Guild Boss Cooldown",
+                description=(
+                    "The guild boss was **defeated**.\n\n"
+                    f"**Next boss cooldown ends:** <t:{cooldown_end}:R>\n"
+                    f"**Ready at:** <t:{cooldown_end}:F>"
+                ),
+                color=0xFEE75C,
+            )
+            embed.set_footer(
+                text="Discord displays the time correctly for each member's timezone."
+            )
+            return embed
+
+        if config.get("active_boss_message_id") and unverified:
+            if active_expiry > now:
+                timing = (
+                    f"\n\n**Last known escape time:** <t:{active_expiry}:R>\n"
+                    f"**Exact time:** <t:{active_expiry}:F>"
+                )
+            else:
+                timing = ""
+            return discord.Embed(
+                title="‚ùî Guild Boss Status Unconfirmed",
+                description=(
+                    "The last tracked OwO boss message is no longer available, so the "
+                    "helper will not claim that the boss is still active. Run an OwO "
+                    "boss-status command or continue grinding; the next status card will "
+                    f"refresh this automatically.{timing}"
+                ),
+                color=0xFEE75C,
+            )
+
+        if config.get("active_boss_message_id"):
+            if active_expiry > now:
+                description = (
+                    "A guild boss is currently active.\n\n"
+                    f"**The boss will escape:** <t:{active_expiry}:R>\n"
+                    f"**Escape time:** <t:{active_expiry}:F>\n\n"
+                    "If the boss is defeated first, the five-minute cooldown starts "
+                    "from the defeat time."
+                )
+            else:
+                description = (
+                    "A guild boss status is being tracked, but its exact escape time "
+                    "is not available yet. The helper will update when OwO publishes "
+                    "a complete status card."
+                )
+            return discord.Embed(
+                title=f"{self.ui_emoji('boss_appeared', '‚öîÔ∏è')} Guild Boss Active",
+                description=description,
+                color=0x5865F2,
+            )
+
+        if result == "escaped":
+            return discord.Embed(
+                title=f"{self.ui_emoji('boss_escaped', '‚úÖ')} No Active Guild Boss",
+                description=(
+                    "The previous guild boss **escaped**. There is no cooldown after an "
+                    "escape, and no new boss has been detected yet. Keep grinding to "
+                    "spawn the next guild boss."
+                ),
+                color=0x57F287,
+            )
+
+        if result in {"defeated", "ready"}:
+            return discord.Embed(
+                title="‚úÖ Guild Boss Ready",
+                description=(
+                    "There is currently no confirmed guild boss or cooldown. The previous "
+                    "defeat cooldown has ended, so keep grinding to spawn a new boss."
+                ),
+                color=0x57F287,
+            )
+
+        return discord.Embed(
+            title="‚úÖ No Active Guild Boss",
+            description=(
+                "There is currently no confirmed guild boss or cooldown. Keep grinding "
+                "to spawn a new guild boss."
+            ),
+            color=0x57F287,
+        )
+
+    async def get_configured_channel(self, guild_id: int) -> discord.TextChannel | None:
+        config = self.cooldown_config.get(str(guild_id), {})
+        channel_id = int(config.get("channel_id") or 0)
+        if not channel_id:
+            return None
+
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(channel_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                return None
+
+        return channel if isinstance(channel, discord.TextChannel) else None
+
+    async def unpin_legacy_status_message(
+        self, guild_id: int, message_id: int
+    ) -> None:
+        """Unpin the status message created by the previous bot version."""
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            return
+
+        try:
+            message = await channel.fetch_message(message_id)
+            if message.pinned:
+                await message.unpin(reason="OwO cooldown tracker no longer uses pinned messages")
+        except discord.NotFound:
+            return
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Old status message could not be unpinned automatically: %s", exc)
+
+
+    async def send_boss_outcome_marker(self, guild_id: int, outcome: str) -> None:
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            return
+        marker = self.ui_emoji("boss_defeated", "HIT") if outcome == "defeated" else self.ui_emoji("boss_escaped", "SKIP")
+        try:
+            await channel.send(str(marker))
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send boss outcome marker: %s", exc)
+
+    async def send_cooldown_started_message(self, guild_id: int) -> None:
+        config = self.cooldown_config.get(str(guild_id))
+        if not config:
+            return
+
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            logger.warning("Configured cooldown channel for guild %s is unavailable", guild_id)
+            return
+
+        try:
+            await channel.send(embed=self.build_cooldown_embed(config))
+            logger.info("Sent cooldown alert for guild %s", guild_id)
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send cooldown alert: %s", exc)
+
+    async def send_escape_ready_message(self, guild_id: int) -> None:
+        """Announce that an escaped boss can be replaced immediately."""
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            logger.warning(
+                "Configured cooldown channel for guild %s is unavailable", guild_id
+            )
+            return
+
+        try:
+            await channel.send(
+                embed=discord.Embed(
+                    title=f"{self.ui_emoji('boss_escaped', 'SKIP')} Guild Boss Escaped",
+                    description=(
+                        "The guild boss escaped. There is **no cooldown after an "
+                        "escape**, so a new guild boss can appear immediately."
+                    ),
+                    color=0x57F287,
+                )
+            )
+            logger.info("Sent boss-escaped ready alert for guild %s", guild_id)
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send boss-escaped alert: %s", exc)
+
+    async def send_new_boss_message(self, guild_id: int, expiry: int | None) -> None:
+        """Announce a newly detected guild boss once in the configured channel."""
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            logger.warning("Configured cooldown channel for guild %s is unavailable", guild_id)
+            return
+
+        owo_prefix = await get_guild_owo_prefix(guild_id)
+        decision_role_ids = self.decision_role_ids(guild_id)
+        guild = self.bot.get_guild(guild_id)
+        active_mentions = (
+            self.active_member_mentions_for_roles(guild, decision_role_ids)
+            if guild is not None
+            else []
+        )
+        mention_lines = self.chunk_mentions(active_mentions)
+        appeared = self.ui_emoji("boss_appeared", "‚öîÔ∏è")
+
+        description = (
+            f"Use `owo boss i` or `{owo_command(owo_prefix, 'boss i')}` to let the helper "
+            "read the three boss pages.\n\n"
+            "Boss helpers can use `H boss hit`, `H boss skip`, or reply to a note with "
+            "`H sticky`.\n"
+            "Use `H sticky clear` to remove the current sticky. Use `H help` for "
+            "configuration commands."
+        )
+        if expiry:
+            description += (
+                f"\n\n**Boss escapes:** <t:{expiry}:R>\n"
+                f"**Exact time:** <t:{expiry}:F>"
+            )
+
+        try:
+            await channel.send(
+                embed=discord.Embed(
+                    title=f"{appeared} New Guild Boss Appeared",
+                    description=description,
+                    color=0x5865F2,
+                ),
+            )
+            for mention_line in mention_lines:
+                await channel.send(
+                    content=mention_line,
+                    allowed_mentions=discord.AllowedMentions(
+                        roles=False,
+                        users=True,
+                        everyone=False,
+                    ),
+                )
+            logger.info("Announced new guild boss in guild %s", guild_id)
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send new-boss alert: %s", exc)
+
+    async def send_ready_message(self, guild_id: int) -> None:
+        config = self.cooldown_config.get(str(guild_id), {})
+        if config.get("active_boss_message_id"):
+            # A new boss is already running, so a generic "ready to spawn" alert
+            # would be misleading.
+            return
+
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            logger.warning("Configured cooldown channel for guild %s is unavailable", guild_id)
+            return
+
+        try:
+            await channel.send(
+                embed=discord.Embed(
+                    title=f"{self.ui_emoji('boss_defeated', '‚úÖ')} Guild Boss Ready",
+                    description=(
+                        "The 5-minute cooldown has ended. "
+                        "A new guild boss can now appear."
+                    ),
+                    color=0x57F287,
+                )
+            )
+            logger.info("Sent boss-ready alert for guild %s", guild_id)
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send ready alert: %s", exc)
+
+
+async def setup(bot: commands.Bot) -> None:
+    await bot.add_cog(BossGenerator(bot))

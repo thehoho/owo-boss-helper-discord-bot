@@ -347,7 +347,86 @@ Name lookup supports exact or partial matches. If more than one saved team match
 HT D 3
 HTD 3
 HT D <name>
-H team delete <number or ÔŒÌ¢Gß≤⁄Óù∆≠y◊ the server feature only exposes the opt-in controls; it does not rename the tracked member list. Each member must choose **Enable my marker** or click the `üè∑Ô∏è` action reaction under their own successful ticket command. Disabling the server feature returns immediately and restores managed names through a throttled background job.
+H team delete <number or name>
+```
+
+### Guided restoration
+
+Choose one of the buttons on a saved team:
+
+- **Quick replace** ‚Äî overwrites listed positions and equips each saved weapon.
+- **Exact reset** ‚Äî clears positions 1‚Äì3, then rebuilds the team.
+
+Quick replace alternates commands:
+
+```text
+wtm a hsnake 1
+ww AZWWZV hsnake
+wtm a 2025dec_daisy 2
+ww DYLYU5 2025dec_daisy
+wtm a 2026feb_huba 3
+ww EEK29J 2026feb_huba
+```
+
+The next command appears immediately after OwO confirms the current one. Saved weapons are equipped to the animal name instead of the position, so the weapon still goes to the right pet even if positions change.
+
+Skip the current step:
+
+```text
+HS
+H skip
+H escape
+HT skip
+```
+
+Stop the setup:
+
+```text
+HT cancel
+```
+
+The prompt also provides owner-only **Skip step** and **Cancel** buttons.
+
+### Team validation
+
+- All three animal positions are required.
+- Animals with missing weapons are preserved and shown in a confirmation prompt.
+- Saving without a missing weapon omits only that position's invalid `ww` command.
+- Renamed animals use the OwO emoji alias, not the visible nickname.
+- Previously saved templates containing incorrect custom nicknames should be saved again from a fresh OwO team page.
+
+## Boss tickets
+
+### Configure the persistent board
+
+A server manager runs:
+
+```text
+/boss-ticket-channel
+```
+
+Choose the channel where the board should be created and maintained.
+
+### Visual ticket management
+
+A server manager can open the visual ticket-user panel with:
+
+```text
+H boss settings
+HBS
+/boss-ticket-manage
+```
+
+The panel supports:
+
+- **Remove from list** ‚Äî deletes the current board entry, but the user can reappear after their next OwO ticket check.
+- **Block tracking** ‚Äî removes the user and ignores their future ticket checks in that server.
+- **Unblock** ‚Äî allows future ticket checks to be recorded again.
+- **Enable/Disable nickname markers** ‚Äî makes the optional feature available or unavailable without blocking the panel on a server-wide loop.
+- **Sync nickname markers** ‚Äî queues a background sync for members who explicitly opted in.
+- Paginated user selection for servers with more than 25 tracked or blocked users.
+
+Nickname markers are disabled for the server by default, and they are also off for every member by default. Enabling the server feature only exposes the opt-in controls; it does not rename the tracked member list. Each member must choose **Enable my marker** or click the `üè∑Ô∏è` action reaction under their own successful ticket command. Disabling the server feature returns immediately and restores managed names through a throttled background job.
 
 Enabling the feature requires the bot role to have **Manage Nicknames** and to be above the members it edits. Discord does not allow bots to edit the server owner's nickname, so the owner is skipped. Members at or above the bot's highest role are also skipped.
 
