@@ -1,3 +1,13 @@
+
+## v0.11.4-beta - Plain Boss Stickies and Multi-Role Pings
+
+- Changed boss decision/sticky messages from embeds/buttons to plain Discord messages.
+- Added multiple boss-decision roles and multiple fighter ping roles; run the role slash command again to add another role, or omit the role to clear all.
+- New boss alerts now real-ping the configured boss-decision roles and show the command options.
+- `H boss hit` now real-pings configured fighter roles once per active boss and creates a plain `# HIT` sticky.
+- `H boss skip` creates a plain `# SKIP` sticky without the running-person emoji.
+- `H sticky` on a reply copies that note as a plain sticky, and `H sticky clear/off/on` controls the feature.
+
 ## v0.11.3-beta
 
 - Improved boss decision stickies so they only appear after a helper chooses HIT/SKIP or sets a custom sticky note.

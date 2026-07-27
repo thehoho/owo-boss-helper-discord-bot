@@ -1,3 +1,8 @@
+
+## v0.11.4-beta notes
+
+Boss decision stickies are now plain messages instead of embeds/buttons. Server managers can add multiple decision roles with `/boss-decision-role` and multiple fighter ping roles with `/boss-fighter-role`. The new boss alert real-pings configured decision roles, `H boss hit` real-pings configured fighter roles once per boss, and `H sticky` can keep a replied note at the bottom of the configured boss channel. Use `H sticky clear`, `H sticky off`, and `H sticky on` to control it.
+
 # OwO Boss Helper
 
 A community Discord bot for OwO guild-boss fights. It generates Neon battle commands, tracks guild-boss timing, saves reusable teams with exact weapon IDs, scans Neon weapon pages for dex queues, and maintains a per-server boss-ticket board.
