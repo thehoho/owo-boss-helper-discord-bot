@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 6 July 2026_
+_Last updated: 27 July 2026_
 
 OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 
@@ -16,14 +16,17 @@ The bot stores only the information needed to provide its features and operate s
 - Neon weapon scan entries for public NeonUtil inventory pages, including Discord owner ID, weapon ID, quality values, max-possible status, recognized weapon/passive filters, and learned blueprint text.
 - Reported boss-ticket counts, update sources, last ticket activity times, and automatic expiration times.
 - Public OwO guild-boss message IDs and public `owobot.com` battle-log UUIDs used temporarily to deduplicate confirmed Top 10 ticket uses. The helper does not copy or store the full linked battle-log page.
-- Configured Discord channel and message IDs used for cooldown and ticket boards.
+- Configured Discord channel and message IDs used for cooldown alerts, daily boss reports, and ticket boards.
+- Per-server daily totals of confirmed defeated and escaped guild bosses.
 - Operational logs containing events, warnings, and errors.
 
 The bot does not intentionally store ordinary conversation content. It temporarily reads relevant messages to recognize supported OwO commands and responses.
 
+When a new guild boss appears, the bot temporarily reads the current Discord presence and configured-role membership needed to mention decision helpers whose status is Online or Idle. It does not store member presence history, and it does not notify members whose current status is Do Not Disturb or Offline.
+
 ## Why the data is used
 
-Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, and notify the developer when the bot joins or leaves a server.
+Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, notify available boss-decision helpers, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, and notify the developer when the bot joins or leaves a server.
 
 ## Storage and sharing
 

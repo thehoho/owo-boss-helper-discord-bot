@@ -1,4 +1,16 @@
 
+## v0.11.5-beta - Smart Presence Pings and Daily Boss Reports
+
+- New-boss alerts now use an embed and direct-mention only online or idle members in configured boss-decision roles.
+- Offline and Do Not Disturb decision helpers are not pinged.
+- Active-helper lists are split into messages containing at most nine direct mentions.
+- HIT/SKIP stickies now contain only `# HIT` or `# SKIP`, without the deciding member line.
+- Fighter-role pings are now persistent messages separate from the self-reposting sticky.
+- Added `/boss-report-channel` for Pacific-midnight reports of confirmed defeated (HIT) and escaped (SKIP) bosses.
+- Failed daily reports are persisted and retried later instead of losing completed-cycle totals.
+- Enabled the Server Members and Presence gateway intents required for presence-aware role membership.
+- Updated the public bot version to `0.11.5-beta`.
+
 ## v0.11.4-beta - Plain Boss Stickies and Multi-Role Pings
 
 - Changed boss decision/sticky messages from embeds/buttons to plain Discord messages.

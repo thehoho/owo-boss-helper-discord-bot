@@ -1,7 +1,7 @@
 
-## v0.11.4-beta notes
+## v0.11.5-beta notes
 
-Boss decision stickies are now plain messages instead of embeds/buttons. Server managers can add multiple decision roles with `/boss-decision-role` and multiple fighter ping roles with `/boss-fighter-role`. The new boss alert real-pings configured decision roles, `H boss hit` real-pings configured fighter roles once per boss, and `H sticky` can keep a replied note at the bottom of the configured boss channel. Use `H sticky clear`, `H sticky off`, and `H sticky on` to control it.
+New-boss alerts now use an embed followed by direct mentions of only the online or idle members in configured decision roles. DND and offline members are not pinged. HIT/SKIP stickies contain only the decision heading, fighter-role alerts are persistent separate messages, and `/boss-report-channel` configures a Pacific-midnight daily summary of confirmed defeated and escaped bosses.
 
 # OwO Boss Helper
 
@@ -36,6 +36,11 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Sends cooldown-complete alerts.
 - Persists configured channels and active watcher state across restarts.
 - Includes duplicate outcome protection and per-guild request locking.
+- Direct-mentions only online or idle decision helpers when a new boss appears; offline and DND helpers are not notified.
+- Sends a persistent fighter-role alert once when an active boss is marked HIT.
+- Posts a daily confirmed HIT/SKIP outcome report at the Pacific-midnight reset in a manager-configured channel.
+- Limits each presence-aware helper notification message to at most nine direct mentions.
+- Persists up to seven failed daily reports for retry instead of discarding counts during a temporary Discord/channel failure.
 
 ### Team templates
 
@@ -213,8 +218,16 @@ Optional permissions:
 - Send Messages in Threads ‚Äî required when prefix commands are used inside threads.
 - Manage Messages ‚Äî allows guided team setup to remove completed commands and lets nickname action reactions flip cleanly by removing the member's click reaction.
 - Manage Nicknames ‚Äî allows a server manager to enable optional ticket markers through `HBS`. The bot role must be above members whose nicknames it edits.
+- Mention @everyone, @here, and All Roles ‚Äî required for reliable fighter-role notifications when the configured fighter role is not itself mentionable.
 
 The bot does not require Administrator permission.
+
+Required privileged gateway intents in the Discord Developer Portal:
+
+- Server Members Intent
+- Presence Intent
+
+These intents let the bot resolve every configured decision-role member and notify only members whose current status is Online or Idle. Message Content Intent remains required for the existing prefix-command flows.
 
 ### Application-owned UI emojis
 
@@ -259,9 +272,12 @@ Server setup:
 
 ```text
 /boss-cooldown-channel
+/boss-decision-role
+/boss-fighter-role
+/boss-report-channel
 ```
 
-This selects the channel for new-boss, defeat, escape, cooldown, and ready alerts.
+`/boss-cooldown-channel` selects the channel for new-boss, defeat, escape, cooldown, and ready alerts. Add one or more decision roles with `/boss-decision-role`; only their online or idle members are directly mentioned when a boss appears. Add one or more fighter roles with `/boss-fighter-role`; they receive one persistent role alert when a helper chooses HIT. `/boss-report-channel` selects the channel that receives the completed daily outcome report at Pacific midnight. Run `/boss-report-channel` without a channel to disable reports while preserving the current counters.
 
 Channel troubleshooting for server managers:
 
@@ -331,86 +347,7 @@ Name lookup supports exact or partial matches. If more than one saved team match
 HT D 3
 HTD 3
 HT D <name>
-H team delete <number or name>
-```
-
-### Guided restoration
-
-Choose one of the buttons on a saved team:
-
-- **Quick replace** ‚Äî overwrites listed positions and equips each saved weapon.
-- **Exact reset** ‚Äî clears positions 1‚Äì3, then rebuilds the team.
-
-Quick replace alternates commands:
-
-```text
-wtm a hsnake 1
-ww AZWWZV hsnake
-wtm a 2025dec_daisy 2
-ww DYLYU5 2025dec_daisy
-wtm a 2026feb_huba 3
-ww EEK29J 2026feb_huba
-```
-
-The next command appears immediately after OwO confirms the current one. Saved weapons are equipped to the animal name instead of the position, so the weapon still goes to the right pet even if positions change.
-
-Skip the current step:
-
-```text
-HS
-H skip
-H escape
-HT skip
-```
-
-Stop the setup:
-
-```text
-HT cancel
-```
-
-The prompt also provides owner-only **Skip step** and **Cancel** buttons.
-
-### Team validation
-
-- All three animal positions are required.
-- Animals with missing weapons are preserved and shown in a confirmation prompt.
-- Saving without a missing weapon omits only that position's invalid `ww` command.
-- Renamed animals use the OwO emoji alias, not the visible nickname.
-- Previously saved templates containing incorrect custom nicknames should be saved again from a fresh OwO team page.
-
-## Boss tickets
-
-### Configure the persistent board
-
-A server manager runs:
-
-```text
-/boss-ticket-channel
-```
-
-Choose the channel where the board should be created and maintained.
-
-### Visual ticket management
-
-A server manager can open the visual ticket-user panel with:
-
-```text
-H boss settings
-HBS
-/boss-ticket-manage
-```
-
-The panel supports:
-
-- **Remove from list** ‚Äî deletes the current board entry, but the user can reappear after their next OwO ticket check.
-- **Block tracking** ‚Äî removes the user and ignores their future ticket checks in that server.
-- **Unblock** ‚Äî allows future ticket checks to be recorded again.
-- **Enable/Disable nickname markers** ‚Äî makes the optional feature available or unavailable without blocking the panel on a server-wide loop.
-- **Sync nickname markers** ‚Äî queues a background sync for members who explicitly opted in.
-- Paginated user selection for servers with more than 25 tracked or blocked users.
-
-Nickname markers are disabled for the server by default, and they are also off for every member by default. Enabling the server feature only exposes the opt-in controls; it does not rename the tracked member list. Each member must choose **Enable my marker** or click the `üè∑Ô∏è` action reaction under their own successful ticket command. Disabling the server feature returns immediately and restores managed names through a throttled background job.
+H team delete <number or ÔŒÌ¢Gß≤⁄Óù∆≠y◊ the server feature only exposes the opt-in controls; it does not rename the tracked member list. Each member must choose **Enable my marker** or click the `üè∑Ô∏è` action reaction under their own successful ticket command. Disabling the server feature returns immediately and restores managed names through a throttled background job.
 
 Enabling the feature requires the bot role to have **Manage Nicknames** and to be above the members it edits. Discord does not allow bots to edit the server owner's nickname, so the owner is skipped. Members at or above the bot's highest role are also skipped.
 
@@ -550,7 +487,7 @@ logs/
 
 These files are ignored by Git.
 
-When moving the bot to another computer or host, copy `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, and `boss_cooldown_config.json` to preserve saved teams, ticket data, personal tracking and nickname preferences, managed nickname restoration state, developer statistics, board configuration, and boss watcher state.
+When moving the bot to another computer or host, copy `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, and `boss_cooldown_config.json` to preserve saved teams, ticket data, personal tracking and nickname preferences, managed nickname restoration state, developer statistics, board configuration, boss watcher state, daily boss counters, and report-channel configuration.
 
 ## Project structure
 
