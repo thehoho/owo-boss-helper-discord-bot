@@ -28,6 +28,13 @@ from discord import app_commands
 from discord.ext import commands
 
 from .message_utils import safe_reply
+from .owo_prefix import (
+    OWO_PREFIX_DEFAULT,
+    get_guild_owo_prefix,
+    is_owo_prefixed_command,
+    is_possible_owo_prefixed_command,
+    owo_command,
+)
 from .ui_emojis import ensure_ui_emojis, ui_emoji_button, ui_emoji_text
 
 logger = logging.getLogger(__name__)
@@ -63,6 +70,7 @@ TICKET_NICKNAME_RE = re.compile(
     r"\s*·\s*(?:(?:🎟|▫)\ufe0f?){3}\s*$"
 )
 
+TICKET_COMMAND_SUFFIXES = {"bosst", "bossticket", "bosstickets"}
 TICKET_COMMANDS = {
     "owobosst",
     "owobossticket",
@@ -236,8 +244,8 @@ def normalize_ticket_command(content: str) -> str:
     return re.sub(r"\s+", "", content or "").lower()
 
 
-def is_ticket_command(content: str) -> bool:
-    return normalize_ticket_command(content) in TICKET_COMMANDS
+def is_ticket_command(content: str, owo_prefix: str = OWO_PREFIX_DEFAULT) -> bool:
+    return is_owo_prefixed_command(content, owo_prefix, TICKET_COMMAND_SUFFIXES)
 
 
 def is_ticket_list_command(content: str) -> bool:
@@ -3391,7 +3399,7 @@ class TicketTracker(commands.Cog):
             return "Your preference is saved. A manager must enable markers first."
         status = await self.store.get_status(guild_id, user_id)
         if status is None:
-            return "Your marker is enabled. Run `w boss t` to record a count and apply it."
+            return "Your marker is enabled. Run your server's OwO boss-ticket command to record a count and apply it."
         outcome = await self.apply_ticket_nickname(guild_id, user_id, status.tickets)
         logger.info(
             "User %s enabled ticket nickname marker in guild %s (%s)",
@@ -3451,7 +3459,7 @@ class TicketTracker(commands.Cog):
                 user_id,
                 guild_id,
             )
-            return "Ticket tracking resumed. Run `w boss t` to add your current count."
+            return "Ticket tracking resumed. Run your server's OwO boss-ticket command to add your current count."
 
         opted_out.add(user_id)
         removed = await self.store.remove_status(guild_id, user_id)
@@ -3991,7 +3999,7 @@ class TicketTracker(commands.Cog):
                 return
             if (
                 message.author.id != control.user_id
-                or not is_ticket_command(message.content or "")
+                or not is_possible_owo_prefixed_command(message.content or "", TICKET_COMMAND_SUFFIXES)
             ):
                 self.reaction_controls.pop(key, None)
                 return
@@ -4070,7 +4078,8 @@ class TicketTracker(commands.Cog):
                 if is_ticket_list_command(message.content or ""):
                     await self.send_ticket_list(message)
                     return
-                if is_ticket_command(message.content or ""):
+                owo_prefix = await get_guild_owo_prefix(message.guild.id)
+                if is_ticket_command(message.content or "", owo_prefix):
                     armed = self.arm_ticket_request(message)
                     if (
                         not armed
@@ -4180,10 +4189,11 @@ class TicketTracker(commands.Cog):
 
         await self.store.set_channel(interaction.guild_id, channel.id)
         await self.refresh_board(interaction.guild_id)
+        owo_prefix = await get_guild_owo_prefix(interaction.guild_id)
         await interaction.followup.send(
             f"✅ Boss-ticket updates will be maintained in {channel.mention}. Users can "
-            "refresh their entry with `owo boss t`, `owo boss ticket`, `w boss t`, or "
-            "`w boss ticket` anywhere I can read messages.",
+            f"refresh their entry with `owo boss t`, `owo boss ticket`, `{owo_command(owo_prefix, 'boss t')}`, or "
+            f"`{owo_command(owo_prefix, 'boss ticket')}` anywhere I can read messages.",
             ephemeral=True,
         )
         logger.info(

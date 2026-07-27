@@ -1,3 +1,9 @@
+# v0.11.2-beta
+
+- Applied the configured OwO prefix to boss inventory and boss-ticket commands, not only team restores.
+- Added a boss hit/skip decision sticky in the configured boss alert channel.
+- Added `/boss-decision-role` so servers can allow a trusted boss-helper role to set hit/skip decisions.
+
 ## v0.11.1-beta
 
 - Added per-server OwO prefix configuration for saved-team restore commands with `HT prefix <prefix>` / `H team prefix <prefix>`. Servers using `otm`, `gtm`, or another OwO prefix no longer need to edit generated team commands manually.

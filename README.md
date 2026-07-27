@@ -716,3 +716,8 @@ Weapon type filters are OR-based, while passive filters are still matched togeth
 ### Daily owner report fix
 
 The scheduled owner DM report now starts with the bot. The owner can also run `/bot-daily-report-test` to send a report immediately for verification.
+### v0.11.2-beta feedback update
+
+- Server OwO prefixes now apply to team restores, boss inventory (`o boss i`), and boss tickets (`o boss t`).
+- Boss alert channels can show a temporary hit/skip sticky while a guild boss is active.
+- Managers can set a trusted role for hit/skip decisions with `/boss-decision-role`; Manage Server still works.

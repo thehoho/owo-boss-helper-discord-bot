@@ -34,6 +34,12 @@ from discord import app_commands
 from discord.ext import commands
 
 from .message_utils import safe_reply
+from .owo_prefix import (
+    OWO_PREFIX_DEFAULT,
+    get_guild_owo_prefix,
+    is_owo_prefixed_command,
+    owo_command,
+)
 from .ui_emojis import ensure_ui_emojis, ui_emoji_text
 
 
@@ -52,12 +58,15 @@ PAGE_POSITION_SEARCH_RE = re.compile(r"(?<!\d)([1-3])\s*/\s*3(?!\d)")
 # Official verified OwO Bot user ID.
 OWO_BOT_ID = 408785106942164992
 
-# Only these two commands are accepted after all whitespace is removed.
-ALLOWED_BOSS_TRIGGERS = {"owobossi", "wbossi"}
+# OwO command suffixes accepted after all whitespace is removed. The actual
+# short prefix is read per server from the shared OwO prefix setting.
+BOSS_TRIGGER_SUFFIXES = {"bossi"}
 
 # Lightweight public helper commands. Whitespace and capitalization are ignored.
 PREFIX_COOLDOWN_TRIGGERS = {"hbosscd", "hbosscooldown"}
 PREFIX_HELP_TRIGGERS = {"hhelp"}
+BOSS_DECISION_HIT_TRIGGERS = {"hbosshit", "hsethit"}
+BOSS_DECISION_SKIP_TRIGGERS = {"hbossskip", "hskipboss", "hsetskip"}
 
 SESSION_TIMEOUT_SECONDS = 180
 BOSS_COOLDOWN_SECONDS = 5 * 60
@@ -70,10 +79,26 @@ COOLDOWN_CONFIG_FILE = PROJECT_ROOT / "boss_cooldown_config.json"
 HP_TEMPLATE_DIR = PROJECT_ROOT / "assets" / "hp_digits"
 
 
-def is_boss_trigger(content: str) -> bool:
-    """Accept only `owo boss i` or `w boss i`, with any whitespace/capitalization."""
-    normalized = re.sub(r"\s+", "", content or "").lower()
-    return normalized in ALLOWED_BOSS_TRIGGERS
+def compact_first_line(content: str) -> str:
+    first_line = next(
+        (line.strip() for line in (content or "").splitlines() if line.strip()),
+        "",
+    )
+    return re.sub(r"\s+", "", first_line).lower()
+
+
+def parse_boss_decision_command(content: str) -> str | None:
+    compact = compact_first_line(content)
+    if compact in BOSS_DECISION_HIT_TRIGGERS:
+        return "hit"
+    if compact in BOSS_DECISION_SKIP_TRIGGERS:
+        return "skip"
+    return None
+
+
+def is_boss_trigger(content: str, owo_prefix: str = OWO_PREFIX_DEFAULT) -> bool:
+    """Accept `owo boss i` or this server's configured short OwO prefix."""
+    return is_owo_prefixed_command(content, owo_prefix, BOSS_TRIGGER_SUFFIXES)
 
 
 def is_prefix_cooldown_trigger(content: str) -> bool:
@@ -1096,6 +1121,37 @@ active_sessions: dict[int, BossSession] = {}
 STEP_EMOJI = {1: "1️⃣", 2: "2️⃣", 3: "3️⃣"}
 
 
+class BossDecisionView(discord.ui.View):
+    """Buttons for the current guild-boss hit/skip decision."""
+
+    def __init__(self, cog: "BossGenerator", guild_id: int) -> None:
+        super().__init__(timeout=None)
+        self.cog = cog
+        self.guild_id = guild_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.guild_id != self.guild_id:
+            await interaction.response.send_message(
+                "This boss decision belongs to another server.", ephemeral=True
+            )
+            return False
+        if not self.cog.member_can_set_boss_decision(interaction.user, self.guild_id):
+            await interaction.response.send_message(
+                "You need the configured boss-decision role or **Manage Server** to set hit/skip.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Hit", emoji="⚔️", style=discord.ButtonStyle.success)
+    async def hit(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.cog.set_boss_decision_from_interaction(interaction, "hit")
+
+    @discord.ui.button(label="Skip", emoji="🏃", style=discord.ButtonStyle.secondary)
+    async def skip(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
+        await self.cog.set_boss_decision_from_interaction(interaction, "skip")
+
+
 async def process_boss_page(
     cog: "BossGenerator",
     channel_id: int,
@@ -1182,6 +1238,203 @@ class BossGenerator(commands.Cog):
     def ui_emoji(self, name: str, fallback: str) -> str:
         return ui_emoji_text(self.bot, name, fallback)
 
+
+    def member_can_set_boss_decision(
+        self,
+        member: discord.abc.User | discord.Member,
+        guild_id: int,
+    ) -> bool:
+        permissions = getattr(member, "guild_permissions", None)
+        if permissions and (
+            getattr(permissions, "manage_guild", False)
+            or getattr(permissions, "administrator", False)
+        ):
+            return True
+        role_id = int(self.cooldown_config.get(str(guild_id), {}).get("decision_role_id") or 0)
+        if not role_id:
+            return False
+        return any(int(getattr(role, "id", 0) or 0) == role_id for role in getattr(member, "roles", []))
+
+    @app_commands.command(
+        name="boss-decision-role",
+        description="Choose the role allowed to mark guild bosses as hit or skip.",
+    )
+    @app_commands.describe(role="Role allowed to use boss hit/skip controls. Leave empty to clear.")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_decision_role(
+        self,
+        interaction: discord.Interaction,
+        role: discord.Role | None = None,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "❌ This command only works inside a server.", ephemeral=True
+            )
+            return
+        config = self.cooldown_config.setdefault(str(interaction.guild_id), {})
+        if role is None:
+            config.pop("decision_role_id", None)
+            save_cooldown_config(self.cooldown_config)
+            await interaction.response.send_message(
+                "✅ Boss hit/skip controls are now limited to members with **Manage Server**.",
+                ephemeral=True,
+            )
+            return
+        config["decision_role_id"] = role.id
+        save_cooldown_config(self.cooldown_config)
+        await interaction.response.send_message(
+            f"✅ {role.mention} can now mark active guild bosses as **hit** or **skip**. "
+            "Members with **Manage Server** can still use the controls.",
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(roles=False),
+        )
+        if config.get("active_boss_message_id"):
+            await self.upsert_boss_decision_message(interaction.guild_id)
+
+    async def handle_boss_decision_message(self, message: discord.Message, decision: str) -> None:
+        guild = message.guild
+        if guild is None:
+            return
+        config = self.cooldown_config.get(str(guild.id), {})
+        channel_id = int(config.get("channel_id") or 0)
+        if not channel_id:
+            await safe_reply(
+                message,
+                "⚠️ Boss alerts are not configured yet. A server manager can use `/boss-cooldown-channel` first.",
+                mention_author=False,
+            )
+            return
+        if channel_id != message.channel.id:
+            channel = guild.get_channel(channel_id)
+            where = channel.mention if isinstance(channel, discord.TextChannel) else "the configured boss alert channel"
+            await safe_reply(
+                message,
+                f"Use boss hit/skip controls in {where}.",
+                mention_author=False,
+            )
+            return
+        if not self.member_can_set_boss_decision(message.author, guild.id):
+            role_id = int(config.get("decision_role_id") or 0)
+            role_text = f"<@&{role_id}> or " if role_id else ""
+            await safe_reply(
+                message,
+                f"You need {role_text}**Manage Server** to set the boss hit/skip decision.",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+        notice = await self.set_boss_decision(guild.id, decision, message.author.id)
+        await safe_reply(message, notice, mention_author=False, delete_after=20)
+
+    async def set_boss_decision_from_interaction(
+        self,
+        interaction: discord.Interaction,
+        decision: str,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message("This only works in a server.", ephemeral=True)
+            return
+        notice = await self.set_boss_decision(interaction.guild_id, decision, interaction.user.id)
+        config = self.cooldown_config.get(str(interaction.guild_id), {})
+        await interaction.response.edit_message(
+            embed=self.build_boss_decision_embed(config),
+            view=BossDecisionView(self, interaction.guild_id),
+        )
+        await interaction.followup.send(notice, ephemeral=True)
+
+    async def set_boss_decision(self, guild_id: int, decision: str, user_id: int) -> str:
+        if decision not in {"hit", "skip"}:
+            return "Unknown boss decision."
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        if not config.get("active_boss_message_id"):
+            return "There is no active guild boss to mark right now."
+        now = int(time.time())
+        config["boss_decision"] = decision
+        config["boss_decision_by"] = user_id
+        config["boss_decision_at"] = now
+        save_cooldown_config(self.cooldown_config)
+        await self.upsert_boss_decision_message(guild_id)
+        label = "HIT" if decision == "hit" else "SKIP"
+        return f"✅ Boss decision set to **{label}** by <@{user_id}>."
+
+    def build_boss_decision_embed(self, config: dict[str, Any]) -> discord.Embed:
+        decision = str(config.get("boss_decision") or "pending")
+        by = int(config.get("boss_decision_by") or 0)
+        at = int(config.get("boss_decision_at") or 0)
+        expiry = int(config.get("active_boss_expires_at") or 0)
+        role_id = int(config.get("decision_role_id") or 0)
+
+        if decision == "hit":
+            title = f"{self.ui_emoji('boss_appeared', '⚔️')} Boss Decision: HIT"
+            description = "Boss helpers decided to **hit** this guild boss."
+            color = 0x57F287
+        elif decision == "skip":
+            title = f"{self.ui_emoji('boss_escaped', '🏃')} Boss Decision: SKIP"
+            description = "Boss helpers decided to **skip** this guild boss."
+            color = 0x95A5A6
+        else:
+            title = "❔ Boss Decision Needed"
+            description = "Choose whether this guild boss should be **hit** or **skipped**."
+            color = 0xFEE75C
+
+        if by:
+            description += f"\n\n**Set by:** <@{by}>"
+        if at:
+            description += f" • <t:{at}:R>"
+        if expiry:
+            description += f"\n**Boss escapes:** <t:{expiry}:R>"
+        if role_id:
+            description += f"\n\nAllowed controls: <@&{role_id}> or members with **Manage Server**."
+        else:
+            description += "\n\nAllowed controls: members with **Manage Server**."
+        description += "\nUse `H boss hit` / `Hboss hit` or `H boss skip` / `H skip boss`."
+
+        return discord.Embed(title=title, description=description, color=color)
+
+    async def upsert_boss_decision_message(self, guild_id: int) -> None:
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            return
+        embed = self.build_boss_decision_embed(config)
+        view = BossDecisionView(self, guild_id)
+        message_id = int(config.get("decision_message_id") or 0)
+        try:
+            if message_id:
+                message = await channel.fetch_message(message_id)
+                await message.edit(embed=embed, view=view)
+                return
+        except discord.NotFound:
+            config.pop("decision_message_id", None)
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not edit boss decision sticky for guild %s: %s", guild_id, exc)
+            return
+        try:
+            message = await channel.send(embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send boss decision sticky for guild %s: %s", guild_id, exc)
+            return
+        config["decision_message_id"] = message.id
+        save_cooldown_config(self.cooldown_config)
+
+    async def clear_boss_decision_message(self, guild_id: int) -> None:
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        message_id = int(config.get("decision_message_id") or 0)
+        channel = await self.get_configured_channel(guild_id)
+        if channel is not None and message_id:
+            try:
+                await channel.get_partial_message(message_id).delete()
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+        changed = False
+        for key in ("decision_message_id", "boss_decision", "boss_decision_by", "boss_decision_at"):
+            if key in config:
+                config.pop(key, None)
+                changed = True
+        if changed:
+            save_cooldown_config(self.cooldown_config)
+
     def cog_unload(self) -> None:
         for task in self.cooldown_tasks.values():
             task.cancel()
@@ -1252,7 +1505,7 @@ class BossGenerator(commands.Cog):
 
         await interaction.followup.send(
             f"✅ Automatic boss cooldown alerts will be sent in {channel.mention}. "
-            "Messages will not be pinned.",
+            "A hit/skip sticky will appear there while a guild boss is active.",
             ephemeral=True,
         )
 
@@ -1320,6 +1573,8 @@ class BossGenerator(commands.Cog):
         if message.guild is None:
             return
 
+        owo_prefix = await get_guild_owo_prefix(message.guild.id)
+
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
             description=(
@@ -1331,7 +1586,7 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name=f"{self.ui_emoji('boss_appeared', '⚔️')} Boss command generator",
             value=(
-                "Send `owo boss i` or `w boss i`, then open pages `1/3`, `2/3`, "
+                f"Send `owo boss i` or `{owo_command(owo_prefix, 'boss i')}`, then open pages `1/3`, `2/3`, "
                 "and `3/3`."
             ),
             inline=False,
@@ -1347,7 +1602,7 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="🎟️ Boss tickets",
             value=(
-                "Update manually with `owo boss t` / `w boss t`; view with `H boss t`, "
+                f"Update manually with `owo boss t` / `{owo_command(owo_prefix, 'boss t')}`; view with `H boss t`, "
                 "`H boss list`, `HBL`, or `/boss-ticket-list`, and look up one "
                 "tracked member with `HBT <name/mention/ID>`. Public Top 10 battle "
                 "logs automatically subtract confirmed hits for already-tracked "
@@ -1695,6 +1950,9 @@ class BossGenerator(commands.Cog):
         if is_new_boss:
             config["cooldown_end"] = 0
             config["last_result"] = "active"
+            config["boss_decision"] = "pending"
+            config.pop("boss_decision_by", None)
+            config.pop("boss_decision_at", None)
             old_task = self.cooldown_tasks.pop(guild_id, None)
             if old_task:
                 old_task.cancel()
@@ -1813,26 +2071,34 @@ class BossGenerator(commands.Cog):
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         try:
-            # Human trigger: only exact owo-boss-inventory forms.
+            # Human trigger: helper commands and configured OwO boss-inventory forms.
             if not message.author.bot:
-                if message.guild and is_prefix_help_trigger(message.content):
-                    await self.send_prefix_help(message)
-                    return
+                if message.guild:
+                    decision = parse_boss_decision_command(message.content or "")
+                    if decision is not None:
+                        await self.handle_boss_decision_message(message, decision)
+                        return
 
-                if message.guild and is_prefix_cooldown_trigger(message.content):
-                    await self.send_prefix_cooldown_status(message)
-                    return
+                    if is_prefix_help_trigger(message.content):
+                        await self.send_prefix_help(message)
+                        return
 
-                if message.guild and is_boss_trigger(message.content):
-                    active_sessions[message.channel.id] = BossSession(
-                        user_id=message.author.id,
-                        channel_id=message.channel.id,
-                    )
-                    logger.info(
-                        "Boss reader armed by %s in #%s",
-                        message.author,
-                        getattr(message.channel, "name", message.channel.id),
-                    )
+                    if is_prefix_cooldown_trigger(message.content):
+                        await self.send_prefix_cooldown_status(message)
+                        return
+
+                    owo_prefix = await get_guild_owo_prefix(message.guild.id)
+                    if is_boss_trigger(message.content, owo_prefix):
+                        active_sessions[message.channel.id] = BossSession(
+                            user_id=message.author.id,
+                            channel_id=message.channel.id,
+                        )
+                        logger.info(
+                            "Boss reader armed by %s in #%s with OwO prefix %s",
+                            message.author,
+                            getattr(message.channel, "name", message.channel.id),
+                            owo_prefix,
+                        )
                 return
 
             if message.author.id != OWO_BOT_ID or message.guild is None:
@@ -1966,9 +2232,11 @@ class BossGenerator(commands.Cog):
 
         if missing_pages or len(blocks) != 3:
             missing_text = ", ".join(f"{page}/3" for page in missing_pages) or "unknown"
+            guild_id = int(getattr(getattr(channel, "guild", None), "id", 0) or 0)
+            owo_prefix = await get_guild_owo_prefix(guild_id)
             await channel.send(
                 f"⚠️ I could not capture every boss page. Missing: **{missing_text}**. "
-                "Run `owo boss i` or `w boss i` again and open all three pages."
+                f"Run `owo boss i` or `{owo_command(owo_prefix, 'boss i')}` again and open all three pages."
             )
             return
 
@@ -2160,6 +2428,7 @@ class BossGenerator(commands.Cog):
                 guild_id,
                 cooldown_end,
             )
+            await self.clear_boss_decision_message(guild_id)
             await self.send_cooldown_started_message(guild_id)
             self.schedule_ready_update(guild_id, cooldown_end)
 
@@ -2207,6 +2476,7 @@ class BossGenerator(commands.Cog):
                 guild_id,
                 event_time,
             )
+            await self.clear_boss_decision_message(guild_id)
             await self.send_escape_ready_message(guild_id)
 
     def schedule_ready_update(self, guild_id: int, cooldown_end: int) -> None:
@@ -2406,9 +2676,10 @@ class BossGenerator(commands.Cog):
             logger.warning("Configured cooldown channel for guild %s is unavailable", guild_id)
             return
 
+        owo_prefix = await get_guild_owo_prefix(guild_id)
         description = (
             "A new guild boss has appeared!\n\n"
-            "Use `owo boss i` or `w boss i` to let the helper read your three "
+            f"Use `owo boss i` or `{owo_command(owo_prefix, 'boss i')}` to let the helper read your three "
             "bosses and generate the Neon battle command."
         )
         if expiry:
@@ -2425,6 +2696,7 @@ class BossGenerator(commands.Cog):
                     color=0x5865F2,
                 )
             )
+            await self.upsert_boss_decision_message(guild_id)
             logger.info("Announced new guild boss in guild %s", guild_id)
         except (discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Could not send new-boss alert: %s", exc)

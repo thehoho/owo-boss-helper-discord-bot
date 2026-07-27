@@ -2372,12 +2372,12 @@ class TeamTemplates(commands.Cog):
             if target is None:
                 notice = (
                     "⚠️ This animal is already in your team. If it is in the wrong "
-                    "position, run `wtm d <animal>` and retry this step; if it is already "
+                    "position, run the matching remove command for that animal and retry this step; if it is already "
                     "correct, press **Skip step** or type `HS` / `H escape`."
                 )
             else:
                 animal, target_position = target
-                retry_command = f"wtm a {animal} {target_position}"
+                retry_command = owo_team_command(session.owo_prefix, "a", animal, target_position)
                 notice = (
                     f"⚠️ `{animal}` is already in your team. If it is in the wrong "
                     f"position, run `wtm d {animal}` then resend `{retry_command}`; if "
@@ -2391,7 +2391,7 @@ class TeamTemplates(commands.Cog):
         elif status == "position_occupied":
             target = parse_team_add_target(session.expected_command or "")
             position = target[1] if target else None
-            remove_command = f"`wtm d {position}`" if position else "`wtm d <position>`"
+            remove_command = f"`{owo_team_command(session.owo_prefix, 'd', position)}`" if position else f"`{owo_team_command(session.owo_prefix, 'd', '<position>')}`"
             notice = (
                 "⚠️ The target team position is occupied. Remove the current animal "
                 f"with {remove_command}, then retry this step. Use `HS` only when the "
@@ -2515,7 +2515,7 @@ class TeamTemplates(commands.Cog):
         value = re.sub(r"\s+", "", argument or "").strip()
         if not value:
             await message.reply(
-                f"This server's OwO prefix for team restores is currently `{current}`. "
+                f"This server's OwO prefix for helper-generated OwO commands is currently `{current}`. "
                 f"Generated commands use `{owo_team_command(current)}` and `{current}w <weapon_id> <animal>`. "
                 "Server managers can change it with `HT prefix <prefix>`, for example `HT prefix o`.",
                 mention_author=False,
@@ -2537,8 +2537,8 @@ class TeamTemplates(commands.Cog):
             return
         saved = await self.store.set_guild_owo_prefix(message.guild.id, prefix, message.author.id)
         await message.reply(
-            f"✅ OwO team prefix saved for this server: `{saved}`. "
-            f"Guided team restore now uses `{owo_team_command(saved)}` and `{saved}w <weapon_id> <animal>`.",
+            f"✅ OwO prefix saved for this server: `{saved}`. "
+            f"Guided team restore, boss inventory, and boss-ticket tracking now use `{owo_team_command(saved)}` and `{saved}w <weapon_id> <animal>`.",
             mention_author=False,
         )
 
@@ -2585,8 +2585,8 @@ class TeamTemplates(commands.Cog):
             value=(
                 f"Save up to **{MAX_TEMPLATES_PER_USER}** teams. Reply to an OwO team "
                 "page with `HT C <name>`. Use `HT`, `HT<number>`, `HT U <slot/name>`, "
-                "or `HT D <slot/name>`. Server managers can set the OwO restore prefix with "
-                "`HT prefix o` when the server uses `otm` instead of `wtm`. During guided setup use `HS` to skip and "
+                "or `HT D <slot/name>`. Server managers can set the OwO prefix used by team restores, boss inventory, and boss-ticket tracking with "
+                "`HT prefix o` when the server uses `o boss i` / `otm` instead of `w boss i` / `wtm`. During guided setup use `HS` to skip and "
                 "`HT cancel` to stop. Use `HT help` for the complete team guide. Use **All commands** on a saved team for a clean paste-ready command list."
             ),
             inline=False,
