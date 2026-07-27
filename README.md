@@ -721,3 +721,7 @@ The scheduled owner DM report now starts with the bot. The owner can also run `/
 - Server OwO prefixes now apply to team restores, boss inventory (`o boss i`), and boss tickets (`o boss t`).
 - Boss alert channels can show a temporary hit/skip sticky while a guild boss is active.
 - Managers can set a trusted role for hit/skip decisions with `/boss-decision-role`; Manage Server still works.
+
+### v0.11.3-beta boss decision stickies
+
+Boss alert channels now support helper-controlled stickies: `H boss hit`, `H boss skip`, `H sticky`, `H sticky clear`, `H sticky on`, and `H sticky off`. Server managers can configure `/boss-decision-role` for helpers and `/boss-fighter-role` for one-time HIT pings.

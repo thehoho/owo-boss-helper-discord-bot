@@ -1,3 +1,9 @@
+## v0.11.3-beta
+
+- Improved boss decision stickies so they only appear after a helper chooses HIT/SKIP or sets a custom sticky note.
+- Added `H sticky`, `H sticky clear`, `H sticky on`, and `H sticky off`.
+- Added `/boss-fighter-role` for one-time HIT pings, and removed the running-person skip emoji.
+
 # v0.11.2-beta
 
 - Applied the configured OwO prefix to boss inventory and boss-ticket commands, not only team restores.

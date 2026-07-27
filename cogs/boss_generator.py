@@ -96,6 +96,19 @@ def parse_boss_decision_command(content: str) -> str | None:
     return None
 
 
+def parse_boss_sticky_command(content: str) -> str | None:
+    compact = compact_first_line(content)
+    if compact in {"hstickyclear", "hclearsticky"}:
+        return "clear"
+    if compact in {"hstickyoff"}:
+        return "off"
+    if compact in {"hstickyon"}:
+        return "on"
+    if compact == "hsticky":
+        return "set"
+    return None
+
+
 def is_boss_trigger(content: str, owo_prefix: str = OWO_PREFIX_DEFAULT) -> bool:
     """Accept `owo boss i` or this server's configured short OwO prefix."""
     return is_owo_prefixed_command(content, owo_prefix, BOSS_TRIGGER_SUFFIXES)
@@ -1147,7 +1160,7 @@ class BossDecisionView(discord.ui.View):
     async def hit(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self.cog.set_boss_decision_from_interaction(interaction, "hit")
 
-    @discord.ui.button(label="Skip", emoji="🏃", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(label="Skip", style=discord.ButtonStyle.secondary)
     async def skip(self, interaction: discord.Interaction, _: discord.ui.Button) -> None:
         await self.cog.set_boss_decision_from_interaction(interaction, "skip")
 
@@ -1233,6 +1246,7 @@ class BossGenerator(commands.Cog):
         self.guild_boss_outcome_locks: dict[int, asyncio.Lock] = {}
         self.http_session: aiohttp.ClientSession | None = None
         self.hp_templates = load_hp_templates()
+        self.boss_sticky_refresh_tasks: dict[int, asyncio.Task[None]] = {}
         self._restored = False
 
     def ui_emoji(self, name: str, fallback: str) -> str:
@@ -1292,6 +1306,43 @@ class BossGenerator(commands.Cog):
         if config.get("active_boss_message_id"):
             await self.upsert_boss_decision_message(interaction.guild_id)
 
+
+    @app_commands.command(
+        name="boss-fighter-role",
+        description="Choose the role pinged when helpers mark a guild boss as HIT.",
+    )
+    @app_commands.describe(role="Role to ping once when a boss is marked HIT. Leave empty to clear.")
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def boss_fighter_role(
+        self,
+        interaction: discord.Interaction,
+        role: discord.Role | None = None,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "❌ This command only works inside a server.", ephemeral=True
+            )
+            return
+        config = self.cooldown_config.setdefault(str(interaction.guild_id), {})
+        if role is None:
+            config.pop("fighter_role_id", None)
+            config.pop("fighter_role_pinged_boss_key", None)
+            save_cooldown_config(self.cooldown_config)
+            await interaction.response.send_message(
+                "✅ No fighter role will be pinged when a boss is marked **HIT**.",
+                ephemeral=True,
+            )
+            return
+        config["fighter_role_id"] = role.id
+        config.pop("fighter_role_pinged_boss_key", None)
+        save_cooldown_config(self.cooldown_config)
+        await interaction.response.send_message(
+            f"✅ {role.mention} will be pinged once when a boss helper marks an active boss as **HIT**.",
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions(roles=False),
+        )
+
     async def handle_boss_decision_message(self, message: discord.Message, decision: str) -> None:
         guild = message.guild
         if guild is None:
@@ -1327,6 +1378,97 @@ class BossGenerator(commands.Cog):
         notice = await self.set_boss_decision(guild.id, decision, message.author.id)
         await safe_reply(message, notice, mention_author=False, delete_after=20)
 
+    async def handle_boss_sticky_command(self, message: discord.Message, action: str) -> None:
+        guild = message.guild
+        if guild is None:
+            return
+        config = self.cooldown_config.setdefault(str(guild.id), {})
+        channel_id = int(config.get("channel_id") or 0)
+        if not channel_id:
+            await safe_reply(
+                message,
+                "⚠️ Boss alerts are not configured yet. A server manager can use `/boss-cooldown-channel` first.",
+                mention_author=False,
+            )
+            return
+        if channel_id != message.channel.id:
+            channel = guild.get_channel(channel_id)
+            where = channel.mention if isinstance(channel, discord.TextChannel) else "the configured boss alert channel"
+            await safe_reply(message, f"Use sticky controls in {where}.", mention_author=False)
+            return
+        if not self.member_can_set_boss_decision(message.author, guild.id):
+            role_id = int(config.get("decision_role_id") or 0)
+            role_text = f"<@&{role_id}> or " if role_id else ""
+            await safe_reply(
+                message,
+                f"You need {role_text}**Manage Server** to control boss stickies.",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+
+        if action == "clear":
+            await self.clear_boss_decision_message(guild.id)
+            await safe_reply(message, "✅ Boss sticky cleared.", mention_author=False, delete_after=20)
+            return
+
+        if action == "off":
+            config["decision_sticky_disabled"] = True
+            save_cooldown_config(self.cooldown_config)
+            await self.clear_boss_decision_message(guild.id, preserve_disabled=True)
+            await safe_reply(message, "✅ Boss stickies are now **off** for this server.", mention_author=False, delete_after=20)
+            return
+
+        if action == "on":
+            config.pop("decision_sticky_disabled", None)
+            save_cooldown_config(self.cooldown_config)
+            await safe_reply(message, "✅ Boss stickies are now **on** for this server.", mention_author=False, delete_after=20)
+            return
+
+        if action != "set":
+            return
+
+        if not self.boss_sticky_enabled(config):
+            await safe_reply(message, "Boss stickies are off. Use `H sticky on` first.", mention_author=False)
+            return
+        if message.reference is None or message.reference.message_id is None:
+            await safe_reply(
+                message,
+                "Reply to the note/message you want to keep sticky, then send `H sticky`.",
+                mention_author=False,
+            )
+            return
+        try:
+            referenced = await message.channel.fetch_message(int(message.reference.message_id))
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            await safe_reply(message, "I could not read the replied message.", mention_author=False)
+            return
+
+        note = (referenced.content or "").strip()
+        if not note and referenced.embeds:
+            parts: list[str] = []
+            for embed in referenced.embeds[:2]:
+                if embed.title:
+                    parts.append(str(embed.title))
+                if embed.description:
+                    parts.append(str(embed.description))
+                for field in embed.fields[:3]:
+                    parts.append(f"{field.name}: {field.value}")
+            note = "\n".join(part.strip() for part in parts if part and part.strip())
+        if not note:
+            await safe_reply(message, "That message does not have readable text to stick.", mention_author=False)
+            return
+        if len(note) > 1600:
+            note = note[:1597].rstrip() + "..."
+
+        config["sticky_custom_text"] = note
+        config["boss_decision"] = "custom"
+        config["boss_decision_by"] = message.author.id
+        config["boss_decision_at"] = int(time.time())
+        save_cooldown_config(self.cooldown_config)
+        await self.upsert_boss_decision_message(guild.id, force_repost=True)
+        await safe_reply(message, "✅ Custom sticky note saved.", mention_author=False, delete_after=20)
+
     async def set_boss_decision_from_interaction(
         self,
         interaction: discord.Interaction,
@@ -1337,11 +1479,14 @@ class BossGenerator(commands.Cog):
             return
         notice = await self.set_boss_decision(interaction.guild_id, decision, interaction.user.id)
         config = self.cooldown_config.get(str(interaction.guild_id), {})
-        await interaction.response.edit_message(
-            embed=self.build_boss_decision_embed(config),
-            view=BossDecisionView(self, interaction.guild_id),
-        )
-        await interaction.followup.send(notice, ephemeral=True)
+        if self.boss_sticky_enabled(config):
+            await interaction.response.edit_message(
+                embed=self.build_boss_decision_embed(config),
+                view=BossDecisionView(self, interaction.guild_id),
+            )
+            await interaction.followup.send(notice, ephemeral=True)
+        else:
+            await interaction.response.send_message(notice, ephemeral=True)
 
     async def set_boss_decision(self, guild_id: int, decision: str, user_id: int) -> str:
         if decision not in {"hit", "skip"}:
@@ -1353,10 +1498,28 @@ class BossGenerator(commands.Cog):
         config["boss_decision"] = decision
         config["boss_decision_by"] = user_id
         config["boss_decision_at"] = now
+        config.pop("sticky_custom_text", None)
+
+        ping_role_id = 0
+        boss_key = int(config.get("active_boss_expires_at") or config.get("active_boss_message_id") or 0)
+        if decision == "hit" and self.boss_sticky_enabled(config):
+            fighter_role_id = int(config.get("fighter_role_id") or 0)
+            if fighter_role_id and int(config.get("fighter_role_pinged_boss_key") or 0) != boss_key:
+                ping_role_id = fighter_role_id
+                config["fighter_role_pinged_boss_key"] = boss_key
+
         save_cooldown_config(self.cooldown_config)
-        await self.upsert_boss_decision_message(guild_id)
+        if self.boss_sticky_enabled(config):
+            await self.upsert_boss_decision_message(guild_id, ping_role_id=ping_role_id)
+            sticky_note = ""
+        else:
+            sticky_note = " Sticky is currently off for this server."
         label = "HIT" if decision == "hit" else "SKIP"
-        return f"✅ Boss decision set to **{label}** by <@{user_id}>."
+        return f"✅ Boss decision set to **{label}** by <@{user_id}>.{sticky_note}"
+
+    @staticmethod
+    def boss_sticky_enabled(config: dict[str, Any]) -> bool:
+        return not bool(config.get("decision_sticky_disabled"))
 
     def build_boss_decision_embed(self, config: dict[str, Any]) -> discord.Embed:
         decision = str(config.get("boss_decision") or "pending")
@@ -1364,18 +1527,26 @@ class BossGenerator(commands.Cog):
         at = int(config.get("boss_decision_at") or 0)
         expiry = int(config.get("active_boss_expires_at") or 0)
         role_id = int(config.get("decision_role_id") or 0)
+        fighter_role_id = int(config.get("fighter_role_id") or 0)
+        custom_text = str(config.get("sticky_custom_text") or "").strip()
 
-        if decision == "hit":
-            title = f"{self.ui_emoji('boss_appeared', '⚔️')} Boss Decision: HIT"
+        if custom_text:
+            title = "📌 Boss Sticky Note"
+            description = custom_text
+            color = 0x5865F2
+        elif decision == "hit":
+            title = f"{self.ui_emoji('boss_appeared', 'HIT')} Boss Decision: HIT"
             description = "Boss helpers decided to **hit** this guild boss."
+            if fighter_role_id:
+                description += f"\n\nFighter role: <@&{fighter_role_id}>"
             color = 0x57F287
         elif decision == "skip":
-            title = f"{self.ui_emoji('boss_escaped', '🏃')} Boss Decision: SKIP"
+            title = "Boss Decision: SKIP"
             description = "Boss helpers decided to **skip** this guild boss."
             color = 0x95A5A6
         else:
-            title = "❔ Boss Decision Needed"
-            description = "Choose whether this guild boss should be **hit** or **skipped**."
+            title = "Boss Decision Needed"
+            description = "Choose whether this guild boss should be **HIT** or **SKIP**."
             color = 0xFEE75C
 
         if by:
@@ -1388,18 +1559,40 @@ class BossGenerator(commands.Cog):
             description += f"\n\nAllowed controls: <@&{role_id}> or members with **Manage Server**."
         else:
             description += "\n\nAllowed controls: members with **Manage Server**."
-        description += "\nUse `H boss hit` / `Hboss hit` or `H boss skip` / `H skip boss`."
+        description += "\nUse `H boss hit`, `H boss skip`, `H sticky`, or `H sticky clear`."
 
         return discord.Embed(title=title, description=description, color=color)
 
-    async def upsert_boss_decision_message(self, guild_id: int) -> None:
+    async def upsert_boss_decision_message(
+        self,
+        guild_id: int,
+        *,
+        ping_role_id: int | None = None,
+        force_repost: bool = False,
+    ) -> None:
         config = self.cooldown_config.setdefault(str(guild_id), {})
+        if not self.boss_sticky_enabled(config):
+            return
+        if not (
+            str(config.get("boss_decision") or "") in {"hit", "skip", "custom"}
+            or str(config.get("sticky_custom_text") or "").strip()
+        ):
+            return
         channel = await self.get_configured_channel(guild_id)
         if channel is None:
             return
+
+        message_id = int(config.get("decision_message_id") or 0)
+        if force_repost and message_id:
+            try:
+                await channel.get_partial_message(message_id).delete()
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                pass
+            config.pop("decision_message_id", None)
+            message_id = 0
+
         embed = self.build_boss_decision_embed(config)
         view = BossDecisionView(self, guild_id)
-        message_id = int(config.get("decision_message_id") or 0)
         try:
             if message_id:
                 message = await channel.fetch_message(message_id)
@@ -1410,15 +1603,22 @@ class BossGenerator(commands.Cog):
         except (discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Could not edit boss decision sticky for guild %s: %s", guild_id, exc)
             return
+
+        content = f"<@&{int(ping_role_id)}>" if ping_role_id else None
         try:
-            message = await channel.send(embed=embed, view=view, allowed_mentions=discord.AllowedMentions.none())
+            message = await channel.send(
+                content=content,
+                embed=embed,
+                view=view,
+                allowed_mentions=discord.AllowedMentions(roles=bool(ping_role_id), users=False, everyone=False),
+            )
         except (discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Could not send boss decision sticky for guild %s: %s", guild_id, exc)
             return
         config["decision_message_id"] = message.id
         save_cooldown_config(self.cooldown_config)
 
-    async def clear_boss_decision_message(self, guild_id: int) -> None:
+    async def clear_boss_decision_message(self, guild_id: int, *, preserve_disabled: bool = False) -> None:
         config = self.cooldown_config.setdefault(str(guild_id), {})
         message_id = int(config.get("decision_message_id") or 0)
         channel = await self.get_configured_channel(guild_id)
@@ -1428,12 +1628,59 @@ class BossGenerator(commands.Cog):
             except (discord.Forbidden, discord.NotFound, discord.HTTPException):
                 pass
         changed = False
-        for key in ("decision_message_id", "boss_decision", "boss_decision_by", "boss_decision_at"):
+        keys = (
+            "decision_message_id",
+            "boss_decision",
+            "boss_decision_by",
+            "boss_decision_at",
+            "sticky_custom_text",
+            "fighter_role_pinged_boss_key",
+        )
+        for key in keys:
             if key in config:
                 config.pop(key, None)
                 changed = True
+        if not preserve_disabled and config.get("decision_sticky_disabled") is None:
+            pass
         if changed:
             save_cooldown_config(self.cooldown_config)
+
+    def should_refresh_boss_sticky_on_message(self, message: discord.Message) -> bool:
+        if message.guild is None:
+            return False
+        config = self.cooldown_config.get(str(message.guild.id), {})
+        if not self.boss_sticky_enabled(config):
+            return False
+        if int(config.get("channel_id") or 0) != message.channel.id:
+            return False
+        sticky_id = int(config.get("decision_message_id") or 0)
+        if not sticky_id or sticky_id == message.id:
+            return False
+        return bool(
+            str(config.get("boss_decision") or "") in {"hit", "skip", "custom"}
+            or str(config.get("sticky_custom_text") or "").strip()
+        )
+
+    def queue_boss_sticky_refresh(self, guild_id: int) -> None:
+        existing = self.boss_sticky_refresh_tasks.get(guild_id)
+        if existing and not existing.done():
+            return
+        self.boss_sticky_refresh_tasks[guild_id] = asyncio.create_task(
+            self.refresh_boss_sticky_after_chat(guild_id)
+        )
+
+    async def refresh_boss_sticky_after_chat(self, guild_id: int) -> None:
+        try:
+            await asyncio.sleep(0.75)
+            await self.upsert_boss_decision_message(guild_id, force_repost=True)
+        except asyncio.CancelledError:
+            return
+        except Exception:
+            logger.exception("Could not refresh boss decision sticky for guild %s", guild_id)
+        finally:
+            current = self.boss_sticky_refresh_tasks.get(guild_id)
+            if current is asyncio.current_task():
+                self.boss_sticky_refresh_tasks.pop(guild_id, None)
 
     def cog_unload(self) -> None:
         for task in self.cooldown_tasks.values():
@@ -1442,6 +1689,9 @@ class BossGenerator(commands.Cog):
         for task in self.guild_boss_watch_tasks.values():
             task.cancel()
         self.guild_boss_watch_tasks.clear()
+        for task in self.boss_sticky_refresh_tasks.values():
+            task.cancel()
+        self.boss_sticky_refresh_tasks.clear()
         if self.http_session and not self.http_session.closed:
             asyncio.create_task(self.http_session.close())
 
@@ -1505,7 +1755,7 @@ class BossGenerator(commands.Cog):
 
         await interaction.followup.send(
             f"✅ Automatic boss cooldown alerts will be sent in {channel.mention}. "
-            "A hit/skip sticky will appear there while a guild boss is active.",
+            "Boss helpers can use `H boss hit`, `H boss skip`, or `H sticky` there.",
             ephemeral=True,
         )
 
@@ -2079,6 +2329,11 @@ class BossGenerator(commands.Cog):
                         await self.handle_boss_decision_message(message, decision)
                         return
 
+                    sticky_action = parse_boss_sticky_command(message.content or "")
+                    if sticky_action is not None:
+                        await self.handle_boss_sticky_command(message, sticky_action)
+                        return
+
                     if is_prefix_help_trigger(message.content):
                         await self.send_prefix_help(message)
                         return
@@ -2099,6 +2354,9 @@ class BossGenerator(commands.Cog):
                             getattr(message.channel, "name", message.channel.id),
                             owo_prefix,
                         )
+
+                    if self.should_refresh_boss_sticky_on_message(message):
+                        self.queue_boss_sticky_refresh(message.guild.id)
                 return
 
             if message.author.id != OWO_BOT_ID or message.guild is None:
@@ -2429,6 +2687,7 @@ class BossGenerator(commands.Cog):
                 cooldown_end,
             )
             await self.clear_boss_decision_message(guild_id)
+            await self.send_boss_outcome_marker(guild_id, "defeated")
             await self.send_cooldown_started_message(guild_id)
             self.schedule_ready_update(guild_id, cooldown_end)
 
@@ -2477,6 +2736,7 @@ class BossGenerator(commands.Cog):
                 event_time,
             )
             await self.clear_boss_decision_message(guild_id)
+            await self.send_boss_outcome_marker(guild_id, "escaped")
             await self.send_escape_ready_message(guild_id)
 
     def schedule_ready_update(self, guild_id: int, cooldown_end: int) -> None:
@@ -2629,6 +2889,17 @@ class BossGenerator(commands.Cog):
         except (discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Old status message could not be unpinned automatically: %s", exc)
 
+
+    async def send_boss_outcome_marker(self, guild_id: int, outcome: str) -> None:
+        channel = await self.get_configured_channel(guild_id)
+        if channel is None:
+            return
+        marker = self.ui_emoji("boss_defeated", "HIT") if outcome == "defeated" else self.ui_emoji("boss_escaped", "SKIP")
+        try:
+            await channel.send(str(marker))
+        except (discord.Forbidden, discord.HTTPException) as exc:
+            logger.warning("Could not send boss outcome marker: %s", exc)
+
     async def send_cooldown_started_message(self, guild_id: int) -> None:
         config = self.cooldown_config.get(str(guild_id))
         if not config:
@@ -2676,11 +2947,16 @@ class BossGenerator(commands.Cog):
             logger.warning("Configured cooldown channel for guild %s is unavailable", guild_id)
             return
 
+        config = self.cooldown_config.get(str(guild_id), {})
         owo_prefix = await get_guild_owo_prefix(guild_id)
+        decision_role_id = int(config.get("decision_role_id") or 0)
+        content = f"<@&{decision_role_id}> Boss decision needed: **HIT** or **SKIP**." if decision_role_id else None
         description = (
             "A new guild boss has appeared!\n\n"
             f"Use `owo boss i` or `{owo_command(owo_prefix, 'boss i')}` to let the helper read your three "
-            "bosses and generate the Neon battle command."
+            "bosses and generate the Neon battle command.\n\n"
+            "Boss helpers can use `H boss hit`, `H boss skip`, or reply to a note with `H sticky`. "
+            "Use `H sticky clear` to remove a sticky note."
         )
         if expiry:
             description += (
@@ -2690,13 +2966,14 @@ class BossGenerator(commands.Cog):
 
         try:
             await channel.send(
+                content=content,
                 embed=discord.Embed(
                     title=f"{self.ui_emoji('boss_appeared', '⚔️')} New Guild Boss Appeared",
                     description=description,
                     color=0x5865F2,
-                )
+                ),
+                allowed_mentions=discord.AllowedMentions(roles=bool(decision_role_id), users=False, everyone=False),
             )
-            await self.upsert_boss_decision_message(guild_id)
             logger.info("Announced new guild boss in guild %s", guild_id)
         except (discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Could not send new-boss alert: %s", exc)
