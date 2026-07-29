@@ -1,7 +1,7 @@
 
-## v0.11.6-beta notes
+## v0.11.7-beta notes
 
-Guild Members and Presence are no longer requested. New-boss alerts use an embed without pinging decision roles; those roles remain available only for HIT/SKIP and sticky authorization. Optional fighter-role HIT alerts remain persistent and work when the configured role is mentionable. `/setup-guide` and `H setup` provide a server-owner checklist, the `HW` guide now highlights the requirement to open every weapon page, and `HWD` includes clearer copy-ready command controls. Daily Pacific-midnight boss reports and the clean HIT/SKIP sticky improvements from v0.11.5-beta remain included.
+HWD is now clearer on both mobile and desktop. Its queue preview offers only **Start dexing session**, active steps show the current command directly beneath a small “copy and send it in this channel” note, and the misleading copy buttons have been removed. **Skip weapon** and **Stop** remain available during active sessions. The `HW` guide now keeps step 4 in sequence and tells members to click the right arrow through every Neon weapon page. The Message Content-only intent setup, server setup guide, daily reports, and boss-sticky improvements from v0.11.6-beta remain included.
 
 # OwO Boss Helper
 
@@ -119,7 +119,7 @@ H weapon stats
 H weapon clear
 ```
 
-`HWD` / `H dex` previews the queue with **Start dexing session** and **Copy first command** controls. Active one-command prompts also include **Copy command**, which opens the exact command in an ephemeral copy-ready code block. When the member sends `ww <weapon_id>` and Neon replies with a blueprint such as `sword 31,7 mtap 77`, the helper marks that weapon saved and learns any available weapon/passive context.
+`HWD` / `H dex` previews the queue with one **Start dexing session** button. Each active step shows the exact command directly in the channel beneath a small instruction telling the member to copy and send it there. **Skip weapon** and **Stop** remain available while the session is active. When the member sends `ww <weapon_id>` and Neon replies with a blueprint such as `sword 31,7 mtap 77`, the helper marks that weapon saved and learns any available weapon/passive context.
 
 The scanner does not assume one stable emoji ID per weapon or passive. It tags weapon/passive context from Neon filter headers, command context, learned blueprint replies, and known aliases. Unknown rows still remain in the unfiltered dex queue.
 
@@ -637,7 +637,7 @@ MIT License. See [LICENSE](LICENSE).
 
 ### Guided Neon weapon dex sessions
 
-`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon weapon pages. Use **Copy first command** for a copy-ready code block or click **Start dexing session** to receive one command at a time. Active prompts include their own **Copy command** button. After the member sends the shown command, the helper waits for Neon to confirm the weapon, waits about two seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
+`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon weapon pages. Select **Start dexing session** to receive one command at a time. Each active prompt displays the current command directly in the channel for easy mobile copying; no extra copy button is required. After the member sends the shown command, the helper waits for Neon to confirm the weapon, waits about two seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
 
 ### Mobile-friendly dex prompts
 

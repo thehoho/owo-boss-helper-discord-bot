@@ -1445,39 +1445,10 @@ class WeaponDexView(discord.ui.View):
         )
         await interaction.followup.send(
             f"Started a dexing session for **{self.owner_display_name}**. I will post one alternating `ww` / `wuse` command at a time. "
-            "Send that command, then I will wait for Neon to confirm it before moving to the next one. "
+            "Copy the command shown in the channel and send it there, then I will wait for Neon to confirm it before moving to the next one. "
             "Use `H stop`, `Hstop`, or `HS` to pause and continue later.",
             ephemeral=True,
         )
-
-    @discord.ui.button(
-        label="Copy first command",
-        emoji="📋",
-        style=discord.ButtonStyle.primary,
-    )
-    async def copy_first_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ) -> None:
-        if not self.entries:
-            await interaction.response.send_message(
-                "There is no queued command to copy.", ephemeral=True
-            )
-            return
-        command = f"{DEX_COMMAND_PREFIXES[0]} {self.entries[0].weapon_id}"
-        await interaction.response.send_message(
-            f"Copy this command and send it in this channel:\n```text\n{command}\n```",
-            ephemeral=True,
-        )
-
-    @discord.ui.button(label="Close", style=discord.ButtonStyle.secondary)
-    async def close_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ) -> None:
-        for child in self.children:
-            if isinstance(child, discord.ui.Button):
-                child.disabled = True
-        await interaction.response.edit_message(view=self)
-        self.stop()
 
 
 class ActiveDexStepView(discord.ui.View):
@@ -1493,29 +1464,6 @@ class ActiveDexStepView(discord.ui.View):
             )
             return False
         return True
-
-    @discord.ui.button(
-        label="Copy command",
-        emoji="📋",
-        style=discord.ButtonStyle.primary,
-    )
-    async def copy_button(
-        self, interaction: discord.Interaction, button: discord.ui.Button
-    ) -> None:
-        channel_id = int(getattr(interaction, "channel_id", 0) or 0)
-        session = self.cog.active_dex_sessions.get(
-            self.cog.dex_session_key(channel_id, self.runner_user_id)
-        )
-        command = self.cog.dex_command_for_session(session) if session is not None else None
-        if command is None:
-            await interaction.response.send_message(
-                "This dex command is no longer active.", ephemeral=True
-            )
-            return
-        await interaction.response.send_message(
-            f"Copy this command and send it in this channel:\n```text\n{command}\n```",
-            ephemeral=True,
-        )
 
     @discord.ui.button(label="Skip weapon", style=discord.ButtonStyle.secondary)
     async def skip_button(
@@ -1848,8 +1796,8 @@ class NeonWeapons(commands.Cog):
                 "**1.** Run `nw inv public`.\n"
                 "**2.** Run `ww`.\n"
                 f"**3.** Click Neon's reaction {calculate_emoji} on the `ww` message.\n"
-                "➡️ **4. Click through every weapon page.** The helper can only scan "
-                "the pages that Neon actually displays.\n\n"
+                "**4.** Click the right arrow ➡️ through every weapon page.\n"
+                "-# The helper can only scan the pages that Neon actually displays.\n\n"
                 "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible** or any scanned row without a green saved tick. "
                 "Then run `HWD`, `H dex`, or `H weapon dex` to get guided alternating `ww <weapon_id>` / `wuse <weapon_id>` commands.\n\n"
                 "Battle helpers can scan another member's Neon filtered pages; the queue is saved under the member shown in Neon's title. Helpers can run `HWD @member` to dex that member's queue, combine weapon filters such as `HWD dagger shield 100`, and any confirmed Neon blueprint removes the weapon from every matching owner's queue across all servers the helper can see."
@@ -1936,9 +1884,9 @@ class NeonWeapons(commands.Cog):
             title=f"🧾 Weapons needing Neon dex for {target_display_name}",
             description=(
                 "These are the next queued weapons.\n\n"
-                "• **Start dexing session** posts one command at a time.\n"
-                "• **Copy first command** opens the first command in a copy-ready code block.\n"
-                "• Send the exact command in this channel; the helper advances only "
+                "• Select **Start dexing session** to begin.\n"
+                "• Copy each command from the session message and send it in this channel.\n"
+                "• The helper advances only "
                 "after OwO and Neon confirm that weapon.\n"
                 "• Sessions alternate `ww` and `wuse`, support `HWD 100` / `HWD all`, "
                 "and allow combined filters such as `HWD dagger shield 100`.\n\n"
@@ -1991,7 +1939,12 @@ class NeonWeapons(commands.Cog):
         runner_note = ""
         if session.runner_user_id != session.owner_user_id:
             runner_note = f" — **{session.runner_display_name}** running"
-        return f"**{session.owner_display_name}**{runner_note} — {session.index + 1}/{len(session.entries)}\n`{command}`"
+        return (
+            f"**{session.owner_display_name}**{runner_note} — "
+            f"{session.index + 1}/{len(session.entries)}\n"
+            "-# Copy this command and send it in this channel:\n"
+            f"`{command}`"
+        )
 
     async def delete_session_prompt(self, channel: discord.abc.Messageable, session: ActiveDexSession) -> None:
         if not session.guide_message_id:

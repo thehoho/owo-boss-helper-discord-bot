@@ -1,4 +1,13 @@
 
+## v0.11.7-beta - Mobile-Friendly Dex Prompts
+
+- Removed **Copy first command** and **Close** from the HWD queue preview so **Start dexing session** is the only preview action.
+- Removed the active-session **Copy command** button because Discord cannot copy directly to the mobile clipboard.
+- Added a small instruction above every active `ww` / `wuse` command telling members to copy it and send it in the same channel.
+- Kept **Skip weapon** and **Stop** available during an active dex session.
+- Reworded HW step 4 to tell members to click the right arrow through every Neon weapon page, with the scan-limit note on its own line.
+- Updated the public bot version to `0.11.7-beta`.
+
 ## v0.11.6-beta - Intent-Safe Setup and Dex Clarity
 
 - Removed Guild Members and Presence from the requested Gateway intents.
