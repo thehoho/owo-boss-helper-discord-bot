@@ -1,5 +1,20 @@
 
+## v0.11.6-beta - Intent-Safe Setup and Dex Clarity
+
+- Removed Guild Members and Presence from the requested Gateway intents.
+- Removed all decision-role and direct-member pings from new-boss announcements; decision roles remain authorization controls for HIT/SKIP and stickies.
+- Kept optional fighter-role HIT alerts as persistent messages and added clearer setup guidance for making fighter roles mentionable.
+- Added `/setup-guide` and `H setup` with a server-owner checklist for channels, roles, reports, ticket boards, permissions, and the per-server OwO prefix.
+- Added the setup-guide shortcut to `H help`.
+- Highlighted `➡️ Click through every weapon page` in the existing `HW` guide.
+- Added copy-ready HWD controls for the first queued command and every active guided step.
+- Clarified the HWD preview so members understand how commands advance.
+- Preserved the v0.11.5 daily reports, clean HIT/SKIP stickies, persistent fighter alerts, and failed-report retries.
+- Updated the public bot version to `0.11.6-beta`.
+
 ## v0.11.5-beta - Smart Presence Pings and Daily Boss Reports
+
+> Superseded before production deployment by v0.11.6-beta. The presence-dependent portion was removed.
 
 - New-boss alerts now use an embed and direct-mention only online or idle members in configured boss-decision roles.
 - Offline and Do Not Disturb decision helpers are not pinged.

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 27 July 2026_
+_Last updated: 29 July 2026_
 
 OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 
@@ -22,11 +22,11 @@ The bot stores only the information needed to provide its features and operate s
 
 The bot does not intentionally store ordinary conversation content. It temporarily reads relevant messages to recognize supported OwO commands and responses.
 
-When a new guild boss appears, the bot temporarily reads the current Discord presence and configured-role membership needed to mention decision helpers whose status is Online or Idle. It does not store member presence history, and it does not notify members whose current status is Do Not Disturb or Offline.
+The bot does not request Discord presence data or a complete server-member list. Configured decision-role IDs are used only to authorize HIT/SKIP and sticky controls. New-boss announcements do not ping those roles or individual members.
 
 ## Why the data is used
 
-Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, notify available boss-decision helpers, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, and notify the developer when the bot joins or leaves a server.
+Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, authorize configured boss-decision helpers, send optional fighter-role HIT alerts, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, and notify the developer when the bot joins or leaves a server.
 
 ## Storage and sharing
 

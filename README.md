@@ -1,7 +1,7 @@
 
-## v0.11.5-beta notes
+## v0.11.6-beta notes
 
-New-boss alerts now use an embed followed by direct mentions of only the online or idle members in configured decision roles. DND and offline members are not pinged. HIT/SKIP stickies contain only the decision heading, fighter-role alerts are persistent separate messages, and `/boss-report-channel` configures a Pacific-midnight daily summary of confirmed defeated and escaped bosses.
+Guild Members and Presence are no longer requested. New-boss alerts use an embed without pinging decision roles; those roles remain available only for HIT/SKIP and sticky authorization. Optional fighter-role HIT alerts remain persistent and work when the configured role is mentionable. `/setup-guide` and `H setup` provide a server-owner checklist, the `HW` guide now highlights the requirement to open every weapon page, and `HWD` includes clearer copy-ready command controls. Daily Pacific-midnight boss reports and the clean HIT/SKIP sticky improvements from v0.11.5-beta remain included.
 
 # OwO Boss Helper
 
@@ -36,10 +36,9 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Sends cooldown-complete alerts.
 - Persists configured channels and active watcher state across restarts.
 - Includes duplicate outcome protection and per-guild request locking.
-- Direct-mentions only online or idle decision helpers when a new boss appears; offline and DND helpers are not notified.
+- Posts new-boss announcements without pinging decision roles or individual members.
 - Sends a persistent fighter-role alert once when an active boss is marked HIT.
 - Posts a daily confirmed HIT/SKIP outcome report at the Pacific-midnight reset in a manager-configured channel.
-- Limits each presence-aware helper notification message to at most nine direct mentions.
 - Persists up to seven failed daily reports for retry instead of discarding counts during a temporary Discord/channel failure.
 
 ### Team templates
@@ -97,7 +96,7 @@ Use `H about` or `/about` inside Discord for the public project profile.
 
 The helper can watch public NeonUtil weapon inventory pages from Neon bot ID `851436490415931422`. When Neon shows **M** / max possible quality on a weapon row, the helper stores that weapon under the owner shown in Neon's title. The scan is deduped by Discord owner ID and weapon ID, so paging backward and forward does not create duplicates.
 
-A successful scan adds a visible `🧾` reaction to the Neon page. Battle helpers can scan another member's filtered Neon pages; the resulting queue belongs to the member shown in Neon's title, so that member can later dex their own weapons.
+A successful scan adds a visible `🧾` reaction to the Neon page. Battle helpers can scan another member's filtered Neon pages; the resulting queue belongs to the member shown in Neon's title, so that member can later dex their own weapons. The `HW` guide prominently reminds members to click through every Neon weapon page because only displayed pages can be scanned.
 
 Setup guide:
 
@@ -120,7 +119,7 @@ H weapon stats
 H weapon clear
 ```
 
-`HWD` / `H dex` returns guided `ww <weapon_id>` commands with a five-second step guard. When the member sends `ww <weapon_id>` and Neon replies with a blueprint such as `sword 31,7 mtap 77`, the helper marks that weapon saved and learns any available weapon/passive context.
+`HWD` / `H dex` previews the queue with **Start dexing session** and **Copy first command** controls. Active one-command prompts also include **Copy command**, which opens the exact command in an ephemeral copy-ready code block. When the member sends `ww <weapon_id>` and Neon replies with a blueprint such as `sword 31,7 mtap 77`, the helper marks that weapon saved and learns any available weapon/passive context.
 
 The scanner does not assume one stable emoji ID per weapon or passive. It tags weapon/passive context from Neon filter headers, command context, learned blueprint replies, and known aliases. Unknown rows still remain in the unfiltered dex queue.
 
@@ -173,7 +172,7 @@ The project has since been substantially expanded with automatic boss reading, H
 - Python 3.11 or newer
 - A Discord bot application
 - Message Content Intent enabled
-- Guild Members Intent is not required
+- Guild Members and Presence Intents are not required
 
 Install dependencies:
 
@@ -222,12 +221,11 @@ Optional permissions:
 
 The bot does not require Administrator permission.
 
-Required privileged gateway intents in the Discord Developer Portal:
+Required privileged gateway intent in the Discord Developer Portal:
 
-- Server Members Intent
-- Presence Intent
+- Message Content Intent
 
-These intents let the bot resolve every configured decision-role member and notify only members whose current status is Online or Idle. Message Content Intent remains required for the existing prefix-command flows.
+Server Members and Presence are not requested. Decision roles authorize trusted helpers to use HIT/SKIP and sticky controls, but new-boss announcements do not ping those roles or individual members.
 
 ### Application-owned UI emojis
 
@@ -275,9 +273,10 @@ Server setup:
 /boss-decision-role
 /boss-fighter-role
 /boss-report-channel
+/setup-guide
 ```
 
-`/boss-cooldown-channel` selects the channel for new-boss, defeat, escape, cooldown, and ready alerts. Add one or more decision roles with `/boss-decision-role`; only their online or idle members are directly mentioned when a boss appears. Add one or more fighter roles with `/boss-fighter-role`; they receive one persistent role alert when a helper chooses HIT. `/boss-report-channel` selects the channel that receives the completed daily outcome report at Pacific midnight. Run `/boss-report-channel` without a channel to disable reports while preserving the current counters.
+`/boss-cooldown-channel` selects the channel for new-boss, defeat, escape, cooldown, and ready alerts. Add one or more decision roles with `/boss-decision-role`; they authorize HIT/SKIP and sticky controls but are not pinged by new-boss announcements. Add one or more fighter roles with `/boss-fighter-role`; they receive one persistent role alert when a helper chooses HIT. Make fighter roles mentionable, or grant the bot **Mention @everyone, @here, and All Roles** in the alert channel. `/boss-report-channel` selects the channel that receives the completed daily outcome report at Pacific midnight. Run `/boss-report-channel` without a channel to disable reports while preserving the current counters. `/setup-guide` shows server managers the complete configuration checklist; `H setup` posts the same guide publicly.
 
 Channel troubleshooting for server managers:
 
@@ -291,7 +290,7 @@ Channel troubleshooting for server managers:
 H help
 ```
 
-`H help` lists only commands currently supported by the bot, including the ticket-management panel, optional nickname markers, and the 100-template workflow. It is recognized at the start of the first non-empty line; any text after `H help` is ignored.
+`H help` lists only commands currently supported by the bot, including the setup-guide shortcut, ticket-management panel, optional nickname markers, and the 100-template workflow. It is recognized at the start of the first non-empty line; any text after `H help` is ignored.
 
 ## Team templates
 
@@ -638,7 +637,7 @@ MIT License. See [LICENSE](LICENSE).
 
 ### Guided Neon weapon dex sessions
 
-`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon weapon pages. Click **Start dexing session** to receive one command at a time. After the member sends the shown command, the helper waits for Neon to confirm the weapon, waits about two seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
+`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon weapon pages. Use **Copy first command** for a copy-ready code block or click **Start dexing session** to receive one command at a time. Active prompts include their own **Copy command** button. After the member sends the shown command, the helper waits for Neon to confirm the weapon, waits about two seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
 
 ### Mobile-friendly dex prompts
 

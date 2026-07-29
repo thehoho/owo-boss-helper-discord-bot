@@ -2594,10 +2594,12 @@ class TeamTemplates(commands.Cog):
         embed.add_field(
             name="🧾 Neon weapon dex",
             value=(
-                "Use `HW` or `H weapons` for Pencilvester's Neon setup guide. "
+                "➡️ Start with `HW` or `H weapons` for Pencilvester's Neon setup guide, "
+                "then open every weapon page so the complete queue is scanned. "
                 "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` "
                 "to show queued alternating `ww` / `wuse` commands. Helpers can target another "
-                "member with `HWD @member`, `HWD @member dagger shield 100`, or `HWD @member dagger mtap sg`. Click "
+                "member with `HWD @member`, `HWD @member dagger shield 100`, or `HWD @member dagger mtap sg`. Use "
+                "**Copy first command** for a copy-ready code block or click "
                 "**Start dexing session** for mobile-friendly one-command prompts labelled "
                 "with the weapon owner's name. The helper advances only after Neon confirms "
                 "the shown weapon, waits about two seconds, removes the old prompt, "
@@ -2605,6 +2607,16 @@ class TeamTemplates(commands.Cog):
                 "dexed for every matching owner queue. Rows without a green tick are "
                 "queued too, including orb/empowered rows that Neon does not mark with M. "
                 "Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Multiple weapon types can be combined in one run, such as `HWD dagger shield 100`. Use `H stop`, `Hstop`, or `HS` to pause."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🛠️ Server-owner setup",
+            value=(
+                "Use `/setup-guide` for a private configuration checklist, or `H setup` "
+                "to post it in the channel. It covers alert/report channels, ticket "
+                "boards, decision roles, optional fighter pings, permissions, and the "
+                "server OwO prefix."
             ),
             inline=False,
         )

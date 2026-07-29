@@ -1,5 +1,7 @@
 # v0.11.5-beta - Smart Presence Pings and Daily Boss Reports
 
+> Superseded before production deployment by v0.11.6-beta. Guild Members/Presence and decision-helper pings were removed; daily reports, clean stickies, persistent fighter alerts, and the new-boss embed were retained.
+
 This beta makes boss alerts more considerate, separates persistent fighter notifications from temporary stickies, and adds daily outcome reporting.
 
 ## Changed

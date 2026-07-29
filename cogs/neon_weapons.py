@@ -1450,6 +1450,25 @@ class WeaponDexView(discord.ui.View):
             ephemeral=True,
         )
 
+    @discord.ui.button(
+        label="Copy first command",
+        emoji="📋",
+        style=discord.ButtonStyle.primary,
+    )
+    async def copy_first_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        if not self.entries:
+            await interaction.response.send_message(
+                "There is no queued command to copy.", ephemeral=True
+            )
+            return
+        command = f"{DEX_COMMAND_PREFIXES[0]} {self.entries[0].weapon_id}"
+        await interaction.response.send_message(
+            f"Copy this command and send it in this channel:\n```text\n{command}\n```",
+            ephemeral=True,
+        )
+
     @discord.ui.button(label="Close", style=discord.ButtonStyle.secondary)
     async def close_button(
         self, interaction: discord.Interaction, button: discord.ui.Button
@@ -1474,6 +1493,29 @@ class ActiveDexStepView(discord.ui.View):
             )
             return False
         return True
+
+    @discord.ui.button(
+        label="Copy command",
+        emoji="📋",
+        style=discord.ButtonStyle.primary,
+    )
+    async def copy_button(
+        self, interaction: discord.Interaction, button: discord.ui.Button
+    ) -> None:
+        channel_id = int(getattr(interaction, "channel_id", 0) or 0)
+        session = self.cog.active_dex_sessions.get(
+            self.cog.dex_session_key(channel_id, self.runner_user_id)
+        )
+        command = self.cog.dex_command_for_session(session) if session is not None else None
+        if command is None:
+            await interaction.response.send_message(
+                "This dex command is no longer active.", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            f"Copy this command and send it in this channel:\n```text\n{command}\n```",
+            ephemeral=True,
+        )
 
     @discord.ui.button(label="Skip weapon", style=discord.ButtonStyle.secondary)
     async def skip_button(
@@ -1803,10 +1845,11 @@ class NeonWeapons(commands.Cog):
             title="🧾 Neon weapon dex helper",
             description=(
                 "To upload and clean up your weapon data for Neon:\n\n"
-                "1. Run `nw inv public`.\n"
-                "2. Run `ww`.\n"
-                f"3. Click Neon's reaction {calculate_emoji} on the `ww` message.\n"
-                "4. Click through your weapon pages.\n\n"
+                "**1.** Run `nw inv public`.\n"
+                "**2.** Run `ww`.\n"
+                f"**3.** Click Neon's reaction {calculate_emoji} on the `ww` message.\n"
+                "➡️ **4. Click through every weapon page.** The helper can only scan "
+                "the pages that Neon actually displays.\n\n"
                 "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible** or any scanned row without a green saved tick. "
                 "Then run `HWD`, `H dex`, or `H weapon dex` to get guided alternating `ww <weapon_id>` / `wuse <weapon_id>` commands.\n\n"
                 "Battle helpers can scan another member's Neon filtered pages; the queue is saved under the member shown in Neon's title. Helpers can run `HWD @member` to dex that member's queue, combine weapon filters such as `HWD dagger shield 100`, and any confirmed Neon blueprint removes the weapon from every matching owner's queue across all servers the helper can see."
@@ -1892,7 +1935,13 @@ class NeonWeapons(commands.Cog):
         embed = discord.Embed(
             title=f"🧾 Weapons needing Neon dex for {target_display_name}",
             description=(
-                "These are the next queued weapons. Click **Start dexing session** for short mobile-friendly prompts. The session alternates `ww` and `wuse`, supports long runs with `HWD 100` / `HWD all`, supports combined weapon filters like `HWD dagger shield 100`, and only moves forward after Neon confirms the weapon.\n\n"
+                "These are the next queued weapons.\n\n"
+                "• **Start dexing session** posts one command at a time.\n"
+                "• **Copy first command** opens the first command in a copy-ready code block.\n"
+                "• Send the exact command in this channel; the helper advances only "
+                "after OwO and Neon confirm that weapon.\n"
+                "• Sessions alternate `ww` and `wuse`, support `HWD 100` / `HWD all`, "
+                "and allow combined filters such as `HWD dagger shield 100`.\n\n"
                 + "\n".join(lines)
             ),
             color=0xFEE75C,

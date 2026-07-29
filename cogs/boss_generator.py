@@ -66,6 +66,7 @@ BOSS_TRIGGER_SUFFIXES = {"bossi"}
 # Lightweight public helper commands. Whitespace and capitalization are ignored.
 PREFIX_COOLDOWN_TRIGGERS = {"hbosscd", "hbosscooldown"}
 PREFIX_HELP_TRIGGERS = {"hhelp"}
+PREFIX_SETUP_TRIGGERS = {"hsetup", "hsetupguide"}
 BOSS_DECISION_HIT_TRIGGERS = {"hbosshit", "hsethit"}
 BOSS_DECISION_SKIP_TRIGGERS = {"hbossskip", "hskipboss", "hsetskip"}
 
@@ -147,6 +148,11 @@ def is_prefix_help_trigger(content: str) -> bool:
         "",
     )
     return re.match(r"^h\s*help\b", first_line, re.IGNORECASE) is not None
+
+
+def is_prefix_setup_trigger(content: str) -> bool:
+    """Accept `H setup` and `H setup guide`, case-insensitively."""
+    return compact_first_line(content) in PREFIX_SETUP_TRIGGERS
 
 
 def load_cooldown_config() -> dict[str, dict[str, Any]]:
@@ -1316,52 +1322,6 @@ class BossGenerator(commands.Cog):
     def role_mentions(role_ids: list[int]) -> str:
         return " ".join(f"<@&{role_id}>" for role_id in role_ids if role_id)
 
-    @staticmethod
-    def active_member_mentions_for_roles(
-        guild: discord.Guild,
-        role_ids: list[int],
-    ) -> list[str]:
-        """Mention unique non-bot members who are online or idle in any role."""
-        active_statuses = {discord.Status.online, discord.Status.idle}
-        member_ids: set[int] = set()
-        for role_id in role_ids:
-            role = guild.get_role(role_id)
-            if role is None:
-                continue
-            for member in role.members:
-                if (
-                    not member.bot
-                    and member.status in active_statuses
-                    and member.id not in member_ids
-                ):
-                    member_ids.add(member.id)
-        return [f"<@{member_id}>" for member_id in sorted(member_ids)]
-
-    @staticmethod
-    def chunk_mentions(
-        mentions: list[str],
-        max_mentions: int = 9,
-        limit: int = 1900,
-    ) -> list[str]:
-        chunks: list[str] = []
-        current: list[str] = []
-        current_length = 0
-        for mention in mentions:
-            added_length = len(mention) + (1 if current else 0)
-            if current and (
-                len(current) >= max_mentions
-                or current_length + added_length > limit
-            ):
-                chunks.append(" ".join(current))
-                current = []
-                current_length = 0
-                added_length = len(mention)
-            current.append(mention)
-            current_length += added_length
-        if current:
-            chunks.append(" ".join(current))
-        return chunks
-
     def member_can_set_boss_decision(
         self,
         member: discord.abc.User | discord.Member,
@@ -1832,6 +1792,132 @@ class BossGenerator(commands.Cog):
 
     # ── Cooldown channel setup + status check ─────────────────
 
+    def build_setup_guide_embed(self, guild: discord.Guild) -> discord.Embed:
+        """Build the server-owner setup checklist and show known boss settings."""
+        config = self.cooldown_config.get(str(guild.id), {})
+        cooldown_channel_id = int(config.get("channel_id") or 0)
+        report_channel_id = int(config.get("boss_report_channel_id") or 0)
+        decision_roles = self.decision_role_ids(guild.id)
+        fighter_roles = self.fighter_role_ids(guild.id)
+
+        cooldown_status = (
+            f"<#{cooldown_channel_id}>" if cooldown_channel_id else "**Not configured**"
+        )
+        report_status = (
+            f"<#{report_channel_id}>" if report_channel_id else "**Not configured**"
+        )
+        decision_status = (
+            self.role_mentions(decision_roles) if decision_roles else "**Manage Server only**"
+        )
+        fighter_status = (
+            self.role_mentions(fighter_roles) if fighter_roles else "**No fighter role configured**"
+        )
+
+        embed = discord.Embed(
+            title="🛠️ OwO Boss Helper — Server Setup",
+            description=(
+                "Follow this checklist in order. Slash-command setup actions require "
+                "**Manage Server**. Run `/channel-diagnostics` in any channel where "
+                "the helper cannot read or respond."
+            ),
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name="1️⃣ Boss alerts and daily reports",
+            value=(
+                f"Boss alert channel: {cooldown_status}\n"
+                f"Daily report channel: {report_status}\n\n"
+                "• `/boss-cooldown-channel` — new boss, defeat, escape, and cooldown alerts.\n"
+                "• `/boss-report-channel` — daily HIT/SKIP totals at Pacific midnight; "
+                "leave the channel empty to disable reports."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="2️⃣ Decision and fighter roles",
+            value=(
+                f"Decision controls: {decision_status}\n"
+                f"Fighter HIT alert: {fighter_status}\n\n"
+                "• `/boss-decision-role` — roles allowed to use `H boss hit`, "
+                "`H boss skip`, and sticky controls. Decision roles are not pinged.\n"
+                "• `/boss-fighter-role` — optional persistent role ping after **HIT**. "
+                "Make each fighter role mentionable, or grant the bot **Mention "
+                "@everyone, @here, and All Roles** in the boss-alert channel."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="3️⃣ Boss-ticket board",
+            value=(
+                "• `/boss-ticket-channel` — choose the persistent ticket-board channel.\n"
+                "• `/boss-ticket-manage` — remove/block tracked users and manage the "
+                "optional nickname-marker feature.\n"
+                "• `/boss-ticket-nickname` — personal nickname-marker control."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="4️⃣ Server OwO prefix",
+            value=(
+                "The default short prefix is `w`. If this server uses another prefix, "
+                "run `HT prefix o`, `HT prefix g`, or `H team prefix <prefix>`. "
+                "Run `HT prefix` to show the current value."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="5️⃣ Member guides",
+            value=(
+                "• `H help` — current command overview.\n"
+                "• `HT help` — saved-team setup and restore guide.\n"
+                "• `HW` / `H weapons` — Neon weapon scanning setup.\n"
+                "• `HWD` — preview the dex queue and open copy-ready guided commands."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="Required access",
+            value=(
+                "**Discord permissions:** View Channels, Send Messages, Embed Links, "
+                "Read Message History, and Add Reactions.\n"
+                "**Privileged intent:** Message Content. Server Members and Presence "
+                "are not requested or required."
+            ),
+            inline=False,
+        )
+        embed.set_footer(text="Setup guide: /setup-guide or H setup")
+        return embed
+
+    @app_commands.command(
+        name="setup-guide",
+        description="Show the server-owner checklist for configuring OwO Boss Helper.",
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def setup_guide(self, interaction: discord.Interaction) -> None:
+        guild = interaction.guild
+        if guild is None:
+            await interaction.response.send_message(
+                "❌ This command only works inside a server.", ephemeral=True
+            )
+            return
+        await interaction.response.send_message(
+            embed=self.build_setup_guide_embed(guild),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    async def send_prefix_setup_guide(self, message: discord.Message) -> None:
+        guild = message.guild
+        if guild is None:
+            return
+        await safe_reply(
+            message,
+            embed=self.build_setup_guide_embed(guild),
+            mention_author=False,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
     @app_commands.command(
         name="boss-cooldown-channel",
         description="Choose where automatic guild-boss cooldown alerts are sent.",
@@ -2080,15 +2166,26 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="🧾 Neon weapon dex",
             value=(
-                "Use `HW` or `H weapons` for Pencilvester's Neon setup guide, including clicking Neon’s reaction on the `ww` message. "
+                "➡️ Start with `HW` or `H weapons` for Pencilvester's Neon setup guide, including clicking Neon’s reaction on the `ww` message and opening every weapon page. "
                 "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` to show queued "
                 "alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon pages. Helpers can target another member with "
-                "`HWD @member` or `HWD @member dagger mtap sg`. Click **Start dexing session** "
+                "`HWD @member` or `HWD @member dagger mtap sg`. Use **Copy first command** "
+                "for a copy-ready code block or click **Start dexing session** "
                 "for mobile-friendly one-command prompts labelled with the weapon owner's name. "
                 "The helper advances only after Neon confirms the shown weapon, then waits about two seconds, "
                 "removes the old prompt, and posts the next one. Any confirmed Neon blueprint marks that weapon "
                 "dexed for every matching owner queue. Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Use `H stop`, `Hstop`, or `HS` to pause. "
                 "`HW stats` / `H weapon stats` shows scanned, queued, saved, and no-action counts. Rows without a green tick are queued too, including orb/empowered rows that Neon does not mark with M."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🛠️ Server-owner setup",
+            value=(
+                "Use `/setup-guide` for a private configuration checklist, or `H setup` "
+                "to post it in the channel. It covers alert/report channels, ticket "
+                "boards, decision roles, optional fighter pings, permissions, and the "
+                "server OwO prefix."
             ),
             inline=False,
         )
@@ -2727,6 +2824,10 @@ class BossGenerator(commands.Cog):
                         await self.send_prefix_help(message)
                         return
 
+                    if is_prefix_setup_trigger(message.content):
+                        await self.send_prefix_setup_guide(message)
+                        return
+
                     if is_prefix_cooldown_trigger(message.content):
                         await self.send_prefix_cooldown_status(message)
                         return
@@ -3339,14 +3440,6 @@ class BossGenerator(commands.Cog):
             return
 
         owo_prefix = await get_guild_owo_prefix(guild_id)
-        decision_role_ids = self.decision_role_ids(guild_id)
-        guild = self.bot.get_guild(guild_id)
-        active_mentions = (
-            self.active_member_mentions_for_roles(guild, decision_role_ids)
-            if guild is not None
-            else []
-        )
-        mention_lines = self.chunk_mentions(active_mentions)
         appeared = self.ui_emoji("boss_appeared", "⚔️")
 
         description = (
@@ -3371,15 +3464,6 @@ class BossGenerator(commands.Cog):
                     color=0x5865F2,
                 ),
             )
-            for mention_line in mention_lines:
-                await channel.send(
-                    content=mention_line,
-                    allowed_mentions=discord.AllowedMentions(
-                        roles=False,
-                        users=True,
-                        everyone=False,
-                    ),
-                )
             logger.info("Announced new guild boss in guild %s", guild_id)
         except (discord.Forbidden, discord.HTTPException) as exc:
             logger.warning("Could not send new-boss alert: %s", exc)
