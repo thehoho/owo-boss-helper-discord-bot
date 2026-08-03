@@ -22,6 +22,14 @@ from typing import Any, Iterable
 import discord
 from discord.ext import commands
 
+from .helper_prefix import (
+    HELPER_PREFIX_DEFAULT,
+    get_guild_helper_prefix,
+    helper_alias,
+    helper_aliases,
+    helper_command,
+)
+
 logger = logging.getLogger(__name__)
 
 OWO_BOT_ID = 408785106942164992
@@ -141,7 +149,10 @@ ANIMAL_RANK_EMOJI_PREFIXES = frozenset(
 )
 
 
-def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
+def parse_team_helper_command(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> tuple[str, str | None] | None:
     """Parse long and compact team-helper commands.
 
     Supported examples:
@@ -172,10 +183,18 @@ def parse_team_helper_command(content: str) -> tuple[str, str | None] | None:
 
     # Fast guided-step shortcuts are intentionally separate from HTS because
     # HTS already means "save" in the compact team command family.
-    if compact in {"hs", "hskip", "hescape"}:
+    fast_skip_aliases = {
+        re.sub(r"\s+", "", alias)
+        for alias in helper_aliases(helper_prefix, {"hs", "hskip", "hescape"})
+    }
+    if compact in fast_skip_aliases:
         return "skip", None
 
-    prefix = next((item for item in TEAM_COMMAND_PREFIXES if lowered.startswith(item)), None)
+    command_prefixes = helper_aliases(helper_prefix, TEAM_COMMAND_PREFIXES)
+    prefix = next(
+        (item for item in command_prefixes if lowered.startswith(item)),
+        None,
+    )
     if prefix is None:
         return None
 
@@ -267,6 +286,7 @@ class GuidedTeamSession:
     mode: str
     commands: tuple[str, ...]
     owo_prefix: str = OWO_PREFIX_DEFAULT
+    helper_prefix: str = HELPER_PREFIX_DEFAULT
     next_index: int = 0
     ready_for_user: bool = False
     waiting_for_owo: bool = False
@@ -551,6 +571,7 @@ def format_command_packet(
     note: str,
     *,
     owo_prefix: str = OWO_PREFIX_DEFAULT,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
 ) -> str:
     command_list = list(commands)
     lines = [f"**{title}**", ""]
@@ -563,8 +584,10 @@ def format_command_packet(
             "Animal additions and weapon equips alternate to avoid unnecessary same-action cooldowns.",
             "Saved weapons are equipped to the animal name, not the team position, so position changes are safer.",
             note,
-            "Use `HS` / `H skip` or the **Skip step** button when a saved animal or "
-            "weapon is already correct. Use `HT cancel` to stop.",
+            f"Use `{helper_alias(helper_prefix, 'hs')}` / "
+            f"`{helper_command(helper_prefix, 'skip')}` or the **Skip step** button "
+            "when a saved animal or weapon is already correct. "
+            f"Use `{helper_alias(helper_prefix, 'ht')} cancel` to stop.",
             "The full packet stays here as a backup. At the end, the helper sends "
             f"`{owo_team_command(owo_prefix)}` so you can verify all three animals and weapon IDs before battling.",
         )
@@ -736,11 +759,21 @@ class TeamTemplateStore:
                 CREATE TABLE IF NOT EXISTS team_guild_config (
                     guild_id INTEGER PRIMARY KEY,
                     owo_prefix TEXT NOT NULL DEFAULT 'w',
+                    helper_prefix TEXT NOT NULL DEFAULT 'h',
                     updated_by INTEGER NOT NULL DEFAULT 0,
                     updated_at INTEGER NOT NULL DEFAULT 0
                 )
                 """
             )
+            config_columns = {
+                str(row[1])
+                for row in connection.execute("PRAGMA table_info(team_guild_config)")
+            }
+            if "helper_prefix" not in config_columns:
+                connection.execute(
+                    "ALTER TABLE team_guild_config "
+                    "ADD COLUMN helper_prefix TEXT NOT NULL DEFAULT 'h'"
+                )
 
             columns = {
                 str(row["name"])
@@ -889,7 +922,7 @@ class TeamTemplateStore:
                 if not available_slots:
                     return None, (
                         f"You already have {MAX_TEMPLATES_PER_USER} templates. "
-                        "Delete one with `HT D <number or name>` before saving another."
+                        "Delete one from the saved-team menu before saving another."
                     )
                 slot = available_slots[0]
                 cursor = connection.execute(
@@ -1334,7 +1367,7 @@ class OwnedView(discord.ui.View):
         if interaction.user.id == self.owner_id:
             return True
         await interaction.response.send_message(
-            "These team templates belong to another user. Send `HT` to open yours.",
+            "These team templates belong to another user. Open your own saved-team list.",
             ephemeral=True,
         )
         return False
@@ -1412,6 +1445,7 @@ class MissingWeaponConfirmView(OwnedView):
     async def save_anyway(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
+        helper_prefix = await get_guild_helper_prefix(interaction.guild_id)
         if self.action == "update" and self.existing is not None:
             updated = await self.cog.store.update_existing(
                 interaction.user.id,
@@ -1439,7 +1473,7 @@ class MissingWeaponConfirmView(OwnedView):
                     view=None,
                 )
                 return
-            embed = self.cog.build_saved_embed(template)
+            embed = self.cog.build_saved_embed(template, helper_prefix)
 
         await interaction.response.edit_message(content=None, embed=embed, view=None)
 
@@ -1470,6 +1504,7 @@ class TemplateActionView(OwnedView):
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
         owo_prefix = await self.cog.store.get_guild_owo_prefix(interaction.guild_id or 0)
+        helper_prefix = await get_guild_helper_prefix(interaction.guild_id)
         commands = quick_replace_commands(self.template, owo_prefix)
         packet = format_command_packet(
             f"Quick replace — #{self.template.slot} {self.template.name}",
@@ -1478,6 +1513,7 @@ class TemplateActionView(OwnedView):
             "different slot, OwO may reject the add step; the helper will catch that "
             "brief error and tell you how to move it. Unmentioned positions remain unchanged.",
             owo_prefix=owo_prefix,
+            helper_prefix=helper_prefix,
         )
         await interaction.response.send_message(packet, ephemeral=True)
         await self.cog.start_guided_session(
@@ -1489,6 +1525,7 @@ class TemplateActionView(OwnedView):
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
         owo_prefix = await self.cog.store.get_guild_owo_prefix(interaction.guild_id or 0)
+        helper_prefix = await get_guild_helper_prefix(interaction.guild_id)
         commands = exact_reset_commands(self.template, owo_prefix)
         packet = format_command_packet(
             f"Exact reset — #{self.template.slot} {self.template.name}",
@@ -1496,6 +1533,7 @@ class TemplateActionView(OwnedView):
             "This clears all three positions first, then restores each animal and its "
             "weapon as an alternating pair.",
             owo_prefix=owo_prefix,
+            helper_prefix=helper_prefix,
         )
         await interaction.response.send_message(packet, ephemeral=True)
         await self.cog.start_guided_session(
@@ -1861,7 +1899,7 @@ class TemplateSelect(discord.ui.Select):
         )
         if template is None:
             await interaction.response.send_message(
-                "That template no longer exists. Run `HT` again.", ephemeral=True
+                "That template no longer exists. Open your saved-team list again.", ephemeral=True
             )
             return
 
@@ -1970,31 +2008,16 @@ class TeamTemplates(commands.Cog):
         self.reaction_instruction_cooldowns: dict[tuple[int, int], float] = {}
         self.guided_sessions: dict[tuple[int, int, int], GuidedTeamSession] = {}
         self.guided_timeout_tasks: dict[tuple[int, int, int], asyncio.Task[None]] = {}
-        self._original_boss_help: Any = None
 
     async def cog_load(self) -> None:
         await self.store.initialize()
-        self._patch_main_help()
         logger.info("Team template storage ready at %s", DATABASE_FILE)
 
     async def cog_unload(self) -> None:
-        boss_cog = self.bot.get_cog("BossGenerator")
-        if boss_cog is not None and self._original_boss_help is not None:
-            boss_cog.send_prefix_help = self._original_boss_help
         for task in self.guided_timeout_tasks.values():
             task.cancel()
         self.guided_timeout_tasks.clear()
         self.guided_sessions.clear()
-
-    def _patch_main_help(self) -> None:
-        """Extend the existing H help command without coupling the two cog files."""
-        boss_cog = self.bot.get_cog("BossGenerator")
-        if boss_cog is None or not hasattr(boss_cog, "send_prefix_help"):
-            logger.warning("BossGenerator was not loaded before TeamTemplates")
-            return
-        self._original_boss_help = boss_cog.send_prefix_help
-        boss_cog.send_prefix_help = self.send_combined_help
-
 
     @staticmethod
     def guided_key(guild_id: int, channel_id: int, user_id: int) -> tuple[int, int, int]:
@@ -2069,6 +2092,7 @@ class TeamTemplates(commands.Cog):
                 reverse=True,
             )
         )
+        helper_prefix = await get_guild_helper_prefix(interaction.guild_id)
         session = GuidedTeamSession(
             user_id=interaction.user.id,
             guild_id=interaction.guild_id,
@@ -2080,6 +2104,7 @@ class TeamTemplates(commands.Cog):
             mode=mode,
             commands=tuple(commands_to_run),
             owo_prefix=owo_prefix,
+            helper_prefix=helper_prefix,
             last_activity=time.monotonic(),
         )
         self.guided_sessions[key] = session
@@ -2120,8 +2145,10 @@ class TeamTemplates(commands.Cog):
                 f"`{expected}`",
                 "Send this exact command. The next step appears immediately after "
                 "OwO confirms it.",
-                "Use `HS` / `H skip` / `H escape` or **Skip step** when this step is already "
-                "correct. Use `HT cancel` to stop.",
+                f"Use `{helper_alias(session.helper_prefix, 'hs')}` / "
+                f"`{helper_command(session.helper_prefix, 'skip')}` or **Skip step** "
+                "when this step is already correct. "
+                f"Use `{helper_alias(session.helper_prefix, 'ht')} cancel` to stop.",
             )
         )
         sent = await channel.send(
@@ -2373,7 +2400,8 @@ class TeamTemplates(commands.Cog):
                 notice = (
                     "⚠️ This animal is already in your team. If it is in the wrong "
                     "position, run the matching remove command for that animal and retry this step; if it is already "
-                    "correct, press **Skip step** or type `HS` / `H escape`."
+                    f"correct, press **Skip step** or type "
+                    f"`{helper_alias(session.helper_prefix, 'hs')}`."
                 )
             else:
                 animal, target_position = target
@@ -2381,7 +2409,8 @@ class TeamTemplates(commands.Cog):
                 notice = (
                     f"⚠️ `{animal}` is already in your team. If it is in the wrong "
                     f"position, run `wtm d {animal}` then resend `{retry_command}`; if "
-                    "it is already correct, press **Skip step** or type `HS` / `H escape`."
+                    f"it is already correct, press **Skip step** or type "
+                    f"`{helper_alias(session.helper_prefix, 'hs')}`."
                 )
             logger.info(
                 "Guided add conflict for user %s at step %s",
@@ -2394,13 +2423,15 @@ class TeamTemplates(commands.Cog):
             remove_command = f"`{owo_team_command(session.owo_prefix, 'd', position)}`" if position else f"`{owo_team_command(session.owo_prefix, 'd', '<position>')}`"
             notice = (
                 "⚠️ The target team position is occupied. Remove the current animal "
-                f"with {remove_command}, then retry this step. Use `HS` only when the "
+                f"with {remove_command}, then retry this step. Use "
+                f"`{helper_alias(session.helper_prefix, 'hs')}` only when the "
                 "saved animal is already correct."
             )
         else:
             notice = (
                 "⏳ OwO did not confirm that step, usually because of a temporary "
-                "cooldown. Retry the same command when OwO is ready, or use `HS` to skip it."
+                "cooldown. Retry the same command when OwO is ready, or use "
+                f"`{helper_alias(session.helper_prefix, 'hs')}` to skip it."
             )
             logger.info(
                 "OwO did not confirm guided team step for user %s; retrying step %s",
@@ -2436,7 +2467,8 @@ class TeamTemplates(commands.Cog):
         if session.waiting_for_owo:
             await message.reply(
                 "OwO is still responding to the command you sent. Wait for that "
-                "response before using `HS` / `H skip` / `H escape`.",
+                f"response before using `{helper_alias(session.helper_prefix, 'hs')}` "
+                f"or `{helper_command(session.helper_prefix, 'skip')}`.",
                 mention_author=False,
             )
             return
@@ -2512,12 +2544,15 @@ class TeamTemplates(commands.Cog):
         if message.guild is None:
             return
         current = await self.store.get_guild_owo_prefix(message.guild.id)
+        helper_prefix = await get_guild_helper_prefix(message.guild.id)
+        team_short = helper_alias(helper_prefix, "ht")
         value = re.sub(r"\s+", "", argument or "").strip()
         if not value:
             await message.reply(
                 f"This server's OwO prefix for helper-generated OwO commands is currently `{current}`. "
                 f"Generated commands use `{owo_team_command(current)}` and `{current}w <weapon_id> <animal>`. "
-                "Server managers can change it with `HT prefix <prefix>`, for example `HT prefix o`.",
+                f"Server managers can change it with `{team_short} prefix <prefix>`, "
+                f"for example `{team_short} prefix o`.",
                 mention_author=False,
             )
             return
@@ -2531,7 +2566,8 @@ class TeamTemplates(commands.Cog):
         if prefix is None:
             await message.reply(
                 f"Use a short no-space prefix, up to **{MAX_OWO_PREFIX_LENGTH}** characters. "
-                "Examples: `HT prefix w`, `HT prefix o`, or `HT prefix g`.",
+                f"Examples: `{team_short} prefix w`, `{team_short} prefix o`, "
+                f"or `{team_short} prefix g`.",
                 mention_author=False,
             )
             return
@@ -2542,101 +2578,12 @@ class TeamTemplates(commands.Cog):
             mention_author=False,
         )
 
-    async def send_combined_help(self, message: discord.Message) -> None:
-        if message.guild is None:
-            return
-        embed = discord.Embed(
-            title="🐾 OwO Boss Helper",
-            description=(
-                "`H` stands for **Helper** — and it is also the first letter of "
-                "Hassaan's name. This guide lists only the commands currently supported."
-            ),
-            color=0x5865F2,
-        )
-        embed.add_field(
-            name="⚔️ Boss command generator",
-            value=(
-                "Send `owo boss i` or `w boss i`, then open pages `1/3`, `2/3`, "
-                "and `3/3`. The helper reads their HP and sends the ordered Neon command."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="⏱️ Guild-boss status",
-            value=(
-                "Use `H boss cd` or `H boss cooldown`. Server managers configure "
-                "automatic alerts with `/boss-cooldown-channel`; `/boss-cooldown` "
-                "shows the same status privately."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="🎟️ Boss tickets",
-            value=(
-                "Update your count with `owo boss t` or `w boss t`. View the list "
-                "with `H boss t`, `H boss list`, `HBL`, or `/boss-ticket-list`. "
-                "Managers use `/boss-ticket-channel` and can open the visual user "
-                "panel with `H boss settings`, `HBS`, or `/boss-ticket-manage`."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="💾 Team templates",
-            value=(
-                f"Save up to **{MAX_TEMPLATES_PER_USER}** teams. Reply to an OwO team "
-                "page with `HT C <name>`. Use `HT`, `HT<number>`, `HT U <slot/name>`, "
-                "or `HT D <slot/name>`. Server managers can set the OwO prefix used by team restores, boss inventory, and boss-ticket tracking with "
-                "`HT prefix o` when the server uses `o boss i` / `otm` instead of `w boss i` / `wtm`. During guided setup use `HS` to skip and "
-                "`HT cancel` to stop. Use `HT help` for the complete team guide. Use **All commands** on a saved team for a clean paste-ready command list."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="🧾 Neon weapon dex",
-            value=(
-                "➡️ Start with `HW` or `H weapons` for Pencilvester's Neon setup guide, "
-                "then open every weapon page so the complete queue is scanned. "
-                "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` "
-                "to show queued alternating `ww` / `wuse` commands. Helpers can target another "
-                "member with `HWD @member`, `HWD @member dagger shield 100`, or `HWD @member dagger mtap sg`. Use "
-                "**Copy first command** for a copy-ready code block or click "
-                "**Start dexing session** for mobile-friendly one-command prompts labelled "
-                "with the weapon owner's name. The helper advances only after Neon confirms "
-                "the shown weapon, waits about two seconds, removes the old prompt, "
-                "and posts the next one. Any confirmed Neon blueprint marks that weapon "
-                "dexed for every matching owner queue. Rows without a green tick are "
-                "queued too, including orb/empowered rows that Neon does not mark with M. "
-                "Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Multiple weapon types can be combined in one run, such as `HWD dagger shield 100`. Use `H stop`, `Hstop`, or `HS` to pause."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="🛠️ Server-owner setup",
-            value=(
-                "Use `/setup-guide` for a private configuration checklist, or `H setup` "
-                "to post it in the channel. It covers alert/report channels, ticket "
-                "boards, decision roles, optional fighter pings, permissions, and the "
-                "server OwO prefix."
-            ),
-            inline=False,
-        )
-        embed.add_field(
-            name="ℹ️ Project information",
-            value=(
-                "Use `H about` or `/about`. The developer-only operational commands "
-                "are `/bot-stats` and `/bot-servers`."
-            ),
-            inline=False,
-        )
-        embed.set_footer(text="Use H help anytime to show this current command guide.")
-        await message.reply(embed=embed, mention_author=False)
-        logger.info(
-            "Combined helper help requested by %s in guild %s",
-            message.author,
-            message.guild.id,
-        )
-
     async def send_team_help(self, message: discord.Message) -> None:
+        helper_prefix = await get_guild_helper_prefix(
+            message.guild.id if message.guild else None
+        )
+        team_short = helper_alias(helper_prefix, "ht")
+        team_menu = helper_alias(helper_prefix, "htm")
         embed = discord.Embed(
             title="💾 OwO Team Templates",
             description=(
@@ -2651,7 +2598,8 @@ class TeamTemplates(commands.Cog):
             name="Save a team",
             value=(
                 "Run `wtm` or `owo team`, open the correct page, and reply to it with "
-                "`HT C <name>`. Full form: `H team create <name>`. The helper reads "
+                f"`{team_short} C <name>`. Full form: "
+                f"`{helper_command(helper_prefix, 'team create <name>')}`. The helper reads "
                 "the animal emoji alias, so custom pet nicknames do not break restores."
             ),
             inline=False,
@@ -2659,7 +2607,8 @@ class TeamTemplates(commands.Cog):
         embed.add_field(
             name="Open teams",
             value=(
-                "`HT` or `HTM` opens the dropdown. `HT3` or `HTM3` opens team #3 "
+                f"`{team_short}` or `{team_menu}` opens the dropdown. "
+                f"`{team_short}3` or `{team_menu}3` opens team #3 "
                 "directly without the extra selection step."
             ),
             inline=False,
@@ -2667,10 +2616,11 @@ class TeamTemplates(commands.Cog):
         embed.add_field(
             name="Update, delete, skip, and cancel",
             value=(
-                "Reply to a fresh OwO team page with `HT U <number or name>` / `HTU 3` "
-                "to update an existing template. Use `HT D 3` / `HTD 3` to delete by "
-                "number, or `HT D <name>` to delete by name. During guided setup, use "
-                "`HS` / `H skip` / `H escape` to skip the current step, or `HT cancel` to stop."
+                f"Reply to a fresh OwO team page with `{team_short} U <number or name>` "
+                f"to update it. Use `{team_short} D <number or name>` to delete it. "
+                f"During guided setup, use `{helper_alias(helper_prefix, 'hs')}` / "
+                f"`{helper_command(helper_prefix, 'skip')}` to skip the current step, "
+                f"or `{team_short} cancel` to stop."
             ),
             inline=False,
         )
@@ -2678,8 +2628,9 @@ class TeamTemplates(commands.Cog):
             name="Server OwO prefix",
             value=(
                 "Default generated commands use `wtm` and `ww`. If your server uses "
-                "another OwO prefix, a manager can run `HT prefix o`, `HT prefix g`, "
-                "or `H team prefix <prefix>`. Use `HT prefix` to check the current setting."
+                f"another OwO prefix, a manager can run `{team_short} prefix o` or "
+                f"`{helper_command(helper_prefix, 'team prefix <prefix>')}`. "
+                f"Use `{team_short} prefix` to check the current setting."
             ),
             inline=False,
         )
@@ -2689,7 +2640,9 @@ class TeamTemplates(commands.Cog):
                 "Choose **Quick replace** or **Exact reset**. The helper shows the full "
                 "packet, then posts one command at a time. Animal adds and weapon equips "
                 "alternate, and weapon equips use the animal name instead of the team position. "
-                "Use **All commands** to post a public, clean command list in one message. Discord does not allow true drag-and-drop inside bot messages, so ordering uses buttons, `HT move`, and `HT swap`."
+                "Use **All commands** to post a public, clean command list in one message. "
+                "Discord does not allow true drag-and-drop inside bot messages, so "
+                f"ordering uses buttons, `{team_short} move`, and `{team_short} swap`."
             ),
             inline=False,
         )
@@ -2747,12 +2700,17 @@ class TeamTemplates(commands.Cog):
         return parsed
 
     @staticmethod
-    def build_saved_embed(template: TeamTemplate) -> discord.Embed:
+    def build_saved_embed(
+        template: TeamTemplate,
+        helper_prefix: str = HELPER_PREFIX_DEFAULT,
+    ) -> discord.Embed:
+        team_short = helper_alias(helper_prefix, "ht")
         return discord.Embed(
             title=f"✅ Team #{template.slot} saved: {template.name}",
             description=(
                 f"{format_team_members(template.members)}\n\n"
-                f"Use `HT{template.slot}` or `HT {template.name}` to open it directly, or `HT` to open the full list."
+                f"Use `{team_short}{template.slot}` or `{team_short} {template.name}` "
+                f"to open it directly, or `{team_short}` to open the full list."
             ),
             color=0x57F287,
         )
@@ -2799,7 +2757,13 @@ class TeamTemplates(commands.Cog):
         if error or template is None:
             await message.reply(f"⚠️ {error or 'The team could not be saved.'}", mention_author=False)
             return
-        await message.reply(embed=self.build_saved_embed(template), mention_author=False)
+        helper_prefix = await get_guild_helper_prefix(
+            message.guild.id if message.guild else None
+        )
+        await message.reply(
+            embed=self.build_saved_embed(template, helper_prefix),
+            mention_author=False,
+        )
         logger.info(
             "Saved team template %s for user %s with %s member(s)",
             template.template_id,
@@ -2810,7 +2774,14 @@ class TeamTemplates(commands.Cog):
     async def save_from_reply(self, message: discord.Message, requested_name: str) -> None:
         name = re.sub(r"\s+", " ", requested_name).strip()
         if not name:
-            await message.reply("Use `HT C <name>` or `H team create <name>`.", mention_author=False)
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
+            await message.reply(
+                f"Use `{helper_alias(helper_prefix, 'ht')} C <name>` or "
+                f"`{helper_command(helper_prefix, 'team create <name>')}`.",
+                mention_author=False,
+            )
             return
         if len(name) > MAX_TEMPLATE_NAME_LENGTH:
             await message.reply(
@@ -2828,8 +2799,13 @@ class TeamTemplates(commands.Cog):
     ) -> None:
         value = re.sub(r"\s+", " ", selector or "").strip()
         if not value:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
+            team_short = helper_alias(helper_prefix, "ht")
             await message.reply(
-                "Use `HT U <number or name>`, for example `HTU 3` or `HT U boss team`.",
+                f"Use `{team_short} U <number or name>`, for example "
+                f"`{team_short}U 3` or `{team_short} U boss team`.",
                 mention_author=False,
             )
             return
@@ -2899,7 +2875,9 @@ class TeamTemplates(commands.Cog):
             ),
             color=0xFEE75C,
         )
-        embed.set_footer(text="Discord does not support real drag-and-drop in bot messages, so order changes use buttons or HT move / HT swap.")
+        embed.set_footer(
+            text="Discord does not support real drag-and-drop in bot messages; use the buttons or saved-team move/swap commands."
+        )
         return embed
 
     def build_order_embed(
@@ -2916,12 +2894,12 @@ class TeamTemplates(commands.Cog):
             marker = "✅" if selected and selected.template_id == template.template_id else "•"
             lines.append(f"{marker} `#{template.slot}` **{discord.utils.escape_markdown(template.name)}**")
         if len(templates) > 25:
-            lines.append(f"…and {len(templates) - 25} more. Use `HT move <team> <slot>` for teams past the first page.")
+            lines.append(f"…and {len(templates) - 25} more saved teams.")
         embed = discord.Embed(
             title="↕️ Edit saved-team order",
             description=(
                 "Choose a team, then use **Move up** or **Move down**. "
-                "For exact control, use `HT move <slot/name> <new position>` or `HT swap <team A> with <team B>`.\n\n"
+                "The saved-team move and swap commands provide exact control.\n\n"
                 + ("\n".join(lines) if lines else "No saved teams yet.")
             ),
             color=0x5865F2,
@@ -2967,8 +2945,11 @@ class TeamTemplates(commands.Cog):
     ) -> TeamTemplate | None:
         value = re.sub(r"\s+", " ", selector or "").strip()
         if not value:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
             await message.reply(
-                f"Use `HT {action_name} <number or name>`.",
+                f"Use `{helper_alias(helper_prefix, 'ht')} {action_name} <number or name>`.",
                 mention_author=False,
             )
             return None
@@ -3002,7 +2983,7 @@ class TeamTemplates(commands.Cog):
         await message.reply(
             content=(
                 f"I found **{len(matches)}** saved teams matching **{value}**. "
-                f"Choose the exact one, then run `HT {action_name} <number>`."
+                "Choose the exact one from the list below."
             ),
             embed=self.build_template_list_embed(matches, 0),
             view=TemplateListView(self, message.author.id, matches, page=0),
@@ -3034,8 +3015,13 @@ class TeamTemplates(commands.Cog):
     async def rename_template_command(self, message: discord.Message, argument: str | None) -> None:
         value = re.sub(r"\s+", " ", argument or "").strip()
         if not value:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
+            team_short = helper_alias(helper_prefix, "ht")
             await message.reply(
-                "Use `HT rename <number> <new name>` or `HT rename <old name> to <new name>`.",
+                f"Use `{team_short} rename <number> <new name>` or "
+                f"`{team_short} rename <old name> to <new name>`.",
                 mention_author=False,
             )
             return
@@ -3050,8 +3036,13 @@ class TeamTemplates(commands.Cog):
             if len(split) == 2:
                 selector, new_name = split[0].strip(), split[1].strip()
         if not selector or not new_name:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
+            team_short = helper_alias(helper_prefix, "ht")
             await message.reply(
-                "For named teams, use `HT rename <old name> to <new name>`. For slots, use `HT rename 3 new name`.",
+                f"For named teams, use `{team_short} rename <old name> to <new name>`. "
+                f"For slots, use `{team_short} rename 3 new name`.",
                 mention_author=False,
             )
             return
@@ -3071,8 +3062,13 @@ class TeamTemplates(commands.Cog):
         value = re.sub(r"\s+", " ", argument or "").strip()
         match = re.match(r"^(.+?)\s+(\d{1,3})$", value)
         if not match:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
+            team_short = helper_alias(helper_prefix, "ht")
             await message.reply(
-                "Use `HT move <number or name> <new position>`, for example `HT move 8 1`.",
+                f"Use `{team_short} move <number or name> <new position>`, for example "
+                f"`{team_short} move 8 1`.",
                 mention_author=False,
             )
             return
@@ -3098,8 +3094,13 @@ class TeamTemplates(commands.Cog):
         value = re.sub(r"\s+", " ", argument or "").strip()
         parts = re.split(r"\s+(?:with|and)\s+|,\s*", value, maxsplit=1, flags=re.IGNORECASE)
         if len(parts) != 2 or not parts[0].strip() or not parts[1].strip():
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
+            team_short = helper_alias(helper_prefix, "ht")
             await message.reply(
-                "Use `HT swap <team A> with <team B>`, for example `HT swap 1 with 5`.",
+                f"Use `{team_short} swap <team A> with <team B>`, for example "
+                f"`{team_short} swap 1 with 5`.",
                 mention_author=False,
             )
             return
@@ -3168,8 +3169,7 @@ class TeamTemplates(commands.Cog):
             description=(
                 f"You have **{len(templates)}/{MAX_TEMPLATES_PER_USER}** templates.\n\n"
                 f"{numbered}\n\nChoose one below, use the arrows to change pages, "
-                "open a known slot directly with `HT<number>` such as `HT73`, "
-                "or use **Edit order** / `HT order` to reorder saved teams."
+                "or use **Edit order** to reorder saved teams."
             ),
             color=0x5865F2,
         )
@@ -3177,9 +3177,12 @@ class TeamTemplates(commands.Cog):
     async def show_templates(self, message: discord.Message) -> None:
         templates = await self.store.list_for_user(message.author.id)
         if not templates:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
             await message.reply(
                 "You do not have any saved teams yet. Reply to an OwO `wtm` / "
-                "`owo team` message with `HT C <name>`.",
+                f"`owo team` message with `{helper_alias(helper_prefix, 'ht')} C <name>`.",
                 mention_author=False,
             )
             return
@@ -3200,8 +3203,12 @@ class TeamTemplates(commands.Cog):
             return
         template = await self.store.get_by_slot(message.author.id, slot)
         if template is None:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
             await message.reply(
-                f"You do not have a saved team in slot **#{slot}**. Use `HT` to see "
+                f"You do not have a saved team in slot **#{slot}**. Use "
+                f"`{helper_alias(helper_prefix, 'ht')}` to see "
                 "your current list.",
                 mention_author=False,
             )
@@ -3216,8 +3223,12 @@ class TeamTemplates(commands.Cog):
         templates = await self.store.list_for_user(message.author.id)
         matches = [template for template in templates if template_matches_query(template, value)]
         if not matches:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
             await message.reply(
-                f"I could not find a saved team matching **{value}**. Use `HT` to open your full list.",
+                f"I could not find a saved team matching **{value}**. Use "
+                f"`{helper_alias(helper_prefix, 'ht')}` to open your full list.",
                 mention_author=False,
             )
             return
@@ -3237,7 +3248,7 @@ class TeamTemplates(commands.Cog):
         await message.reply(
             content=(
                 f"I found **{len(matches)}** saved teams matching **{value}**. "
-                "Choose one below, or open it directly with `HT<number>`."
+                "Choose one below."
             ),
             embed=self.build_template_list_embed(matches, 0),
             view=TemplateListView(self, message.author.id, matches, page=0),
@@ -3248,9 +3259,13 @@ class TeamTemplates(commands.Cog):
     async def delete_template(self, message: discord.Message, selector: str | None) -> None:
         value = re.sub(r"\s+", " ", selector or "").strip()
         if not value:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
+            team_short = helper_alias(helper_prefix, "ht")
             await message.reply(
-                "Use `HT D <number or name>`, for example `HTD 3` or "
-                "`HT D boss team`.",
+                f"Use `{team_short} D <number or name>`, for example "
+                f"`{team_short}D 3` or `{team_short} D boss team`.",
                 mention_author=False,
             )
             return
@@ -3299,7 +3314,8 @@ class TeamTemplates(commands.Cog):
             if await self.handle_guided_user_command(message):
                 return
 
-            parsed = parse_team_helper_command(message.content or "")
+            helper_prefix = await get_guild_helper_prefix(message.guild.id)
+            parsed = parse_team_helper_command(message.content or "", helper_prefix)
             if parsed is None:
                 return
             action, argument = parsed
@@ -3385,11 +3401,14 @@ class TeamTemplates(commands.Cog):
 
         user = self.bot.get_user(payload.user_id)
         mention = user.mention if user else f"<@{payload.user_id}>"
+        helper_prefix = await get_guild_helper_prefix(payload.guild_id)
+        team_short = helper_alias(helper_prefix, "ht")
         try:
             await channel.send(
-                f"{mention} Reply to this OwO team message with `HT C <name>` "
-                "(or `H team create <name>`) to save its animals and exact weapon IDs. "
-                "Use `HT help` for the full guide.",
+                f"{mention} Reply to this OwO team message with "
+                f"`{team_short} C <name>` (or "
+                f"`{helper_command(helper_prefix, 'team create <name>')}`) to save its "
+                f"animals and exact weapon IDs. Use `{team_short} help` for the full guide.",
                 reference=discord.MessageReference(
                     message_id=payload.message_id,
                     channel_id=payload.channel_id,

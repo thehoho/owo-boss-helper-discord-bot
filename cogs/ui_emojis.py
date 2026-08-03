@@ -22,7 +22,9 @@ logger = logging.getLogger(__name__)
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ASSET_DIR = PROJECT_ROOT / "assets" / "ui_emojis"
+GAME_ASSET_DIR = PROJECT_ROOT / "assets" / "game_emojis"
 MAX_EMOJI_BYTES = 256 * 1024
+SUPPORTED_ASSET_SUFFIXES = frozenset({".gif", ".jpeg", ".jpg", ".png", ".webp"})
 
 EMOJI_FILES: dict[str, str] = {
     "ticket_available": "ticket_available.png",
@@ -33,12 +35,40 @@ EMOJI_FILES: dict[str, str] = {
     "neon_calculate": "neon_calculate.png",
 }
 
+GAME_EMOJI_CATEGORIES: dict[str, str] = {
+    "pet": "animals",
+    "weapon": "weapons",
+    "passive": "passives",
+}
+
+
+def discover_emoji_assets() -> dict[str, Path]:
+    """Return every application emoji name and its source file."""
+    assets = {name: ASSET_DIR / filename for name, filename in EMOJI_FILES.items()}
+    for emoji_prefix, directory_name in GAME_EMOJI_CATEGORIES.items():
+        directory = GAME_ASSET_DIR / directory_name
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.iterdir()):
+            if path.is_file() and path.suffix.casefold() in SUPPORTED_ASSET_SUFFIXES:
+                assets[f"{emoji_prefix}_{path.stem.casefold()}"] = path
+    return assets
+
 
 def prepare_emoji_image(path: Path) -> bytes:
     """Normalize source artwork to a centered 128×128 transparent PNG."""
     raw = path.read_bytes()
     try:
         with Image.open(io.BytesIO(raw)) as source:
+            # Discord supports animated WebP/GIF application emojis. Preserve
+            # small catalog animations instead of flattening their first frame.
+            if (
+                bool(getattr(source, "is_animated", False))
+                and source.width <= 128
+                and source.height <= 128
+                and len(raw) <= MAX_EMOJI_BYTES
+            ):
+                return raw
             image = source.convert("RGBA")
             image.thumbnail((128, 128), Image.Resampling.LANCZOS)
             canvas = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
@@ -102,16 +132,16 @@ class UIEmojiManager(commands.Cog):
             missing_assets: list[str] = []
             failed: list[str] = []
 
-            for name, filename in EMOJI_FILES.items():
+            emoji_assets = discover_emoji_assets()
+            for name, path in emoji_assets.items():
                 current = by_name.get(name)
                 if current is not None:
                     self.emojis[name] = self._to_partial(current)
                     reused += 1
                     continue
 
-                path = ASSET_DIR / filename
                 if not path.is_file():
-                    missing_assets.append(filename)
+                    missing_assets.append(str(path.relative_to(PROJECT_ROOT)))
                     continue
 
                 image = prepare_emoji_image(path)
@@ -140,7 +170,8 @@ class UIEmojiManager(commands.Cog):
 
             self._synced = True
             logger.info(
-                "Application emoji registry ready: %s reused, %s created, %s missing assets, %s failed",
+                "Application emoji registry ready: %s configured, %s reused, %s created, %s missing assets, %s failed",
+                len(emoji_assets),
                 reused,
                 created,
                 len(missing_assets),

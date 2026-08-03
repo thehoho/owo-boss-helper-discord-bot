@@ -20,6 +20,13 @@ from typing import Any
 import discord
 from discord.ext import commands
 
+from .helper_prefix import (
+    HELPER_PREFIX_DEFAULT,
+    canonicalize_helper_command,
+    get_guild_helper_prefix,
+    helper_alias,
+    helper_command,
+)
 from .message_utils import safe_reply
 from .ui_emojis import ui_emoji_text
 
@@ -784,7 +791,11 @@ def classify_blueprint(blueprint: str) -> tuple[str, tuple[str, ...]]:
     return weapon_type, tuple(passive_types)
 
 
-def parse_neon_command(content: str) -> tuple[str, str] | None:
+def parse_neon_command(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> tuple[str, str] | None:
+    content = canonicalize_helper_command(content, helper_prefix)
     first_line = next(
         (line.strip() for line in (content or "").splitlines() if line.strip()),
         "",
@@ -1392,6 +1403,7 @@ class ActiveDexSession:
     entries: list[NeonWeaponEntry]
     owner_display_name: str
     runner_display_name: str
+    helper_prefix: str = HELPER_PREFIX_DEFAULT
     index: int = 0
     guide_message_id: int = 0
     started_at: float = field(default_factory=time.monotonic)
@@ -1407,6 +1419,7 @@ class WeaponDexView(discord.ui.View):
         owner_display_name: str,
         runner_display_name: str,
         entries: list[NeonWeaponEntry],
+        helper_prefix: str,
     ) -> None:
         super().__init__(timeout=15 * 60)
         self.cog = cog
@@ -1415,6 +1428,7 @@ class WeaponDexView(discord.ui.View):
         self.owner_display_name = owner_display_name
         self.runner_display_name = runner_display_name
         self.entries = entries
+        self.helper_prefix = helper_prefix
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.runner_user_id:
@@ -1442,11 +1456,14 @@ class WeaponDexView(discord.ui.View):
             owner_display_name=self.owner_display_name,
             runner_display_name=self.runner_display_name,
             entries=self.entries,
+            helper_prefix=self.helper_prefix,
         )
+        stop_command = helper_command(self.helper_prefix, "stop")
+        stop_alias = helper_alias(self.helper_prefix, "hs")
         await interaction.followup.send(
             f"Started a dexing session for **{self.owner_display_name}**. I will post one alternating `ww` / `wuse` command at a time. "
             "Copy the command shown in the channel and send it there, then I will wait for Neon to confirm it before moving to the next one. "
-            "Use `H stop`, `Hstop`, or `HS` to pause and continue later.",
+            f"Use `{stop_command}` or `{stop_alias}` to pause and continue later.",
             ephemeral=True,
         )
 
@@ -1516,7 +1533,8 @@ class NeonWeapons(commands.Cog):
             elif message.author.id == OWO_BOT_ID:
                 await self.handle_owo_message(message)
             return
-        parsed_command = parse_neon_command(message.content or "")
+        helper_prefix = await get_guild_helper_prefix(message.guild.id)
+        parsed_command = parse_neon_command(message.content or "", helper_prefix)
         if parsed_command is not None:
             action, argument = parsed_command
             if action == "guide":
@@ -1788,6 +1806,10 @@ class NeonWeapons(commands.Cog):
         return max(candidates, key=lambda item: item.created_at)
 
     async def send_guide(self, message: discord.Message) -> None:
+        helper_prefix = await get_guild_helper_prefix(
+            message.guild.id if message.guild else None
+        )
+        dex_short = helper_alias(helper_prefix, "hwd")
         calculate_emoji = ui_emoji_text(self.bot, "neon_calculate", "🧮")
         embed = discord.Embed(
             title="🧾 Neon weapon dex helper",
@@ -1799,8 +1821,15 @@ class NeonWeapons(commands.Cog):
                 "**4.** Click the right arrow ➡️ through every weapon page.\n"
                 "-# The helper can only scan the pages that Neon actually displays.\n\n"
                 "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible** or any scanned row without a green saved tick. "
-                "Then run `HWD`, `H dex`, or `H weapon dex` to get guided alternating `ww <weapon_id>` / `wuse <weapon_id>` commands.\n\n"
-                "Battle helpers can scan another member's Neon filtered pages; the queue is saved under the member shown in Neon's title. Helpers can run `HWD @member` to dex that member's queue, combine weapon filters such as `HWD dagger shield 100`, and any confirmed Neon blueprint removes the weapon from every matching owner's queue across all servers the helper can see."
+                f"Then run `{dex_short}`, `{helper_command(helper_prefix, 'dex')}`, "
+                f"or `{helper_command(helper_prefix, 'weapon dex')}` to get guided "
+                "alternating `ww <weapon_id>` / `wuse <weapon_id>` commands.\n\n"
+                "Battle helpers can scan another member's Neon filtered pages; the queue "
+                "is saved under the member shown in Neon's title. Helpers can run "
+                f"`{dex_short} @member` to dex that member's queue, combine weapon filters "
+                f"such as `{dex_short} dagger shield 100`, and any confirmed Neon blueprint "
+                "removes the weapon from every matching owner's queue across all servers "
+                "the helper can see."
             ),
             color=0xFEE75C,
         )
@@ -1842,6 +1871,12 @@ class NeonWeapons(commands.Cog):
         )
 
     async def send_dex(self, message: discord.Message, query: str) -> None:
+        helper_prefix = await get_guild_helper_prefix(
+            message.guild.id if message.guild else None
+        )
+        weapon_short = helper_alias(helper_prefix, "hw")
+        dex_short = helper_alias(helper_prefix, "hwd")
+        stop_command = helper_command(helper_prefix, "stop")
         target_user_id, target_display_name, clean_query = self.resolve_dex_target(message, query)
         runner_display_name = self.user_display_name(message.author)
         filter_query, session_limit, requested_all = parse_dex_query_options(clean_query)
@@ -1851,7 +1886,8 @@ class NeonWeapons(commands.Cog):
                 message,
                 "I did not recognize this dex filter: "
                 + ", ".join(f"`{item}`" for item in unknown)
-                + ". Try `HW` or `H weapons` for supported aliases, or `H stop` to pause a dexing session.",
+                + f". Try `{weapon_short}` or `{helper_command(helper_prefix, 'weapons')}` "
+                f"for supported aliases, or `{stop_command}` to pause a dexing session.",
                 mention_author=False,
             )
             return
@@ -1865,7 +1901,9 @@ class NeonWeapons(commands.Cog):
             suffix = f" for `{filter_query}`" if filter_query else ""
             await safe_reply(
                 message,
-                f"I do not have any queued Neon weapon dex commands for **{target_display_name}**{suffix}. Scan Neon weapon pages first with `ww` / `nw`, then run `HWD` or `H dex`.",
+                f"I do not have any queued Neon weapon dex commands for **{target_display_name}**{suffix}. "
+                f"Scan Neon weapon pages first with `ww` / `nw`, then run `{dex_short}` "
+                f"or `{helper_command(helper_prefix, 'dex')}`.",
                 mention_author=False,
             )
             return
@@ -1888,8 +1926,9 @@ class NeonWeapons(commands.Cog):
                 "• Copy each command from the session message and send it in this channel.\n"
                 "• The helper advances only "
                 "after OwO and Neon confirm that weapon.\n"
-                "• Sessions alternate `ww` and `wuse`, support `HWD 100` / `HWD all`, "
-                "and allow combined filters such as `HWD dagger shield 100`.\n\n"
+                f"• Sessions alternate `ww` and `wuse`, support `{dex_short} 100` / "
+                f"`{dex_short} all`, and allow combined filters such as "
+                f"`{dex_short} dagger shield 100`.\n\n"
                 + "\n".join(lines)
             ),
             color=0xFEE75C,
@@ -1917,6 +1956,7 @@ class NeonWeapons(commands.Cog):
                 owner_display_name=target_display_name,
                 runner_display_name=runner_display_name,
                 entries=entries,
+                helper_prefix=helper_prefix,
             ),
             mention_author=False,
         )
@@ -1935,7 +1975,11 @@ class NeonWeapons(commands.Cog):
     def build_session_message(self, session: ActiveDexSession) -> str:
         command = self.dex_command_for_session(session)
         if command is None:
-            return f"✅ **{session.owner_display_name}**'s weapon dex session is complete. Run `HWD` anytime to continue with any remaining queue."
+            return (
+                f"✅ **{session.owner_display_name}**'s weapon dex session is complete. "
+                f"Run `{helper_alias(session.helper_prefix, 'hwd')}` anytime to continue "
+                "with any remaining queue."
+            )
         runner_note = ""
         if session.runner_user_id != session.owner_user_id:
             runner_note = f" — **{session.runner_display_name}** running"
@@ -1978,6 +2022,7 @@ class NeonWeapons(commands.Cog):
         owner_display_name: str,
         runner_display_name: str,
         entries: list[NeonWeaponEntry],
+        helper_prefix: str,
     ) -> None:
         if not entries:
             return
@@ -1992,6 +2037,7 @@ class NeonWeapons(commands.Cog):
             entries=list(entries),
             owner_display_name=owner_display_name,
             runner_display_name=runner_display_name,
+            helper_prefix=helper_prefix,
         )
         self.active_dex_sessions[key] = session
         await self.send_session_prompt(channel, session)
@@ -2012,7 +2058,9 @@ class NeonWeapons(commands.Cog):
             if channel is not None:
                 await self.delete_session_prompt(channel, session)
                 await channel.send(
-                    "Your weapon dex session expired. Run `HWD 100` or `HWD all` to start a fresh long session.",
+                    f"Your weapon dex session expired. Run "
+                    f"`{helper_alias(session.helper_prefix, 'hwd')} 100` or "
+                    f"`{helper_alias(session.helper_prefix, 'hwd')} all` to start a fresh long session.",
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
             return
@@ -2037,7 +2085,8 @@ class NeonWeapons(commands.Cog):
                 await self.delete_session_prompt(channel, session)
                 self.active_dex_sessions.pop(key, None)
                 await channel.send(
-                    "✅ Weapon dex session complete. Run `HWD` again if more weapons remain queued.",
+                    f"✅ Weapon dex session complete. Run "
+                    f"`{helper_alias(session.helper_prefix, 'hwd')}` again if more weapons remain queued.",
                     allowed_mentions=discord.AllowedMentions.none(),
                 )
                 return
@@ -2056,9 +2105,13 @@ class NeonWeapons(commands.Cog):
             )
             return
         await self.delete_session_prompt(message.channel, session)
+        helper_prefix = await get_guild_helper_prefix(
+            message.guild.id if message.guild else None
+        )
         await safe_reply(
             message,
-            "Stopped your weapon dex session. Run `HWD` to continue later from the remaining queue.",
+            f"Stopped your weapon dex session. Run "
+            f"`{helper_alias(helper_prefix, 'hwd')}` to continue later from the remaining queue.",
             mention_author=False,
         )
 

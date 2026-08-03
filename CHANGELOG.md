@@ -1,4 +1,17 @@
 
+## v0.12.0-beta - Server Prefixes and Game Emoji Catalog
+
+- Fixed `H help` by removing the obsolete team-cog override that exceeded Discord's 1,024-character embed-field limit.
+- Added a single limit-safe, per-server-prefix-aware help guide.
+- Added `/helper-prefix` and `H prefix <new prefix>` for server managers; the setting is separate from the server's OwO command prefix and is stored in the existing `team_templates.db` runtime database.
+- Updated boss, setup, team, ticket, Neon dex, about, and usage-tracking command parsers to use each server's configured helper prefix.
+- Added 55 standard animal emoji assets across Common, Uncommon, Rare, Epic, Mythical, Gem, Legendary, Fabled, Bot, Hidden, and Distorted ranks.
+- Added 29 weapon and 28 passive emoji assets from the desktop OwO Boss Command Generator project.
+- Expanded startup application-emoji synchronization to 118 configured assets while reusing existing emoji names and never deleting unrelated application emojis.
+- Added one random usable custom emoji from the current server to each new SKIP decision; the selected emoji persists with that boss's sticky reposts.
+- Kept Patreon, Custom Patreon, and monthly Special/event animals outside this batch.
+- Updated the public bot version to `0.12.0-beta`.
+
 ## v0.11.7-beta - Mobile-Friendly Dex Prompts
 
 - Removed **Copy first command** and **Close** from the HWD queue preview so **Start dexing session** is the only preview action.

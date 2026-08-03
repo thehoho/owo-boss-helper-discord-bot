@@ -1,7 +1,7 @@
 
-## v0.11.7-beta notes
+## v0.12.0-beta notes
 
-HWD is now clearer on both mobile and desktop. Its queue preview offers only **Start dexing session**, active steps show the current command directly beneath a small “copy and send it in this channel” note, and the misleading copy buttons have been removed. **Skip weapon** and **Stop** remain available during active sessions. The `HW` guide now keeps step 4 in sequence and tells members to click the right arrow through every Neon weapon page. The Message Content-only intent setup, server setup guide, daily reports, and boss-sticky improvements from v0.11.6-beta remain included.
+`H help` is repaired and kept safely within Discord's embed limits. Server managers can now replace the helper's default `h` prefix with `/helper-prefix` or `H prefix <new prefix>`; every supported helper command follows the server setting while the OwO command prefix remains separate. SKIP stickies can include one random usable custom emoji from the current server. The application emoji catalog now contains 55 standard animals—including Bot rank—29 weapons, 28 passives, and the existing six UI emojis.
 
 # OwO Boss Helper
 
@@ -10,6 +10,8 @@ A community Discord bot for OwO guild-boss fights. It generates Neon battle comm
 Developed and maintained by **Hassaan**.
 
 Use `H about` or `/about` inside Discord for the public project profile.
+
+The default helper prefix is `h`. A server manager can change it with `/helper-prefix` or `H prefix <new prefix>`. Run `/setup-guide` after changing it; examples shown by the bot automatically use that server's current prefix.
 
 > Independent community project. Not affiliated with Discord, OwO Bot, or NeonUtil.
 
@@ -40,6 +42,7 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Sends a persistent fighter-role alert once when an active boss is marked HIT.
 - Posts a daily confirmed HIT/SKIP outcome report at the Pacific-midnight reset in a manager-configured channel.
 - Persists up to seven failed daily reports for retry instead of discarding counts during a temporary Discord/channel failure.
+- Adds one random usable custom emoji from the current server when a helper marks an active boss SKIP; servers without a usable custom emoji keep the plain `# SKIP` sticky.
 
 ### Team templates
 
@@ -90,7 +93,8 @@ Use `H about` or `/about` inside Discord for the public project profile.
 - Keeps manual `w boss t` / `owo boss t` results authoritative and reminds members outside the visible Top 10 to update manually.
 - Removes entries after 48 hours without a manual check or confirmed Top 10 hit while preserving block, tracking, and nickname preferences.
 - Adds `HBT <name, username, mention, or ID>` for fast current-ticket lookups without loading server members.
-- Loads the five PNG files under `assets/ui_emojis/` as application-owned Discord emojis on startup. Existing application emoji names are reused and missing names are created automatically.
+- Loads 118 application-owned Discord emojis on startup: six UI emojis, 55 standard animal emojis (Common through Distorted, including Bot rank), 29 weapons, and 28 passives. Existing names are reused and only missing names are created.
+- Excludes Patreon, Custom Patreon, and monthly Special/event animals from this catalog.
 
 ### Neon weapon dex helper
 

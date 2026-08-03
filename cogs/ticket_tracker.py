@@ -27,6 +27,13 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .helper_prefix import (
+    HELPER_PREFIX_DEFAULT,
+    canonicalize_helper_command,
+    get_guild_helper_prefix,
+    helper_alias,
+    helper_command,
+)
 from .message_utils import safe_reply
 from .owo_prefix import (
     OWO_PREFIX_DEFAULT,
@@ -248,20 +255,36 @@ def is_ticket_command(content: str, owo_prefix: str = OWO_PREFIX_DEFAULT) -> boo
     return is_owo_prefixed_command(content, owo_prefix, TICKET_COMMAND_SUFFIXES)
 
 
-def is_ticket_list_command(content: str) -> bool:
-    return normalize_ticket_command(content) in TICKET_LIST_COMMANDS
+def is_ticket_list_command(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> bool:
+    canonical = canonicalize_helper_command(content, helper_prefix)
+    return normalize_ticket_command(canonical) in TICKET_LIST_COMMANDS
 
 
-def is_ticket_settings_command(content: str) -> bool:
-    return normalize_ticket_command(content) in TICKET_SETTINGS_COMMANDS
+def is_ticket_settings_command(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> bool:
+    canonical = canonicalize_helper_command(content, helper_prefix)
+    return normalize_ticket_command(canonical) in TICKET_SETTINGS_COMMANDS
 
 
-def is_ticket_nickname_command(content: str) -> bool:
-    return normalize_ticket_command(content) in TICKET_NICKNAME_COMMANDS
+def is_ticket_nickname_command(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> bool:
+    canonical = canonicalize_helper_command(content, helper_prefix)
+    return normalize_ticket_command(canonical) in TICKET_NICKNAME_COMMANDS
 
 
-def parse_ticket_lookup_query(content: str) -> str | None:
+def parse_ticket_lookup_query(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> str | None:
     """Return the HBT lookup query, an empty string for bare HBT, or None."""
+    content = canonicalize_helper_command(content, helper_prefix)
     first_line = next(
         (line.strip() for line in (content or "").splitlines() if line.strip()),
         "",
@@ -2815,9 +2838,11 @@ class TicketTracker(commands.Cog):
         if bot_member is None:
             return False, "I could not check my server permissions."
         if not bot_member.guild_permissions.manage_nicknames:
+            helper_prefix = await get_guild_helper_prefix(guild_id)
             return (
                 False,
-                "Grant my bot role **Manage Nicknames**, then reopen `HBS`. "
+                f"Grant my bot role **Manage Nicknames**, then reopen "
+                f"`{helper_alias(helper_prefix, 'hbs')}`. "
                 "The role must also be above members whose names should be updated.",
             )
         return True, "Nickname markers are ready."
@@ -3279,10 +3304,12 @@ class TicketTracker(commands.Cog):
             description=description,
             color=0x5865F2,
         )
+        helper_prefix = await get_guild_helper_prefix(guild_id)
         embed.set_footer(
             text=(
                 "Open with My settings, /boss-ticket-nickname, "
-                "H boss nickname, or HBN."
+                f"{helper_command(helper_prefix, 'boss nickname')}, or "
+                f"{helper_alias(helper_prefix, 'hbn')}."
             )
         )
         return embed
@@ -4065,17 +4092,21 @@ class TicketTracker(commands.Cog):
             if message.guild is None:
                 return
             if not message.author.bot:
-                lookup_query = parse_ticket_lookup_query(message.content or "")
+                helper_prefix = await get_guild_helper_prefix(message.guild.id)
+                lookup_query = parse_ticket_lookup_query(
+                    message.content or "",
+                    helper_prefix,
+                )
                 if lookup_query is not None:
                     await self.send_ticket_lookup(message, lookup_query)
                     return
-                if is_ticket_nickname_command(message.content or ""):
+                if is_ticket_nickname_command(message.content or "", helper_prefix):
                     await self.send_personal_nickname_panel_message(message)
                     return
-                if is_ticket_settings_command(message.content or ""):
+                if is_ticket_settings_command(message.content or "", helper_prefix):
                     await self.send_ticket_settings(message)
                     return
-                if is_ticket_list_command(message.content or ""):
+                if is_ticket_list_command(message.content or "", helper_prefix):
                     await self.send_ticket_list(message)
                     return
                 owo_prefix = await get_guild_owo_prefix(message.guild.id)
@@ -4332,9 +4363,14 @@ class TicketTracker(commands.Cog):
     ) -> None:
         terms = split_ticket_lookup_terms(query)
         if not terms:
+            helper_prefix = await get_guild_helper_prefix(
+                message.guild.id if message.guild else None
+            )
+            lookup = helper_alias(helper_prefix, "hbt")
             await safe_reply(
                 message,
-                "Use `HBT <name, username, mention, or user ID>`. You can check multiple people with `HBT name1 name2 name3`, commas, or quoted names.",
+                f"Use `{lookup} <name, username, mention, or user ID>`. You can check "
+                f"multiple people with `{lookup} name1 name2 name3`, commas, or quoted names.",
                 mention_author=False,
             )
             return

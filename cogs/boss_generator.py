@@ -21,6 +21,7 @@ import hashlib
 import io
 import json
 import logging
+import random
 import re
 import time
 from datetime import date, datetime, time as datetime_time, timedelta, timezone
@@ -34,6 +35,17 @@ from PIL import Image
 from discord import app_commands
 from discord.ext import commands
 
+from .helper_prefix import (
+    HELPER_PREFIX_DEFAULT,
+    MAX_HELPER_PREFIX_LENGTH,
+    get_guild_helper_prefix,
+    helper_alias,
+    helper_command,
+    matches_helper_command,
+    normalize_helper_prefix,
+    parse_helper_command_argument,
+    set_guild_helper_prefix,
+)
 from .message_utils import safe_reply
 from .owo_prefix import (
     OWO_PREFIX_DEFAULT,
@@ -65,7 +77,6 @@ BOSS_TRIGGER_SUFFIXES = {"bossi"}
 
 # Lightweight public helper commands. Whitespace and capitalization are ignored.
 PREFIX_COOLDOWN_TRIGGERS = {"hbosscd", "hbosscooldown"}
-PREFIX_HELP_TRIGGERS = {"hhelp"}
 PREFIX_SETUP_TRIGGERS = {"hsetup", "hsetupguide"}
 BOSS_DECISION_HIT_TRIGGERS = {"hbosshit", "hsethit"}
 BOSS_DECISION_SKIP_TRIGGERS = {"hbossskip", "hskipboss", "hsetskip"}
@@ -100,32 +111,28 @@ def next_boss_report_reset_timestamp(now: datetime | None = None) -> int:
     return boss_report_cycle_bounds(next_day.isoformat())[0]
 
 
-def compact_first_line(content: str) -> str:
-    first_line = next(
-        (line.strip() for line in (content or "").splitlines() if line.strip()),
-        "",
-    )
-    return re.sub(r"\s+", "", first_line).lower()
-
-
-def parse_boss_decision_command(content: str) -> str | None:
-    compact = compact_first_line(content)
-    if compact in BOSS_DECISION_HIT_TRIGGERS:
+def parse_boss_decision_command(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> str | None:
+    if matches_helper_command(content, helper_prefix, BOSS_DECISION_HIT_TRIGGERS):
         return "hit"
-    if compact in BOSS_DECISION_SKIP_TRIGGERS:
+    if matches_helper_command(content, helper_prefix, BOSS_DECISION_SKIP_TRIGGERS):
         return "skip"
     return None
 
 
-def parse_boss_sticky_command(content: str) -> str | None:
-    compact = compact_first_line(content)
-    if compact in {"hstickyclear", "hclearsticky"}:
+def parse_boss_sticky_command(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> str | None:
+    if matches_helper_command(content, helper_prefix, {"hstickyclear", "hclearsticky"}):
         return "clear"
-    if compact in {"hstickyoff"}:
+    if matches_helper_command(content, helper_prefix, {"hstickyoff"}):
         return "off"
-    if compact in {"hstickyon"}:
+    if matches_helper_command(content, helper_prefix, {"hstickyon"}):
         return "on"
-    if compact == "hsticky":
+    if matches_helper_command(content, helper_prefix, {"hsticky"}):
         return "set"
     return None
 
@@ -135,24 +142,32 @@ def is_boss_trigger(content: str, owo_prefix: str = OWO_PREFIX_DEFAULT) -> bool:
     return is_owo_prefixed_command(content, owo_prefix, BOSS_TRIGGER_SUFFIXES)
 
 
-def is_prefix_cooldown_trigger(content: str) -> bool:
+def is_prefix_cooldown_trigger(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> bool:
     """Accept `H boss cd` and `H boss cooldown`, case-insensitively."""
-    normalized = re.sub(r"\s+", "", content or "").lower()
-    return normalized in PREFIX_COOLDOWN_TRIGGERS
+    return matches_helper_command(content, helper_prefix, PREFIX_COOLDOWN_TRIGGERS)
 
 
-def is_prefix_help_trigger(content: str) -> bool:
+def is_prefix_help_trigger(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> bool:
     """Accept `H help` at the start and ignore any following text."""
-    first_line = next(
-        (line.strip() for line in (content or "").splitlines() if line.strip()),
-        "",
-    )
-    return re.match(r"^h\s*help\b", first_line, re.IGNORECASE) is not None
+    return parse_helper_command_argument(
+        content,
+        helper_prefix,
+        {"h help", "hhelp"},
+    ) is not None
 
 
-def is_prefix_setup_trigger(content: str) -> bool:
+def is_prefix_setup_trigger(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> bool:
     """Accept `H setup` and `H setup guide`, case-insensitively."""
-    return compact_first_line(content) in PREFIX_SETUP_TRIGGERS
+    return matches_helper_command(content, helper_prefix, PREFIX_SETUP_TRIGGERS)
 
 
 def load_cooldown_config() -> dict[str, dict[str, Any]]:
@@ -1485,6 +1500,7 @@ class BossGenerator(commands.Cog):
         guild = message.guild
         if guild is None:
             return
+        helper_prefix = await get_guild_helper_prefix(guild.id)
         config = self.cooldown_config.setdefault(str(guild.id), {})
         channel_id = int(config.get("channel_id") or 0)
         if not channel_id:
@@ -1532,12 +1548,18 @@ class BossGenerator(commands.Cog):
             return
 
         if not self.boss_sticky_enabled(config):
-            await safe_reply(message, "Boss stickies are off. Use `H sticky on` first.", mention_author=False)
+            await safe_reply(
+                message,
+                f"Boss stickies are off. Use "
+                f"`{helper_command(helper_prefix, 'sticky on')}` first.",
+                mention_author=False,
+            )
             return
         if message.reference is None or message.reference.message_id is None:
             await safe_reply(
                 message,
-                "Reply to the note/message you want to keep sticky, then send `H sticky`.",
+                f"Reply to the note/message you want to keep sticky, then send "
+                f"`{helper_command(helper_prefix, 'sticky')}`.",
                 mention_author=False,
             )
             return
@@ -1586,6 +1608,23 @@ class BossGenerator(commands.Cog):
         else:
             await interaction.response.send_message(notice, ephemeral=True)
 
+    def random_server_emoji(self, guild_id: int) -> str:
+        """Choose one usable custom emoji from the current server, if available."""
+        guild = self.bot.get_guild(guild_id)
+        if guild is None:
+            return ""
+        usable: list[discord.Emoji] = []
+        for emoji in guild.emojis:
+            if not emoji.available:
+                continue
+            try:
+                if not emoji.is_usable():
+                    continue
+            except (AttributeError, RuntimeError):
+                continue
+            usable.append(emoji)
+        return str(random.SystemRandom().choice(usable)) if usable else ""
+
     async def set_boss_decision(self, guild_id: int, decision: str, user_id: int) -> str:
         if decision not in {"hit", "skip"}:
             return "Unknown boss decision."
@@ -1597,6 +1636,14 @@ class BossGenerator(commands.Cog):
         config["boss_decision_by"] = user_id
         config["boss_decision_at"] = now
         config.pop("sticky_custom_text", None)
+        if decision == "skip":
+            skip_emoji = self.random_server_emoji(guild_id)
+            if skip_emoji:
+                config["boss_skip_emoji"] = skip_emoji
+            else:
+                config.pop("boss_skip_emoji", None)
+        else:
+            config.pop("boss_skip_emoji", None)
 
         ping_role_ids: list[int] = []
         boss_key = int(config.get("active_boss_expires_at") or config.get("active_boss_message_id") or 0)
@@ -1630,7 +1677,8 @@ class BossGenerator(commands.Cog):
         if decision == "hit":
             return "# HIT"
         if decision == "skip":
-            return "# SKIP"
+            emoji = str(config.get("boss_skip_emoji") or "").strip()
+            return f"# SKIP {emoji}".rstrip()
         return "# Boss decision needed"
 
     async def send_fighter_ping_message(
@@ -1792,7 +1840,11 @@ class BossGenerator(commands.Cog):
 
     # ── Cooldown channel setup + status check ─────────────────
 
-    def build_setup_guide_embed(self, guild: discord.Guild) -> discord.Embed:
+    def build_setup_guide_embed(
+        self,
+        guild: discord.Guild,
+        helper_prefix: str = HELPER_PREFIX_DEFAULT,
+    ) -> discord.Embed:
         """Build the server-owner setup checklist and show known boss settings."""
         config = self.cooldown_config.get(str(guild.id), {})
         cooldown_channel_id = int(config.get("channel_id") or 0)
@@ -1812,6 +1864,11 @@ class BossGenerator(commands.Cog):
         fighter_status = (
             self.role_mentions(fighter_roles) if fighter_roles else "**No fighter role configured**"
         )
+        boss_hit = helper_command(helper_prefix, "boss hit")
+        boss_skip = helper_command(helper_prefix, "boss skip")
+        team_short = helper_alias(helper_prefix, "ht")
+        weapon_short = helper_alias(helper_prefix, "hw")
+        dex_short = helper_alias(helper_prefix, "hwd")
 
         embed = discord.Embed(
             title="🛠️ OwO Boss Helper — Server Setup",
@@ -1838,8 +1895,8 @@ class BossGenerator(commands.Cog):
             value=(
                 f"Decision controls: {decision_status}\n"
                 f"Fighter HIT alert: {fighter_status}\n\n"
-                "• `/boss-decision-role` — roles allowed to use `H boss hit`, "
-                "`H boss skip`, and sticky controls. Decision roles are not pinged.\n"
+                f"• `/boss-decision-role` — roles allowed to use `{boss_hit}`, "
+                f"`{boss_skip}`, and sticky controls. Decision roles are not pinged.\n"
                 "• `/boss-fighter-role` — optional persistent role ping after **HIT**. "
                 "Make each fighter role mentionable, or grant the bot **Mention "
                 "@everyone, @here, and All Roles** in the boss-alert channel."
@@ -1860,18 +1917,20 @@ class BossGenerator(commands.Cog):
             name="4️⃣ Server OwO prefix",
             value=(
                 "The default short prefix is `w`. If this server uses another prefix, "
-                "run `HT prefix o`, `HT prefix g`, or `H team prefix <prefix>`. "
-                "Run `HT prefix` to show the current value."
+                f"run `{team_short} prefix o`, `{team_short} prefix g`, or "
+                f"`{helper_command(helper_prefix, 'team prefix <prefix>')}`. "
+                f"Run `{team_short} prefix` to show the current value."
             ),
             inline=False,
         )
         embed.add_field(
             name="5️⃣ Member guides",
             value=(
-                "• `H help` — current command overview.\n"
-                "• `HT help` — saved-team setup and restore guide.\n"
-                "• `HW` / `H weapons` — Neon weapon scanning setup.\n"
-                "• `HWD` — preview the dex queue and open copy-ready guided commands."
+                f"• `{helper_command(helper_prefix, 'help')}` — current command overview.\n"
+                f"• `{team_short} help` — saved-team setup and restore guide.\n"
+                f"• `{weapon_short}` / `{helper_command(helper_prefix, 'weapons')}` "
+                "— Neon weapon scanning setup.\n"
+                f"• `{dex_short}` — preview the dex queue and open guided commands."
             ),
             inline=False,
         )
@@ -1885,7 +1944,9 @@ class BossGenerator(commands.Cog):
             ),
             inline=False,
         )
-        embed.set_footer(text="Setup guide: /setup-guide or H setup")
+        embed.set_footer(
+            text=f"Setup guide: /setup-guide or {helper_command(helper_prefix, 'setup')}"
+        )
         return embed
 
     @app_commands.command(
@@ -1901,8 +1962,9 @@ class BossGenerator(commands.Cog):
                 "❌ This command only works inside a server.", ephemeral=True
             )
             return
+        helper_prefix = await get_guild_helper_prefix(guild.id)
         await interaction.response.send_message(
-            embed=self.build_setup_guide_embed(guild),
+            embed=self.build_setup_guide_embed(guild, helper_prefix),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
@@ -1911,11 +1973,105 @@ class BossGenerator(commands.Cog):
         guild = message.guild
         if guild is None:
             return
+        helper_prefix = await get_guild_helper_prefix(guild.id)
         await safe_reply(
             message,
-            embed=self.build_setup_guide_embed(guild),
+            embed=self.build_setup_guide_embed(guild, helper_prefix),
             mention_author=False,
             allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    async def handle_helper_prefix_message(
+        self,
+        message: discord.Message,
+        argument: str,
+    ) -> None:
+        guild = message.guild
+        if guild is None:
+            return
+        current = await get_guild_helper_prefix(guild.id)
+        value = re.sub(r"\s+", "", argument or "").strip()
+        if not value:
+            await safe_reply(
+                message,
+                f"This server's OwO Boss Helper prefix is `{current}`. "
+                f"Use `{helper_command(current, 'help')}` for the guide. "
+                "A server manager can change it with `/helper-prefix`.",
+                mention_author=False,
+            )
+            return
+        if not isinstance(message.author, discord.Member) or not (
+            message.author.guild_permissions.manage_guild
+            or message.author.guild_permissions.administrator
+        ):
+            await safe_reply(
+                message,
+                "Only members with **Manage Server** can change the helper prefix.",
+                mention_author=False,
+            )
+            return
+        prefix = normalize_helper_prefix(value)
+        if prefix is None:
+            await safe_reply(
+                message,
+                f"Use a no-space prefix up to **{MAX_HELPER_PREFIX_LENGTH}** characters. "
+                "Examples: `?`, `bh`, or `!`.",
+                mention_author=False,
+            )
+            return
+        saved = await set_guild_helper_prefix(guild.id, prefix, message.author.id)
+        await safe_reply(
+            message,
+            f"✅ Helper prefix saved as `{saved}`. "
+            f"The old `{current}` helper prefix is no longer active here. "
+            f"Use `{helper_command(saved, 'help')}` for the guide.",
+            mention_author=False,
+        )
+
+    @app_commands.command(
+        name="helper-prefix",
+        description="View or change this server's OwO Boss Helper command prefix.",
+    )
+    @app_commands.describe(
+        prefix="New helper prefix. Leave empty to show the current prefix."
+    )
+    @app_commands.guild_only()
+    @app_commands.default_permissions(manage_guild=True)
+    async def helper_prefix_command(
+        self,
+        interaction: discord.Interaction,
+        prefix: str | None = None,
+    ) -> None:
+        if interaction.guild_id is None:
+            await interaction.response.send_message(
+                "This command only works inside a server.", ephemeral=True
+            )
+            return
+        current = await get_guild_helper_prefix(interaction.guild_id)
+        if prefix is None or not prefix.strip():
+            await interaction.response.send_message(
+                f"This server's helper prefix is `{current}`. "
+                f"Use `{helper_command(current, 'help')}` for the guide.",
+                ephemeral=True,
+            )
+            return
+        normalized = normalize_helper_prefix(prefix)
+        if normalized is None:
+            await interaction.response.send_message(
+                f"Use a no-space prefix up to **{MAX_HELPER_PREFIX_LENGTH}** characters. "
+                "Examples: `?`, `bh`, or `!`.",
+                ephemeral=True,
+            )
+            return
+        saved = await set_guild_helper_prefix(
+            interaction.guild_id,
+            normalized,
+            interaction.user.id,
+        )
+        await interaction.response.send_message(
+            f"✅ Helper prefix changed from `{current}` to `{saved}`. "
+            f"Use `{helper_command(saved, 'help')}` now; the old helper prefix is disabled.",
+            ephemeral=True,
         )
 
     @app_commands.command(
@@ -1974,9 +2130,12 @@ class BossGenerator(commands.Cog):
             channel.id,
         )
 
+        helper_prefix = await get_guild_helper_prefix(guild.id)
         await interaction.followup.send(
             f"✅ Automatic boss cooldown alerts will be sent in {channel.mention}. "
-            "Boss helpers can use `H boss hit`, `H boss skip`, or `H sticky` there.",
+            f"Boss helpers can use `{helper_command(helper_prefix, 'boss hit')}`, "
+            f"`{helper_command(helper_prefix, 'boss skip')}`, or "
+            f"`{helper_command(helper_prefix, 'sticky')}` there.",
             ephemeral=True,
         )
 
@@ -2101,18 +2260,28 @@ class BossGenerator(commands.Cog):
             guild.id,
         )
 
-    async def send_prefix_help(self, message: discord.Message) -> None:
-        """Reply to `H help` with the current command guide."""
-        if message.guild is None:
-            return
-
-        owo_prefix = await get_guild_owo_prefix(message.guild.id)
+    def build_help_embed(
+        self,
+        helper_prefix: str,
+        owo_prefix: str,
+    ) -> discord.Embed:
+        """Build a Discord-limit-safe, server-prefix-aware command guide."""
+        help_command = helper_command(helper_prefix, "help")
+        boss_cd = helper_command(helper_prefix, "boss cd")
+        boss_tickets = helper_command(helper_prefix, "boss t")
+        boss_list = helper_command(helper_prefix, "boss list")
+        boss_lookup = f"{helper_alias(helper_prefix, 'hbt')} <name/mention/ID>"
+        boss_settings = helper_alias(helper_prefix, "hbs")
+        boss_nickname = helper_alias(helper_prefix, "hbn")
+        team_short = helper_alias(helper_prefix, "ht")
+        weapon_short = helper_alias(helper_prefix, "hw")
+        dex_short = helper_alias(helper_prefix, "hwd")
 
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
             description=(
-                "`H` stands for **Helper** — and it is also the first letter of "
-                "Hassaan's name. This guide lists the commands currently supported."
+                f"This server's helper prefix is `{helper_prefix}`. "
+                f"Use `{help_command}` anytime to reopen this guide."
             ),
             color=0x5865F2,
         )
@@ -2127,7 +2296,8 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="⏱️ Guild-boss status",
             value=(
-                "Use `H boss cd`, `H boss cooldown`, or `/boss-cooldown`. Managers "
+                f"Use `{boss_cd}`, `{helper_command(helper_prefix, 'boss cooldown')}`, "
+                "or `/boss-cooldown`. Managers "
                 "configure alerts with `/boss-cooldown-channel`, decision helpers with "
                 "`/boss-decision-role`, fighter pings with `/boss-fighter-role`, and "
                 "daily reset reports with `/boss-report-channel`."
@@ -2137,70 +2307,74 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="🎟️ Boss tickets",
             value=(
-                f"Update manually with `owo boss t` / `{owo_command(owo_prefix, 'boss t')}`; view with `H boss t`, "
-                "`H boss list`, `HBL`, or `/boss-ticket-list`, and look up one "
-                "tracked member with `HBT <name/mention/ID>`. Public Top 10 battle "
-                "logs automatically subtract confirmed hits for already-tracked "
-                "members; fighters outside the Top 10 should update manually. "
-                "Inactive entries expire after 48 hours. Ticket boards include "
-                "**Text view** and clickable **Ping view** controls. Managers use "
-                "`HBS` / `H boss settings` / `/boss-ticket-manage` to remove or "
-                "block users and optionally enable nickname markers. Members control "
-                "their own marker, board entry, and tracking preference with the "
-                "board's **My settings** button, `/boss-ticket-nickname`, "
-                "`H boss nickname`, or `HBN`. A `🏷️` reaction "
-                "means the marker was applied; `🔕` means that member chose to hide it. "
-                "Nickname markers require **Manage Nicknames** and proper role order."
+                f"Update with `owo boss t` or `{owo_command(owo_prefix, 'boss t')}`. "
+                f"View with `{boss_tickets}`, `{boss_list}`, "
+                f"`{helper_alias(helper_prefix, 'hbl')}`, or `/boss-ticket-list`; "
+                f"look up members with `{boss_lookup}`. Managers use `{boss_settings}` "
+                "or `/boss-ticket-manage`. Members use the board's **My settings**, "
+                f"`{boss_nickname}`, or `/boss-ticket-nickname`. Top 10 battle logs "
+                "automatically reconcile tracked hits; inactive entries expire after 48 hours."
             ),
             inline=False,
         )
         embed.add_field(
             name="💾 Team templates",
             value=(
-                "Use `HT C <name>` to save, `HT` or `HT<number>` to open, "
-                "`HT U <slot/name>` to update, `HT D <slot/name>` to delete, and "
-                "`HT help` for the full guide."
+                f"Use `{team_short} C <name>` to save, `{team_short}` or "
+                f"`{team_short}<number>` to open, `{team_short} U <slot/name>` to "
+                f"update, `{team_short} D <slot/name>` to delete, and "
+                f"`{team_short} help` for the full guide."
             ),
             inline=False,
         )
         embed.add_field(
             name="🧾 Neon weapon dex",
             value=(
-                "➡️ Start with `HW` or `H weapons` for Pencilvester's Neon setup guide, including clicking Neon’s reaction on the `ww` message and opening every weapon page. "
-                "Use `HWD`, `H dex`, `H weapon dex`, `H weapondex`, or `HW dex` to show queued "
-                "alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon pages. Helpers can target another member with "
-                "`HWD @member` or `HWD @member dagger mtap sg`. Use **Copy first command** "
-                "for a copy-ready code block or click **Start dexing session** "
-                "for mobile-friendly one-command prompts labelled with the weapon owner's name. "
-                "The helper advances only after Neon confirms the shown weapon, then waits about two seconds, "
-                "removes the old prompt, and posts the next one. Any confirmed Neon blueprint marks that weapon "
-                "dexed for every matching owner queue. Use `HWD skip` or the **Skip weapon** button for sold/dismantled weapons. Use `H stop`, `Hstop`, or `HS` to pause. "
-                "`HW stats` / `H weapon stats` shows scanned, queued, saved, and no-action counts. Rows without a green tick are queued too, including orb/empowered rows that Neon does not mark with M."
+                f"➡️ Start with `{weapon_short}` or "
+                f"`{helper_command(helper_prefix, 'weapons')}` and open every Neon page. "
+                f"Use `{dex_short}` or `{helper_command(helper_prefix, 'dex')}` for "
+                "alternating `ww` / `wuse` prompts. Filters and target members work, "
+                f"for example `{dex_short} @member dagger mtap 100`. Start the guided "
+                "session for mobile-friendly one-command prompts; use "
+                f"`{dex_short} skip` for missing weapons and "
+                f"`{helper_command(helper_prefix, 'stop')}` to pause. "
+                f"`{weapon_short} stats` shows queue totals."
             ),
             inline=False,
         )
         embed.add_field(
             name="🛠️ Server-owner setup",
             value=(
-                "Use `/setup-guide` for a private configuration checklist, or `H setup` "
+                f"Use `/setup-guide` for a private checklist, or "
+                f"`{helper_command(helper_prefix, 'setup')}` "
                 "to post it in the channel. It covers alert/report channels, ticket "
                 "boards, decision roles, optional fighter pings, permissions, and the "
-                "server OwO prefix."
+                "separate OwO and helper prefixes. Change the helper prefix safely with "
+                "`/helper-prefix`."
             ),
             inline=False,
         )
         embed.add_field(
             name="ℹ️ Project",
             value=(
-                "Use `H about` or `/about` for developer and project information. "
+                f"Use `{helper_command(helper_prefix, 'about')}` or `/about` for project information. "
                 "Server managers can run `/channel-diagnostics` inside a problem "
                 "channel or thread."
             ),
             inline=False,
         )
-        embed.set_footer(text="Use H help anytime to show this current command guide.")
+        embed.set_footer(text=f"Use {help_command} anytime to show this command guide.")
+        return embed
 
-        await safe_reply(message,embed=embed, mention_author=False)
+    async def send_prefix_help(self, message: discord.Message) -> None:
+        """Reply to this server's helper-prefix help command."""
+        if message.guild is None:
+            return
+        owo_prefix = await get_guild_owo_prefix(message.guild.id)
+        helper_prefix = await get_guild_helper_prefix(message.guild.id)
+        embed = self.build_help_embed(helper_prefix, owo_prefix)
+
+        await safe_reply(message, embed=embed, mention_author=False)
         logger.info(
             "Prefix help requested by %s in guild %s",
             message.author,
@@ -2810,25 +2984,41 @@ class BossGenerator(commands.Cog):
             # Human trigger: helper commands and configured OwO boss-inventory forms.
             if not message.author.bot:
                 if message.guild:
-                    decision = parse_boss_decision_command(message.content or "")
+                    helper_prefix = await get_guild_helper_prefix(message.guild.id)
+                    prefix_argument = parse_helper_command_argument(
+                        message.content or "",
+                        helper_prefix,
+                        {"h prefix", "hprefix"},
+                    )
+                    if prefix_argument is not None:
+                        await self.handle_helper_prefix_message(message, prefix_argument)
+                        return
+
+                    decision = parse_boss_decision_command(
+                        message.content or "",
+                        helper_prefix,
+                    )
                     if decision is not None:
                         await self.handle_boss_decision_message(message, decision)
                         return
 
-                    sticky_action = parse_boss_sticky_command(message.content or "")
+                    sticky_action = parse_boss_sticky_command(
+                        message.content or "",
+                        helper_prefix,
+                    )
                     if sticky_action is not None:
                         await self.handle_boss_sticky_command(message, sticky_action)
                         return
 
-                    if is_prefix_help_trigger(message.content):
+                    if is_prefix_help_trigger(message.content, helper_prefix):
                         await self.send_prefix_help(message)
                         return
 
-                    if is_prefix_setup_trigger(message.content):
+                    if is_prefix_setup_trigger(message.content, helper_prefix):
                         await self.send_prefix_setup_guide(message)
                         return
 
-                    if is_prefix_cooldown_trigger(message.content):
+                    if is_prefix_cooldown_trigger(message.content, helper_prefix):
                         await self.send_prefix_cooldown_status(message)
                         return
 
@@ -3440,14 +3630,17 @@ class BossGenerator(commands.Cog):
             return
 
         owo_prefix = await get_guild_owo_prefix(guild_id)
+        helper_prefix = await get_guild_helper_prefix(guild_id)
         appeared = self.ui_emoji("boss_appeared", "⚔️")
 
         description = (
             f"Use `owo boss i` or `{owo_command(owo_prefix, 'boss i')}` to let the helper "
             "read the three boss pages.\n\n"
-            "Boss helpers can use `H boss hit`, `H boss skip`, or reply to a note with "
-            "`H sticky`.\n"
-            "Use `H sticky clear` to remove the current sticky. Use `H help` for "
+            f"Boss helpers can use `{helper_command(helper_prefix, 'boss hit')}`, "
+            f"`{helper_command(helper_prefix, 'boss skip')}`, or reply to a note with "
+            f"`{helper_command(helper_prefix, 'sticky')}`.\n"
+            f"Use `{helper_command(helper_prefix, 'sticky clear')}` to remove the "
+            f"current sticky. Use `{helper_command(helper_prefix, 'help')}` for "
             "configuration commands."
         )
         if expiry:

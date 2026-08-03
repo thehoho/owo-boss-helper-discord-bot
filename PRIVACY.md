@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 29 July 2026_
+_Last updated: 3 August 2026_
 
 OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 
@@ -17,6 +17,7 @@ The bot stores only the information needed to provide its features and operate s
 - Reported boss-ticket counts, update sources, last ticket activity times, and automatic expiration times.
 - Public OwO guild-boss message IDs and public `owobot.com` battle-log UUIDs used temporarily to deduplicate confirmed Top 10 ticket uses. The helper does not copy or store the full linked battle-log page.
 - Configured Discord channel and message IDs used for cooldown alerts, daily boss reports, and ticket boards.
+- Per-server helper and OwO command-prefix settings.
 - Per-server daily totals of confirmed defeated and escaped guild bosses.
 - Operational logs containing events, warnings, and errors.
 

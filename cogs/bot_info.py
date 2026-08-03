@@ -23,6 +23,11 @@ import discord
 from discord import app_commands
 from discord.ext import commands
 
+from .helper_prefix import (
+    HELPER_PREFIX_DEFAULT,
+    canonicalize_helper_command,
+    get_guild_helper_prefix,
+)
 from .message_utils import safe_reply
 
 logger = logging.getLogger(__name__)
@@ -33,7 +38,7 @@ TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.11.7-beta"
+BOT_VERSION = "0.12.0-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -72,7 +77,11 @@ def compact_command(content: str) -> str:
     return re.sub(r"\s+", "", content or "").lower()
 
 
-def classify_message_usage(content: str) -> str | None:
+def classify_message_usage(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> str | None:
+    content = canonicalize_helper_command(content, helper_prefix)
     first_line = next(
         (line.strip() for line in (content or "").splitlines() if line.strip()),
         "",
@@ -647,7 +656,7 @@ class BotInfo(commands.Cog):
         embed.add_field(name="Servers", value=str(len(self.bot.guilds)), inline=True)
         embed.add_field(
             name="Get started",
-            value="Use `H help` for commands and setup instructions.",
+            value="Use `/setup-guide` or this server's configured helper prefix.",
             inline=False,
         )
         embed.set_footer(
@@ -920,10 +929,12 @@ class BotInfo(commands.Cog):
     async def on_message(self, message: discord.Message) -> None:
         if message.guild is None or message.author.bot:
             return
-        metric = classify_message_usage(message.content or "")
+        helper_prefix = await get_guild_helper_prefix(message.guild.id)
+        canonical = canonicalize_helper_command(message.content or "", helper_prefix)
+        metric = classify_message_usage(message.content or "", helper_prefix)
         if metric is not None:
             await self.store.record_usage(message.guild.id, metric)
-        if compact_command(message.content or "") in ABOUT_COMMANDS:
+        if compact_command(canonical) in ABOUT_COMMANDS:
             await safe_reply(
                 message,
                 embed=self.build_about_embed(),

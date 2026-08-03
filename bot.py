@@ -82,7 +82,7 @@ async def on_ready() -> None:
     await bot.change_presence(
         activity=discord.Activity(
             type=discord.ActivityType.watching,
-            name="OwO guild bosses • H help",
+            name="OwO guild bosses • /setup-guide",
         )
     )
 
