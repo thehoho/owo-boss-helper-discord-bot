@@ -1636,14 +1636,14 @@ class BossGenerator(commands.Cog):
         config["boss_decision_by"] = user_id
         config["boss_decision_at"] = now
         config.pop("sticky_custom_text", None)
-        if decision == "skip":
-            skip_emoji = self.random_server_emoji(guild_id)
-            if skip_emoji:
-                config["boss_skip_emoji"] = skip_emoji
-            else:
-                config.pop("boss_skip_emoji", None)
+        decision_emoji = self.random_server_emoji(guild_id)
+        emoji_key = "boss_hit_emoji" if decision == "hit" else "boss_skip_emoji"
+        other_emoji_key = "boss_skip_emoji" if decision == "hit" else "boss_hit_emoji"
+        if decision_emoji:
+            config[emoji_key] = decision_emoji
         else:
-            config.pop("boss_skip_emoji", None)
+            config.pop(emoji_key, None)
+        config.pop(other_emoji_key, None)
 
         ping_role_ids: list[int] = []
         boss_key = int(config.get("active_boss_expires_at") or config.get("active_boss_message_id") or 0)
@@ -1675,7 +1675,8 @@ class BossGenerator(commands.Cog):
         if custom_text:
             return custom_text
         if decision == "hit":
-            return "# HIT"
+            emoji = str(config.get("boss_hit_emoji") or "").strip()
+            return f"# HIT {emoji}".rstrip()
         if decision == "skip":
             emoji = str(config.get("boss_skip_emoji") or "").strip()
             return f"# SKIP {emoji}".rstrip()
@@ -1777,6 +1778,8 @@ class BossGenerator(commands.Cog):
             "sticky_custom_text",
             "fighter_role_pinged_boss_key",
             "fighter_roles_pinged_boss_key",
+            "boss_hit_emoji",
+            "boss_skip_emoji",
         )
         for key in keys:
             if key in config:
@@ -2324,6 +2327,27 @@ class BossGenerator(commands.Cog):
                 f"`{team_short}<number>` to open, `{team_short} U <slot/name>` to "
                 f"update, `{team_short} D <slot/name>` to delete, and "
                 f"`{team_short} help` for the full guide."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="📚 Trusted team guides",
+            value=(
+                f"Browse with `{helper_command(helper_prefix, 'guide')}` or `/team-guide`; "
+                f"search by name, alias, category, or author with "
+                f"`{helper_command(helper_prefix, 'guide <query>')}`. "
+                "Trusted experts use `/team-guide-create` and `/team-guide-edit`. "
+                "Only the bot owner can grant expert access with `/guide-expert`."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🐾 Public animal Dex",
+            value=(
+                f"Search with `{helper_command(helper_prefix, 'animal dex <animal>')}` or "
+                "`/animal-dex`. The helper learns public stats from official OwO Dex "
+                "responses and can show its latest cached record when an animal is not "
+                "available in the requesting member's zoo."
             ),
             inline=False,
         )

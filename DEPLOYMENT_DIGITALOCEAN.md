@@ -107,7 +107,7 @@ scp "D:\owo-boss-helper-discord-bot-github-ready\owo-boss-helper-discord-bot	eam
 scp "D:\owo-boss-helper-discord-bot-github-ready\owo-boss-helper-discord-botoss_tickets.db" owohelper@YOUR_SERVER_IP:/opt/owo-boss-helper/
 ```
 
-`bot_stats.db` is created automatically. Copy it too during future migrations if you want to preserve historical server and usage statistics.
+For a complete current migration, preserve `.env`, `boss_cooldown_config.json`, and every runtime database that exists: `team_templates.db`, `animal_dex.db`, `team_guides.db`, `boss_tickets.db`, `bot_stats.db`, and `neon_weapons.db`. Stop the service before copying live SQLite files, or use SQLite's online backup command as the bundled backup script does.
 
 ## 6. Test manually
 
@@ -151,6 +151,8 @@ Add this daily schedule:
 ```
 
 Keep DigitalOcean backups enabled as the off-server recovery layer.
+
+The bundled backup includes `.env`, `boss_cooldown_config.json`, and all six runtime databases. Archives and their working directories are owner-only. After updating the repository, reinstall the latest `deploy/backup.sh` copy in `/usr/local/bin` so newly introduced databases are included.
 
 ## 9. Normal update workflow
 

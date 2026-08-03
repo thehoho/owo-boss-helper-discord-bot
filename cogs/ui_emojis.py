@@ -11,6 +11,7 @@ from __future__ import annotations
 import asyncio
 import io
 import logging
+import re
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,8 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ASSET_DIR = PROJECT_ROOT / "assets" / "ui_emojis"
 GAME_ASSET_DIR = PROJECT_ROOT / "assets" / "game_emojis"
 MAX_EMOJI_BYTES = 256 * 1024
+MAX_APPLICATION_EMOJIS = 2000
+MAX_EMOJI_NAME_LENGTH = 32
 SUPPORTED_ASSET_SUFFIXES = frozenset({".gif", ".jpeg", ".jpg", ".png", ".webp"})
 
 EMOJI_FILES: dict[str, str] = {
@@ -39,6 +42,7 @@ GAME_EMOJI_CATEGORIES: dict[str, str] = {
     "pet": "animals",
     "weapon": "weapons",
     "passive": "passives",
+    "rank": "ranks",
 }
 
 
@@ -51,7 +55,14 @@ def discover_emoji_assets() -> dict[str, Path]:
             continue
         for path in sorted(directory.iterdir()):
             if path.is_file() and path.suffix.casefold() in SUPPORTED_ASSET_SUFFIXES:
-                assets[f"{emoji_prefix}_{path.stem.casefold()}"] = path
+                name = f"{emoji_prefix}_{path.stem.casefold()}"
+                if len(name) > MAX_EMOJI_NAME_LENGTH or not re.fullmatch(r"[a-z0-9_]+", name):
+                    logger.warning("Skipped Discord-unsafe application emoji name: %s", name)
+                    continue
+                if name in assets:
+                    logger.warning("Skipped duplicate application emoji name: %s", name)
+                    continue
+                assets[name] = path
     return assets
 
 
@@ -142,6 +153,15 @@ class UIEmojiManager(commands.Cog):
 
                 if not path.is_file():
                     missing_assets.append(str(path.relative_to(PROJECT_ROOT)))
+                    continue
+
+                if len(by_name) + created >= MAX_APPLICATION_EMOJIS:
+                    logger.warning(
+                        "Application emoji capacity reached at %s; could not create %s",
+                        MAX_APPLICATION_EMOJIS,
+                        name,
+                    )
+                    failed.append(name)
                     continue
 
                 image = prepare_emoji_image(path)

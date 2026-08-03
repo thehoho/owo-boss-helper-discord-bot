@@ -15,7 +15,7 @@ LOG_DIR = PROJECT_ROOT / "logs"
 LOG_FILE = LOG_DIR / "bot.log"
 BOT_DESCRIPTION = (
     "OwO Boss Helper generates ordered Neon boss commands, tracks guild-boss "
-    "cooldowns, tickets, Neon weapon dex queues, and guided team templates."
+    "cooldowns, tickets, Neon weapon dex queues, public animal facts, and trusted team guides."
 )
 
 
@@ -101,6 +101,10 @@ async def main() -> None:
     async with bot:
         await bot.load_extension("cogs.ui_emojis")
         logger.info("Application emoji manager loaded")
+        await bot.load_extension("cogs.animal_dex")
+        logger.info("Public animal dex catalog loaded")
+        await bot.load_extension("cogs.team_guides")
+        logger.info("Trusted team guide manager loaded")
         await bot.load_extension("cogs.boss_generator")
         logger.info("Boss generator and cooldown tracker loaded")
         await bot.load_extension("cogs.team_templates")

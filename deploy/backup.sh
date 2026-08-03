@@ -11,13 +11,13 @@ ARCHIVE="${BACKUP_DIR}/owo-boss-helper-${TIMESTAMP}.tar.gz"
 mkdir -p "${WORK_DIR}"
 chmod 700 "${BACKUP_DIR}" "${WORK_DIR}"
 
-for database in team_templates.db boss_tickets.db bot_stats.db; do
+for database in team_templates.db animal_dex.db team_guides.db boss_tickets.db bot_stats.db neon_weapons.db; do
     if [[ -f "${APP_DIR}/${database}" ]]; then
         sqlite3 "${APP_DIR}/${database}" ".backup '${WORK_DIR}/${database}'"
     fi
 done
 
-for file in boss_cooldown_config.json; do
+for file in .env boss_cooldown_config.json; do
     if [[ -f "${APP_DIR}/${file}" ]]; then
         cp --preserve=mode,timestamps "${APP_DIR}/${file}" "${WORK_DIR}/${file}"
     fi

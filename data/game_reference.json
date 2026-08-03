@@ -1,0 +1,399 @@
+{
+  "schema_version": 1,
+  "source": "https://owobot.fandom.com/wiki/Weapons",
+  "retrieved_at": "2026-08-03T21:37:12.823958+00:00",
+  "weapons": [
+    {
+      "id": 101,
+      "name": "Great Sword",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "100-200",
+      "description": "Deals 35-55% of your STR to all opponents."
+    },
+    {
+      "id": 102,
+      "name": "Healing Staff",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "150-225",
+      "description": "Heals 110-160% of your MAG to the lowest health ally. This weapon can overheal up to 50% of max HP."
+    },
+    {
+      "id": 103,
+      "name": "Bow",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "120-220",
+      "description": "Deals 110-160% of your STR to a an enemy."
+    },
+    {
+      "id": 104,
+      "name": "Rune of the Forgotten",
+      "weapon_stats": 1,
+      "passive_slots": 0,
+      "wp_range": "0",
+      "description": "Increase ALL stats by 5-15%, and changes your physical attacks to do 65% STR and 65% MAG as TRUE damage. This weapon does not have an active ability."
+    },
+    {
+      "id": 105,
+      "name": "Defender's Aegis",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "150-250",
+      "description": "At the start of the turn, apply taunt to your animal for 2 turns. taunt Taunts the enemy team and forces all opponents to attack this animal. Reduces incoming damage by -20-50%. 24px Defense Buff - Cannot be applied if the animal already has a defense buff."
+    },
+    {
+      "id": 106,
+      "name": "Orb of Potency",
+      "weapon_stats": 0,
+      "passive_slots": 2,
+      "wp_range": "0",
+      "description": "This weapon has no active ability, but comes with two passives!"
+    },
+    {
+      "id": 107,
+      "name": "Vampiric Staff",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "90-190",
+      "description": "Deal 25-45% of your MAG to ALL enemies and heal ALL allies by the damage dealt."
+    },
+    {
+      "id": 108,
+      "name": "Poison Dagger",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "100-200",
+      "description": "Deals 70-100% of your STR to an enemy and apply poison for 3 turns. poison Deals 30-50% of your MAG as true damage at the end of the turn."
+    },
+    {
+      "id": 109,
+      "name": "Wand of Absorption",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "150-250",
+      "description": "Deal 80-115% of your MAG to an enemy and transfer their WP to any random ally equal to 20-40% of the damage done."
+    },
+    {
+      "id": 110,
+      "name": "Flame Staff",
+      "weapon_stats": 4,
+      "passive_slots": 1,
+      "wp_range": "100-200",
+      "description": "Deals 75-95% of your MAG to an enemy and apply flame for 3 turns. flame Deals 20-40% of your MAG at the end of the turn. Applying flame on a target that already has flame will explode and deal 80-110% damage to the target."
+    },
+    {
+      "id": 111,
+      "name": "Energy Staff",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "100-200",
+      "description": "Sends a wave of energy and deals 35-65% of your MAG to all opponents."
+    },
+    {
+      "id": 112,
+      "name": "Spirit Staff",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "150-250",
+      "description": "Heal all allies for 30-50% of your MAG and apply defup for 2 turns. defup Reduces incoming damage by -20-30%. 24px Defense Buff - Cannot be applied if the animal already has a defense buff."
+    },
+    {
+      "id": 113,
+      "name": "Arcane Scepter",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "150-250",
+      "description": "Replenish 65-95% of your MAG as WP to any ally with the lowest WP. This weapon can overreplenish up to 50% of max WP."
+    },
+    {
+      "id": 114,
+      "name": "Resurrection Staff",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "300-400",
+      "description": "Revive a random dead ally and heal them for 60-90% of your MAG."
+    },
+    {
+      "id": 115,
+      "name": "Glacial Axe",
+      "weapon_stats": 2,
+      "passive_slots": 1,
+      "wp_range": "160-260",
+      "description": "Deals 40-60% of your STR to an enemy and apply 2 stacks of freeze. freeze Next turn, prevent the target from attacking. Remove a stack after triggering."
+    },
+    {
+      "id": 116,
+      "name": "Vanguard's Banner",
+      "weapon_stats": 4,
+      "passive_slots": 1,
+      "wp_range": "235-290",
+      "description": "At the start of the turn, apply atkup to all allies for 2 turns. If the user has enough WP when the buff expires, the buff will be recasted with a stronger version. atkupIncreases all damage by +15-25%. Cannot stack with other Attack Up buffs. atkup+Increases all damage by +25-35%. Cannot stack with other Attack Up+ buffs. atkup++Increases all damage by +40-50%. Cannot stack with other Attack Up++ buffs."
+    },
+    {
+      "id": 117,
+      "name": "Culling Scythe",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "100-200",
+      "description": "Deals 70-100% of your STR to an enemy and apply mort for 2 turns. mort Decreases all healing for this animal by -45-75%"
+    },
+    {
+      "id": 118,
+      "name": "Rune of Celebration",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "100-200",
+      "description": "Apply celeb to an ally with the lowest health for 3 turns. celeb At the end of every turn, heal 20-45% of your PR as HP and restore 15-35% of your MR as WP."
+    },
+    {
+      "id": 119,
+      "name": "Staff of Purity",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "150-220",
+      "description": "Remove a debuff from a random ally and heal them for 50-100% of your MAG and apply 1 stack of sward for 2 turns. sward Prevents any debuffs to be applied to this animal. On success, remove a stack and replenish 15-25% MAG to the animal."
+    },
+    {
+      "id": 120,
+      "name": "Leeching Scythe",
+      "weapon_stats": 5,
+      "passive_slots": 1,
+      "wp_range": "130-230",
+      "description": "Deal 50-80% of your STR to an enemy and apply leech for 3 turns. If leech is already on the target, deal +40-60% more damage. leech The caster who applied this debuff steals -30-60% of incoming heals and -30-60% of incoming replenishes."
+    },
+    {
+      "id": 121,
+      "name": "Foul Fish",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "180-280",
+      "description": "Deal 50-80% of your STR to an enemy and apply stinky for 2 turns. stinky prevents any future buffs AND debuffs to be applied to this animal. On success, deal 20-50% MAG to the animal. Stinky can be applied to stinky animals."
+    },
+    {
+      "id": 122,
+      "name": "Rune of Luck",
+      "weapon_stats": 6,
+      "passive_slots": 1,
+      "wp_range": "100-200",
+      "description": "Punches an enemy 5 times. Each punch randomly deals either a percentage of your STR or MAG. Punches deals: 1-40%, 1-40%, 1-40%, 1-40%, 1-40%."
+    },
+    {
+      "id": 123,
+      "name": "Staff of Corruption",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "150-250",
+      "description": "Reduce the effectiveness of a random enemy's buff to 70-50% of its original value, and deal 80-120 of your STR to them."
+    },
+    {
+      "id": 124,
+      "name": "Soul Tithe",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "50-100",
+      "description": "Absorb 10-25% of all allies' current WP to deal damage to an enemy. Deals 35-45% of your MAG for every 100 WP absorbed."
+    },
+    {
+      "id": 125,
+      "name": "Briar-Heart Staff",
+      "weapon_stats": 4,
+      "passive_slots": 1,
+      "wp_range": "140-240",
+      "description": "At the start of the turn, apply tether to your allies for 2 turns. tether Create a tether from the weapon owner to this animal. The owner absorbs -25-50% of the incoming damage dealt, but also intercepts -20-30% of healing and -20-30% replenishing from the target. 24px Defense Buff - Cannot be applied if the animal already has a defense buff."
+    },
+    {
+      "id": 126,
+      "name": "Arbiter's Edge",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "125-225",
+      "description": "Unleash judgement upon an enemy. Consume all stacks of sin and vir. Gain a stack of sin when an ally deals damage to an animal. Gain a stack of vir when an ally heals or replenishes an animal. sin When consumed, each stack deals 10-20% of your MIXED highest offense stat as physical damage to an enemy. vir When consumed, each stack deals 20-30% of your MIXED lowest offense stat as magical damage to an enemy. 24px Stack Limit - Cannot exceed 10 stacks"
+    },
+    {
+      "id": 127,
+      "name": "Wounding Crossbow",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "280-480",
+      "description": "If arrow is not loaded, load one. Otherwise, consume it. Loading an arrow does not cost WP. arrow When consumed, deal 220-300% of your STR and apply 10-25 stacks of exposed to an enemy. exposed The next instance of damage taken will be increased by 1% per stack. Consume all stacks after triggering."
+    },
+    {
+      "id": 128,
+      "name": "Bleeding Gaze",
+      "weapon_stats": 4,
+      "passive_slots": 1,
+      "wp_range": "20-10% of Max HP",
+      "description": "Force a random enemy to attack its allies with 30-50% weapon Effectiveness. Their weapon's cost is reduced to 20-40% during this attack. If there is only one enemy, deal 150-200% of your MAG directly to the enemy."
+    },
+    {
+      "id": 129,
+      "name": "Conduit Claw",
+      "weapon_stats": 3,
+      "passive_slots": 1,
+      "wp_range": "100-200",
+      "description": "Move a debuff from an enemy to the ally with the most buffs. Reduce the debuff's effectiveness by -20-50% and deal 120-170% of your MAG to the enemy. Moved buffs are calculated based on the original caster's stats. |}"
+    }
+  ],
+  "passives": [
+    {
+      "name": "Strength",
+      "description": "Increases your STR by 5-20%."
+    },
+    {
+      "name": "Magic",
+      "description": "Increases your MAG by 5-20%."
+    },
+    {
+      "name": "Health Point",
+      "description": "Increases your HP by 5-20%."
+    },
+    {
+      "name": "Weapon Point",
+      "description": "Increases your WP by 10-30%."
+    },
+    {
+      "name": "Physical Resistance",
+      "description": "Increases your PR by 15-35%."
+    },
+    {
+      "name": "Magic Resistance",
+      "description": "Increases your MR by 15-35%."
+    },
+    {
+      "name": "Lifesteal",
+      "description": "All damage you deal heals you for 15-35% of the damage dealt!"
+    },
+    {
+      "name": "Thorns",
+      "description": "Reflect 15-35% of the damage dealt to you as true damage."
+    },
+    {
+      "name": "Mana Tap",
+      "description": "All Damage you deal replenishes your WP for 15-30% of the damage dealt!"
+    },
+    {
+      "name": "Absolve",
+      "description": "When healed, deal 60-80% of the healed amount to an enemy as magical damage."
+    },
+    {
+      "name": "Safeguard",
+      "description": "Negate 20-40% of the damage dealt to you with WP."
+    },
+    {
+      "name": "Critical",
+      "description": "Every attack has a 10-30% chance to deal 25-50% more damage. This can apply to heals."
+    },
+    {
+      "name": "Discharge",
+      "description": "When WP is replenished, deal 110-150% of the replenished amount to an enemy as magical damage."
+    },
+    {
+      "name": "Kamikaze",
+      "description": "When the animal dies, deal 50-75% of its Max HP as magical damage to the attacker."
+    },
+    {
+      "name": "Regeneration",
+      "description": "Heal 5-10% of max HP after every turn."
+    },
+    {
+      "name": "Energize",
+      "description": "Replenish 20-40 WP after every turn."
+    },
+    {
+      "name": "Sprout",
+      "description": "Increase all incoming healing by +20-40%."
+    },
+    {
+      "name": "Enrage",
+      "description": "Every 10% of missing health gives +2-5% damage."
+    },
+    {
+      "name": "Sacrifice",
+      "description": "When this animal dies, heal your teammates for 25-50% of its Max HP and replenish for 15-35% of its Max WP."
+    },
+    {
+      "name": "Snail",
+      "description": "Your pet snail fights with you. Whenever you attack an animal, snail will slap a random enemy for 5-15% of the damage dealt as true damage."
+    },
+    {
+      "name": "Knowledge",
+      "description": "This passive does not do anything in battle. However, it will give this animal +5-15% extra XP after each battle."
+    },
+    {
+      "name": "Giant Slayer",
+      "description": "Deal 10-25% more damage to bosses."
+    },
+    {
+      "name": "Adaptation",
+      "description": "Gains resistance against the last damage type received. Physical hits grant stoneskin, while Magical hits grant spellskin. stoneskin - Reduces incoming Physical damage by 5-10% per stack. Remove all stacks upon taking damage of other types. spellskin - Reduces incoming Magical damage by 5-10% per stack. Remove all stacks upon taking damage of other types. 24px Stack Limit - Cannot exceed 5 stacks"
+    },
+    {
+      "name": "Resonance",
+      "description": "For every buff you have, deal +5-10% more damage. For every debuff you have, take -5-10% less damage."
+    },
+    {
+      "name": "Living Hive",
+      "description": "When dealing damage, spend 8-2 WP to apply pest to the target. pest- At the end of the turn, each stack of pests will deal 2-8% of your MAG as magical damage to the target. Pests will leave after they deal damage."
+    },
+    {
+      "name": "Lone Wolf",
+      "description": "If you are the only animal in your team, deal +10-30% more damage and take -10-30% less damage."
+    },
+    {
+      "name": "Double Strike",
+      "description": "When this animal attacks, it has a 10-25%chance to attack one more time with 15-30% of the weapon's Effectiveness and 35-20% of the weapon's cost. 24px Unique Passive - This passive is only available once per weapon."
+    },
+    {
+      "name": "Frost Armor",
+      "description": "When you receive damage, apply 10-20 stacks of frost to the attacker. frost At 100 stacks, apply a stack of freeze to the target. Remove all stacks after triggering. freeze Next turn, prevent the target from attacking. Remove a stack after triggering. |}"
+    }
+  ],
+  "weapon_quality_tiers": [
+    {
+      "rank": "common",
+      "quality": "0-20%"
+    },
+    {
+      "rank": "uncommon",
+      "quality": "21-40%"
+    },
+    {
+      "rank": "rare",
+      "quality": "41-60%"
+    },
+    {
+      "rank": "epic",
+      "quality": "61-80%"
+    },
+    {
+      "rank": "mythical",
+      "quality": "81-94%"
+    },
+    {
+      "rank": "legendary",
+      "quality": "95-99%"
+    },
+    {
+      "rank": "fabled",
+      "quality": "100%"
+    }
+  ],
+  "animal_ranks": [
+    "common",
+    "uncommon",
+    "rare",
+    "epic",
+    "mythical",
+    "patreon",
+    "custom_patreon",
+    "gem",
+    "legendary",
+    "fabled",
+    "bot",
+    "hidden",
+    "distorted",
+    "special"
+  ]
+}

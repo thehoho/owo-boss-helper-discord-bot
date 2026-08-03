@@ -28,6 +28,7 @@ from .helper_prefix import (
     helper_command,
 )
 from .message_utils import safe_reply
+from .owo_prefix import get_guild_owo_prefix
 from .ui_emojis import ui_emoji_text
 
 logger = logging.getLogger(__name__)
@@ -1809,6 +1810,9 @@ class NeonWeapons(commands.Cog):
         helper_prefix = await get_guild_helper_prefix(
             message.guild.id if message.guild else None
         )
+        owo_prefix = await get_guild_owo_prefix(
+            message.guild.id if message.guild else None
+        )
         dex_short = helper_alias(helper_prefix, "hwd")
         calculate_emoji = ui_emoji_text(self.bot, "neon_calculate", "🧮")
         embed = discord.Embed(
@@ -1819,7 +1823,11 @@ class NeonWeapons(commands.Cog):
                 "**2.** Run `ww`.\n"
                 f"**3.** Click Neon's reaction {calculate_emoji} on the `ww` message.\n"
                 "**4.** Click the right arrow ➡️ through every weapon page.\n"
-                "-# The helper can only scan the pages that Neon actually displays.\n\n"
+                "-# The helper can only scan the pages that Neon actually displays.\n"
+                f"**5.** If your weapons are already uploaded to Neon, run `{owo_prefix}inv`, "
+                "then use Neon's `/weapon inv check` in the same channel. It compares "
+                "your current OwO inventory with Neon's saved inventory and shows any "
+                "weapons that still need to be uploaded.\n\n"
                 "OwO Boss Helper scans Neon weapon pages from NeonUtil and saves weapons where Neon shows **M / max possible** or any scanned row without a green saved tick. "
                 f"Then run `{dex_short}`, `{helper_command(helper_prefix, 'dex')}`, "
                 f"or `{helper_command(helper_prefix, 'weapon dex')}` to get guided "

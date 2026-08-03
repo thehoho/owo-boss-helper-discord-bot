@@ -1,0 +1,4250 @@
+{
+  "schema_version": 1,
+  "source": "https://owobot.fandom.com/wiki/All_Animals",
+  "source_template": "Template:Special Animals List",
+  "retrieved_at": "2026-08-03T21:37:12.823958+00:00",
+  "special_animal_count": 173,
+  "animals": [
+    {
+      "key": "2026july_pecan",
+      "name": "2026july_pecan",
+      "rank": "special",
+      "emoji_stem": "2026july_pecan",
+      "source_image": "2026july_pecan.gif",
+      "event": "July Holidays 2026",
+      "dates": "1 - 8 May 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "TBD",
+      "stats": {
+        "hp": 11,
+        "str": 1,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "2026july_pecan",
+        "pecan",
+        "wetlands",
+        "duckandwetlandsday"
+      ],
+      "asset": "assets/game_emojis/animals/2026july_pecan.gif"
+    },
+    {
+      "key": "2026july_mothweek",
+      "name": "2026july_mothweek",
+      "rank": "special",
+      "emoji_stem": "2026july_mothweek",
+      "source_image": "2026july_mothweek.gif",
+      "event": "July Holidays 2026",
+      "dates": "1 - 8 May 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "TBD",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 13,
+        "mr": 1
+      },
+      "aliases": [
+        "2026july_mothweek",
+        "lunamoth"
+      ],
+      "asset": "assets/game_emojis/animals/2026july_mothweek.gif"
+    },
+    {
+      "key": "2026july_hotdogday",
+      "name": "2026july_hotdogday",
+      "rank": "special",
+      "emoji_stem": "2026july_hotdogday",
+      "source_image": "2026july_hotdogday.gif",
+      "event": "July Holidays 2026",
+      "dates": "1 - 8 May 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "TBD",
+      "stats": {
+        "hp": 9,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 6,
+        "mr": 1
+      },
+      "aliases": [
+        "2026july_hotdogday"
+      ],
+      "asset": "assets/game_emojis/animals/2026july_hotdogday.gif"
+    },
+    {
+      "key": "2026june_oliver",
+      "name": "2026june_oliver",
+      "rank": "special",
+      "emoji_stem": "2026june_oliver",
+      "source_image": "2026june_oliver.gif",
+      "event": "June Holidays 2026",
+      "dates": "2 - 9 May 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "169,391",
+      "stats": {
+        "hp": 13,
+        "str": 1,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2026june_oliver",
+        "oliver",
+        "vincian"
+      ],
+      "asset": "assets/game_emojis/animals/2026june_oliver.gif"
+    },
+    {
+      "key": "2026june_crocday",
+      "name": "2026june_crocday",
+      "rank": "special",
+      "emoji_stem": "2026june_crocday",
+      "source_image": "2026june_crocday.gif",
+      "event": "June Holidays 2026",
+      "dates": "2 - 9 May 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "168,573",
+      "stats": {
+        "hp": 10,
+        "str": 1,
+        "pr": 1,
+        "wp": 6,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2026june_crocday",
+        "2026june_CrocDay",
+        "CrocBread"
+      ],
+      "asset": "assets/game_emojis/animals/2026june_crocday.gif"
+    },
+    {
+      "key": "2026may_beeday",
+      "name": "2026may_beeday",
+      "rank": "special",
+      "emoji_stem": "2026may_beeday",
+      "source_image": "2026may_beeday.gif",
+      "event": "May Holidays 2026",
+      "dates": "1 - 8 May 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "163,087",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 14,
+        "mr": 1
+      },
+      "aliases": [
+        "2026may_beeday",
+        "beeday",
+        "springbee"
+      ],
+      "asset": "assets/game_emojis/animals/2026may_beeday.gif"
+    },
+    {
+      "key": "2026may_graduates",
+      "name": "2026may_graduates",
+      "rank": "special",
+      "emoji_stem": "2026may_graduates",
+      "source_image": "2026may_graduates.gif",
+      "event": "May Holidays 2026",
+      "dates": "1 - 8 May 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "162,563",
+      "stats": {
+        "hp": 1,
+        "str": 1,
+        "pr": 1,
+        "wp": 15,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2026may_graduates",
+        "happygraduation",
+        "penguin_special"
+      ],
+      "asset": "assets/game_emojis/animals/2026may_graduates.gif"
+    },
+    {
+      "key": "2026may_frank",
+      "name": "2026may_frank",
+      "rank": "special",
+      "emoji_stem": "2026may_frank",
+      "source_image": "2026may_frank.gif",
+      "event": "May Holidays 2026",
+      "dates": "1 - 8 May 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "162,690",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 1,
+        "wp": 8,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2026may_frank",
+        "2026worksday",
+        "frank"
+      ],
+      "asset": "assets/game_emojis/animals/2026may_frank.gif"
+    },
+    {
+      "key": "2026april_aprilfools",
+      "name": "2026april_aprilfools",
+      "rank": "special",
+      "emoji_stem": "2026april_aprilfools",
+      "source_image": "2026april_aprilfools.gif",
+      "event": "April Holidays 2026",
+      "dates": "1 - 9 Apr 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "209,134",
+      "stats": {
+        "hp": 9,
+        "str": 5,
+        "pr": 2,
+        "wp": 2,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2026april_aprilfools",
+        "april_jester"
+      ],
+      "asset": "assets/game_emojis/animals/2026april_aprilfools.gif"
+    },
+    {
+      "key": "2026april_easter",
+      "name": "2026april_easter",
+      "rank": "special",
+      "emoji_stem": "2026april_easter",
+      "source_image": "2026april_easter.gif",
+      "event": "April Holidays 2026",
+      "dates": "1 - 9 Apr 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "209,141",
+      "stats": {
+        "hp": 10,
+        "str": 2,
+        "pr": 2,
+        "wp": 4,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2026april_easter",
+        "bunnii",
+        "easter_bunnii",
+        "qt_emul"
+      ],
+      "asset": "assets/game_emojis/animals/2026april_easter.gif"
+    },
+    {
+      "key": "2026march_miku",
+      "name": "2026march_miku",
+      "rank": "special",
+      "emoji_stem": "2026march_miku",
+      "source_image": "2026march_miku.gif",
+      "event": "March Holidays 2026",
+      "dates": "6 - 13 Mar 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "226,550",
+      "stats": {
+        "hp": 5,
+        "str": 1,
+        "pr": 9,
+        "wp": 1,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "2026march_miku",
+        "hatsune",
+        "hatsunemiku",
+        "miku"
+      ],
+      "asset": "assets/game_emojis/animals/2026march_miku.gif"
+    },
+    {
+      "key": "2026march_pi",
+      "name": "2026march_pi",
+      "rank": "special",
+      "emoji_stem": "2026march_pi",
+      "source_image": "2026march_pi.gif",
+      "event": "March Holidays 2026",
+      "dates": "6 - 13 Mar 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "227,057",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 4,
+        "wp": 3,
+        "mag": 1,
+        "mr": 4
+      },
+      "aliases": [
+        "2026march_pi",
+        "2026march_Pi"
+      ],
+      "asset": "assets/game_emojis/animals/2026march_pi.gif"
+    },
+    {
+      "key": "2026march_siti",
+      "name": "2026march_siti",
+      "rank": "special",
+      "emoji_stem": "2026march_siti",
+      "source_image": "2026march_siti.gif",
+      "event": "March Holidays 2026",
+      "dates": "6 - 13 Mar 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "227,022",
+      "stats": {
+        "hp": 7,
+        "str": 1,
+        "pr": 8,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2026march_siti",
+        "siti",
+        "2026ramadan",
+        "2026eid"
+      ],
+      "asset": "assets/game_emojis/animals/2026march_siti.gif"
+    },
+    {
+      "key": "2026feb_huba",
+      "name": "2026feb_huba",
+      "rank": "special",
+      "emoji_stem": "2026feb_huba",
+      "source_image": "2026feb_huba.gif",
+      "event": "February Holidays 2026",
+      "dates": "2 - 9 Feb 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "263,706",
+      "stats": {
+        "hp": 11,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2026feb_huba",
+        "huba"
+      ],
+      "asset": "assets/game_emojis/animals/2026feb_huba.gif"
+    },
+    {
+      "key": "2026feb_snowslug",
+      "name": "2026feb_snowslug",
+      "rank": "special",
+      "emoji_stem": "2026feb_snowslug",
+      "source_image": "2026feb_snowslug.gif",
+      "event": "February Holidays 2026",
+      "dates": "2 - 9 Feb 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "263,379",
+      "stats": {
+        "hp": 7,
+        "str": 8,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2026feb_snowslug",
+        "slugheart",
+        "snowslug"
+      ],
+      "asset": "assets/game_emojis/animals/2026feb_snowslug.gif"
+    },
+    {
+      "key": "4m_owo",
+      "name": "4m_owo",
+      "rank": "special",
+      "emoji_stem": "4m_owo",
+      "source_image": "4m_owo.gif",
+      "event": "4 Million Servers",
+      "dates": "18 - 25 Jan 2026",
+      "rarity": "??? from 4m_Present",
+      "caught": "189,912 (Will increase)",
+      "stats": {
+        "hp": 6,
+        "str": 1,
+        "pr": 6,
+        "wp": 1,
+        "mag": 1,
+        "mr": 6
+      },
+      "aliases": [
+        "4m_owo",
+        "4mowo",
+        "owo4m"
+      ],
+      "asset": "assets/game_emojis/animals/4m_owo.gif"
+    },
+    {
+      "key": "4m_jellyfish",
+      "name": "4m_jellyfish",
+      "rank": "special",
+      "emoji_stem": "4m_jellyfish",
+      "source_image": "4m_jellyfish.gif",
+      "event": "4 Million Servers",
+      "dates": "18 - 25 Jan 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "188,305",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 11,
+        "mag": 4,
+        "mr": 1
+      },
+      "aliases": [
+        "4m_jellyfish",
+        "4mjellyfish"
+      ],
+      "asset": "assets/game_emojis/animals/4m_jellyfish.gif"
+    },
+    {
+      "key": "4m_duck",
+      "name": "4m_duck",
+      "rank": "special",
+      "emoji_stem": "4m_duck",
+      "source_image": "4m_duck.gif",
+      "event": "4 Million Servers",
+      "dates": "18 - 25 Jan 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "188,396",
+      "stats": {
+        "hp": 2,
+        "str": 7,
+        "pr": 1,
+        "wp": 2,
+        "mag": 7,
+        "mr": 1
+      },
+      "aliases": [
+        "4m_duck",
+        "4mduck",
+        "45m_duck",
+        "45mduck"
+      ],
+      "asset": "assets/game_emojis/animals/4m_duck.gif"
+    },
+    {
+      "key": "2025dec_polar",
+      "name": "2025dec_polar",
+      "rank": "special",
+      "emoji_stem": "2025dec_polar",
+      "source_image": "2025dec_polar.gif",
+      "event": "December Holidays 2025",
+      "dates": "25 Dec 2025 - 2 Jan 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "183,552",
+      "stats": {
+        "hp": 1,
+        "str": 1,
+        "pr": 8,
+        "wp": 1,
+        "mag": 1,
+        "mr": 8
+      },
+      "aliases": [
+        "2025dec_polar"
+      ],
+      "asset": "assets/game_emojis/animals/2025dec_polar.gif"
+    },
+    {
+      "key": "2025dec_daisy",
+      "name": "2025dec_daisy",
+      "rank": "special",
+      "emoji_stem": "2025dec_daisy",
+      "source_image": "2025dec_daisy.gif",
+      "event": "December Holidays 2025",
+      "dates": "25 Dec 2025 - 2 Jan 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "183,615",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 13,
+        "mr": 1
+      },
+      "aliases": [
+        "2025dec_daisy",
+        "2025newyear"
+      ],
+      "asset": "assets/game_emojis/animals/2025dec_daisy.gif"
+    },
+    {
+      "key": "2025dec_wintermiku",
+      "name": "2025dec_wintermiku",
+      "rank": "special",
+      "emoji_stem": "2025dec_wintermiku",
+      "source_image": "2025dec_wintermiku.gif",
+      "event": "December Holidays 2025",
+      "dates": "25 Dec 2025 - 2 Jan 2026",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "183,860",
+      "stats": {
+        "hp": 13,
+        "str": 1,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025dec_wintermiku",
+        "wintermiku"
+      ],
+      "asset": "assets/game_emojis/animals/2025dec_wintermiku.gif"
+    },
+    {
+      "key": "2025nov_hector",
+      "name": "2025nov_hector",
+      "rank": "special",
+      "emoji_stem": "2025nov_hector",
+      "source_image": "2025nov_hector.gif",
+      "event": "November Holidays 2025",
+      "dates": "25 Nov - 2 Dec 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "165,679",
+      "stats": {
+        "hp": 5,
+        "str": 6,
+        "pr": 2,
+        "wp": 5,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025nov_hector",
+        "hector",
+        "2025diadelosmuertos"
+      ],
+      "asset": "assets/game_emojis/animals/2025nov_hector.gif"
+    },
+    {
+      "key": "2025nov_fastsnail",
+      "name": "2025nov_fastsnail",
+      "rank": "special",
+      "emoji_stem": "2025nov_fastsnail",
+      "source_image": "2025nov_fastsnail.gif",
+      "event": "November Holidays 2025",
+      "dates": "25 Nov - 2 Dec 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "165,265",
+      "stats": {
+        "hp": 13,
+        "str": 1,
+        "pr": 1,
+        "wp": 3,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025nov_fastsnail",
+        "fastsnail",
+        "tanksnail",
+        "botsnail",
+        "snail_with_tracks"
+      ],
+      "asset": "assets/game_emojis/animals/2025nov_fastsnail.gif"
+    },
+    {
+      "key": "2025nov_gsnail",
+      "name": "2025nov_gsnail",
+      "rank": "special",
+      "emoji_stem": "2025nov_gsnail",
+      "source_image": "2025nov_gsnail.gif",
+      "event": "November Holidays 2025",
+      "dates": "25 Nov - 2 Dec 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "165,352",
+      "stats": {
+        "hp": 3,
+        "str": 13,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025nov_gsnail",
+        "gemsnail",
+        "gsnail",
+        "emerald"
+      ],
+      "asset": "assets/game_emojis/animals/2025nov_gsnail.gif"
+    },
+    {
+      "key": "2025oct_cursedpumpkin",
+      "name": "2025oct_cursedpumpkin",
+      "rank": "special",
+      "emoji_stem": "2025oct_cursedpumpkin",
+      "source_image": "2025oct_cursedpumpkin.gif",
+      "event": "October Holidays 2025",
+      "dates": "29 Oct - 5 Nov 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "177,152",
+      "stats": {
+        "hp": 12,
+        "str": 1,
+        "pr": 3,
+        "wp": 2,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025oct_cursedpumpkin",
+        "cursedpumpkin"
+      ],
+      "asset": "assets/game_emojis/animals/2025oct_cursedpumpkin.gif"
+    },
+    {
+      "key": "2025oct_mothman",
+      "name": "2025oct_mothman",
+      "rank": "special",
+      "emoji_stem": "2025oct_mothman",
+      "source_image": "2025oct_mothman.gif",
+      "event": "October Holidays 2025",
+      "dates": "29 Oct - 5 Nov 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "177,260",
+      "stats": {
+        "hp": 6,
+        "str": 1,
+        "pr": 9,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2025oct_mothman",
+        "mothman"
+      ],
+      "asset": "assets/game_emojis/animals/2025oct_mothman.gif"
+    },
+    {
+      "key": "2025sept_hedgehog",
+      "name": "2025sept_hedgehog",
+      "rank": "special",
+      "emoji_stem": "2025sept_hedgehog",
+      "source_image": "2025sept_hedgehog.gif",
+      "event": "September Holidays 2025",
+      "dates": "1 - 8 Oct 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "191,573",
+      "stats": {
+        "hp": 12,
+        "str": 2,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025sept_hedgehog",
+        "Igel",
+        "autumn_hedgehog"
+      ],
+      "asset": "assets/game_emojis/animals/2025sept_hedgehog.gif"
+    },
+    {
+      "key": "2025sept_literacyday",
+      "name": "2025sept_literacyday",
+      "rank": "special",
+      "emoji_stem": "2025sept_literacyday",
+      "source_image": "2025sept_literacyday.gif",
+      "event": "September Holidays 2025",
+      "dates": "1 - 8 Oct 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "192,163",
+      "stats": {
+        "hp": 11,
+        "str": 2,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2025sept_literacyday",
+        "nerdy_snek"
+      ],
+      "asset": "assets/game_emojis/animals/2025sept_literacyday.gif"
+    },
+    {
+      "key": "2025aug_cuba",
+      "name": "2025aug_cuba",
+      "rank": "special",
+      "emoji_stem": "2025aug_cuba",
+      "source_image": "2025aug_cuba.gif",
+      "event": "August Holidays 2025",
+      "dates": "26 Aug - 2 Sept 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "195,616",
+      "stats": {
+        "hp": 1,
+        "str": 13,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2025aug_cuba",
+        "cuba"
+      ],
+      "asset": "assets/game_emojis/animals/2025aug_cuba.gif"
+    },
+    {
+      "key": "2025aug_worldwideweb",
+      "name": "2025aug_worldwideweb",
+      "rank": "special",
+      "emoji_stem": "2025aug_worldwideweb",
+      "source_image": "2025aug_worldwideweb.gif",
+      "event": "August Holidays 2025",
+      "dates": "26 Aug - 2 Sept 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "194,420",
+      "stats": {
+        "hp": 12,
+        "str": 1,
+        "pr": 2,
+        "wp": 2,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2025aug_worldwideweb",
+        "e_chan"
+      ],
+      "asset": "assets/game_emojis/animals/2025aug_worldwideweb.gif"
+    },
+    {
+      "key": "2025aug_clowncat",
+      "name": "2025aug_clowncat",
+      "rank": "special",
+      "emoji_stem": "2025aug_clowncat",
+      "source_image": "2025aug_clowncat.gif",
+      "event": "August Holidays 2025",
+      "dates": "26 Aug - 2 Sept 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "194,629",
+      "stats": {
+        "hp": 11,
+        "str": 2,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2025aug_clowncat",
+        "clowncat",
+        "clownweek",
+        "catday"
+      ],
+      "asset": "assets/game_emojis/animals/2025aug_clowncat.gif"
+    },
+    {
+      "key": "2025july_sharkday",
+      "name": "2025july_sharkday",
+      "rank": "special",
+      "emoji_stem": "2025july_sharkday",
+      "source_image": "2025july_sharkday.gif",
+      "event": "June Holidays 2025",
+      "dates": "25 July - 1 Aug 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "268,823",
+      "stats": {
+        "hp": 4,
+        "str": 6,
+        "pr": 1,
+        "wp": 4,
+        "mag": 4,
+        "mr": 1
+      },
+      "aliases": [
+        "2025july_sharkday",
+        "sharkday"
+      ],
+      "asset": "assets/game_emojis/animals/2025july_sharkday.gif"
+    },
+    {
+      "key": "2025july_sunshark",
+      "name": "2025july_SunShark",
+      "rank": "special",
+      "emoji_stem": "2025july_sunshark",
+      "source_image": "2025july_SunShark.gif",
+      "event": "June Holidays 2025",
+      "dates": "25 July - 1 Aug 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "268,398",
+      "stats": {
+        "hp": 10,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2025july_SunShark",
+        "BaskingShark",
+        "2025sunshark"
+      ],
+      "asset": "assets/game_emojis/animals/2025july_sunshark.gif"
+    },
+    {
+      "key": "2025june_fathersday",
+      "name": "2025june_fathersday",
+      "rank": "special",
+      "emoji_stem": "2025june_fathersday",
+      "source_image": "2025june_fathersday.gif",
+      "event": "June Holidays 2025",
+      "dates": "30 June - 8 July 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "262,863",
+      "stats": {
+        "hp": 8,
+        "str": 7,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025june_fathersday",
+        "papaferret",
+        "fathersday"
+      ],
+      "asset": "assets/game_emojis/animals/2025june_fathersday.gif"
+    },
+    {
+      "key": "2025june_primrose",
+      "name": "2025june_primrose",
+      "rank": "special",
+      "emoji_stem": "2025june_primrose",
+      "source_image": "2025june_primrose.gif",
+      "event": "June Holidays 2025",
+      "dates": "30 June - 8 July 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "262,471",
+      "stats": {
+        "hp": 1,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 15,
+        "mr": 1
+      },
+      "aliases": [
+        "2025june_primrose",
+        "primrose",
+        "primula",
+        "cowslip",
+        "oxlip"
+      ],
+      "asset": "assets/game_emojis/animals/2025june_primrose.gif"
+    },
+    {
+      "key": "2025june_lavender",
+      "name": "2025june_lavender",
+      "rank": "special",
+      "emoji_stem": "2025june_lavender",
+      "source_image": "2025june_lavender.gif",
+      "event": "June Holidays 2025",
+      "dates": "30 June - 8 July 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "262,899",
+      "stats": {
+        "hp": 1,
+        "str": 15,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025june_lavender",
+        "lavender",
+        "lavandula",
+        "purple",
+        "enby"
+      ],
+      "asset": "assets/game_emojis/animals/2025june_lavender.gif"
+    },
+    {
+      "key": "2025may_mothersdayowo",
+      "name": "2025may_mothersDayOwO",
+      "rank": "special",
+      "emoji_stem": "2025may_mothersdayowo",
+      "source_image": "2025may_mothersDayOwO.gif",
+      "event": "May Holidays 2025",
+      "dates": "29 May - 5 June 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "277,676",
+      "stats": {
+        "hp": 5,
+        "str": 1,
+        "pr": 6,
+        "wp": 2,
+        "mag": 1,
+        "mr": 5
+      },
+      "aliases": [
+        "2025may_mothersDayOwO",
+        "MothersDay_OwO",
+        "mdOwO"
+      ],
+      "asset": "assets/game_emojis/animals/2025may_mothersdayowo.gif"
+    },
+    {
+      "key": "2025may_sportsdayowo",
+      "name": "2025may_sportsdayowo",
+      "rank": "special",
+      "emoji_stem": "2025may_sportsdayowo",
+      "source_image": "2025may_sportsdayowo.gif",
+      "event": "May Holidays 2025",
+      "dates": "29 May - 5 June 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "277,269",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 1,
+        "wp": 7,
+        "mag": 6,
+        "mr": 1
+      },
+      "aliases": [
+        "2025may_sportsdayowo",
+        "sportsowo"
+      ],
+      "asset": "assets/game_emojis/animals/2025may_sportsdayowo.gif"
+    },
+    {
+      "key": "2025apr_easter",
+      "name": "2025apr_easter",
+      "rank": "special",
+      "emoji_stem": "2025apr_easter",
+      "source_image": "2025apr_easter.gif",
+      "event": "April Holidays 2025",
+      "dates": "25 Apr - 2 May 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "215,915",
+      "stats": {
+        "hp": 9,
+        "str": 5,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025apr_easter"
+      ],
+      "asset": "assets/game_emojis/animals/2025apr_easter.gif"
+    },
+    {
+      "key": "2025apr_earthdayowo",
+      "name": "2025apr_earthdayowo",
+      "rank": "special",
+      "emoji_stem": "2025apr_earthdayowo",
+      "source_image": "2025apr_earthdayowo.gif",
+      "event": "April Holidays 2025",
+      "dates": "25 Apr - 2 May 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "215,907",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 10,
+        "wp": 1,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "2025apr_earthdayowo"
+      ],
+      "asset": "assets/game_emojis/animals/2025apr_earthdayowo.gif"
+    },
+    {
+      "key": "2025apr_sillywizard",
+      "name": "2025apr_sillywizard",
+      "rank": "special",
+      "emoji_stem": "2025apr_sillywizard",
+      "source_image": "2025apr_sillywizard.gif",
+      "event": "April Holidays 2025",
+      "dates": "25 Apr - 2 May 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "215,943",
+      "stats": {
+        "hp": 3,
+        "str": 7,
+        "pr": 1,
+        "wp": 1,
+        "mag": 7,
+        "mr": 1
+      },
+      "aliases": [
+        "2025apr_sillywizard",
+        "sillywizard",
+        "2025aprilfools"
+      ],
+      "asset": "assets/game_emojis/animals/2025apr_sillywizard.gif"
+    },
+    {
+      "key": "2025march_horse",
+      "name": "2025march_horse",
+      "rank": "special",
+      "emoji_stem": "2025march_horse",
+      "source_image": "2025march_horse.gif",
+      "event": "March Holidays 2025",
+      "dates": "27 Mar - 2 Apr 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "162,750",
+      "stats": {
+        "hp": 11,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025march_horse"
+      ],
+      "asset": "assets/game_emojis/animals/2025march_horse.gif"
+    },
+    {
+      "key": "2025march_holi",
+      "name": "2025march_holi",
+      "rank": "special",
+      "emoji_stem": "2025march_holi",
+      "source_image": "2025march_holi.gif",
+      "event": "March Holidays 2025",
+      "dates": "27 Mar - 2 Apr 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "163,318",
+      "stats": {
+        "hp": 10,
+        "str": 5,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025march_holi"
+      ],
+      "asset": "assets/game_emojis/animals/2025march_holi.gif"
+    },
+    {
+      "key": "2025march_eidalfitr",
+      "name": "2025march_eidalfitr",
+      "rank": "special",
+      "emoji_stem": "2025march_eidalfitr",
+      "source_image": "2025march_eidalfitr.gif",
+      "event": "March Holidays 2025",
+      "dates": "27 Mar - 2 Apr 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "162,951",
+      "stats": {
+        "hp": 3,
+        "str": 9,
+        "pr": 2,
+        "wp": 4,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025march_eidalfitr",
+        "omar",
+        "2025ramadan",
+        "2025eid"
+      ],
+      "asset": "assets/game_emojis/animals/2025march_eidalfitr.gif"
+    },
+    {
+      "key": "2025feb_jose",
+      "name": "2025feb_jose",
+      "rank": "special",
+      "emoji_stem": "2025feb_jose",
+      "source_image": "2025feb_jose.gif",
+      "event": "February Holidays 2025",
+      "dates": "23 Feb - 2 Mar 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "173,194",
+      "stats": {
+        "hp": 11,
+        "str": 3,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025feb_jose",
+        "2025feb_carnaval",
+        "2025feb_carnival",
+        "jose"
+      ],
+      "asset": "assets/game_emojis/animals/2025feb_jose.gif"
+    },
+    {
+      "key": "2025feb_laki",
+      "name": "2025feb_laki",
+      "rank": "special",
+      "emoji_stem": "2025feb_laki",
+      "source_image": "2025feb_laki.gif",
+      "event": "February Holidays 2025",
+      "dates": "23 Feb - 2 Mar 2025",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "173,033",
+      "stats": {
+        "hp": 12,
+        "str": 1,
+        "pr": 1,
+        "wp": 4,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2025feb_laki",
+        "2025lny",
+        "laki"
+      ],
+      "asset": "assets/game_emojis/animals/2025feb_laki.gif"
+    },
+    {
+      "key": "2024dec_mrelephant",
+      "name": "2024dec_mrelephant",
+      "rank": "special",
+      "emoji_stem": "2024dec_mrelephant",
+      "source_image": "2024dec_mrelephant.gif",
+      "event": "December Holidays 2024",
+      "dates": "12 - 19 Dec 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "197,435",
+      "stats": {
+        "hp": 13,
+        "str": 2,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024dec_mrelephant",
+        "mrelephant"
+      ],
+      "asset": "assets/game_emojis/animals/2024dec_mrelephant.gif"
+    },
+    {
+      "key": "2024dec_christmasreindeer",
+      "name": "2024dec_christmasreindeer",
+      "rank": "special",
+      "emoji_stem": "2024dec_christmasreindeer",
+      "source_image": "2024dec_christmasreindeer.gif",
+      "event": "December Holidays 2024",
+      "dates": "12 - 19 Dec 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "198,361",
+      "stats": {
+        "hp": 7,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 9,
+        "mr": 1
+      },
+      "aliases": [
+        "2024dec_christmasreindeer",
+        "candydeer"
+      ],
+      "asset": "assets/game_emojis/animals/2024dec_christmasreindeer.gif"
+    },
+    {
+      "key": "2024dec_christmasbee",
+      "name": "2024dec_christmasbee",
+      "rank": "special",
+      "emoji_stem": "2024dec_christmasbee",
+      "source_image": "2024dec_christmasbee.gif",
+      "event": "December Holidays 2024",
+      "dates": "12 - 19 Dec 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "197,976",
+      "stats": {
+        "hp": 1,
+        "str": 2,
+        "pr": 1,
+        "wp": 2,
+        "mag": 5,
+        "mr": 9
+      },
+      "aliases": [
+        "2024dec_christmasbee"
+      ],
+      "asset": "assets/game_emojis/animals/2024dec_christmasbee.gif"
+    },
+    {
+      "key": "2024nov_tiago",
+      "name": "2024nov_tiago",
+      "rank": "special",
+      "emoji_stem": "2024nov_tiago",
+      "source_image": "2024nov_tiago.gif",
+      "event": "November Holidays 2024",
+      "dates": "1 - 8 Nov 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "197,046",
+      "stats": {
+        "hp": 15,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024nov_tiago",
+        "bagh",
+        "floof"
+      ],
+      "asset": "assets/game_emojis/animals/2024nov_tiago.gif"
+    },
+    {
+      "key": "2024nov_juan",
+      "name": "2024nov_juan",
+      "rank": "special",
+      "emoji_stem": "2024nov_juan",
+      "source_image": "2024nov_juan.gif",
+      "event": "November Holidays 2024",
+      "dates": "1 - 8 Nov 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "196,741",
+      "stats": {
+        "hp": 1,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 15,
+        "mr": 1
+      },
+      "aliases": [
+        "2024nov_juan",
+        "juan"
+      ],
+      "asset": "assets/game_emojis/animals/2024nov_juan.gif"
+    },
+    {
+      "key": "2024nov_diwaliowo",
+      "name": "2024nov_diwaliOwO",
+      "rank": "special",
+      "emoji_stem": "2024nov_diwaliowo",
+      "source_image": "2024nov_diwaliOwO.gif",
+      "event": "November Holidays 2024",
+      "dates": "1 - 8 Nov 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "196,091",
+      "stats": {
+        "hp": 1,
+        "str": 15,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024nov_diwaliOwO",
+        "DiwaliOwO",
+        "Diwali2024"
+      ],
+      "asset": "assets/game_emojis/animals/2024nov_diwaliowo.gif"
+    },
+    {
+      "key": "2024oct_artistday",
+      "name": "2024oct_artistday",
+      "rank": "special",
+      "emoji_stem": "2024oct_artistday",
+      "source_image": "2024oct_artistday.gif",
+      "event": "October Holidays 2024",
+      "dates": "1 - 8 Oct 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "225,037",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 10,
+        "wp": 1,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "2024oct_artistday",
+        "paintfox"
+      ],
+      "asset": "assets/game_emojis/animals/2024oct_artistday.gif"
+    },
+    {
+      "key": "2024oct_teacherday",
+      "name": "2024oct_teacherday",
+      "rank": "special",
+      "emoji_stem": "2024oct_teacherday",
+      "source_image": "2024oct_teacherday.gif",
+      "event": "October Holidays 2024",
+      "dates": "1 - 8 Oct 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "224,803",
+      "stats": {
+        "hp": 4,
+        "str": 6,
+        "pr": 2,
+        "wp": 5,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2024oct_teacherday",
+        "teachercat",
+        "teacher",
+        "professorcat",
+        "professor"
+      ],
+      "asset": "assets/game_emojis/animals/2024oct_teacherday.gif"
+    },
+    {
+      "key": "2024oct_skellybee",
+      "name": "2024oct_skellybee",
+      "rank": "special",
+      "emoji_stem": "2024oct_skellybee",
+      "source_image": "2024oct_skellybee.gif",
+      "event": "October Holidays 2024",
+      "dates": "1 - 8 Oct 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "225,067",
+      "stats": {
+        "hp": 3,
+        "str": 7,
+        "pr": 1,
+        "wp": 3,
+        "mag": 3,
+        "mr": 3
+      },
+      "aliases": [
+        "2024oct_skellybee",
+        "skellybee"
+      ],
+      "asset": "assets/game_emojis/animals/2024oct_skellybee.gif"
+    },
+    {
+      "key": "2024sept_vietnam",
+      "name": "2024sept_vietnam",
+      "rank": "special",
+      "emoji_stem": "2024sept_vietnam",
+      "source_image": "2024sept_vietnam.gif",
+      "event": "September Holidays 2024",
+      "dates": "1 - 8 Sept 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "236,714",
+      "stats": {
+        "hp": 5,
+        "str": 1,
+        "pr": 5,
+        "wp": 1,
+        "mag": 4,
+        "mr": 5
+      },
+      "aliases": [
+        "2024sept_vietnam",
+        "2024sept_vietnamindependenceday",
+        "2024vietnamindependenceday",
+        "2024vnsoldier",
+        "2024thiff"
+      ],
+      "asset": "assets/game_emojis/animals/2024sept_vietnam.gif"
+    },
+    {
+      "key": "2024sept_nerdturtle",
+      "name": "2024sept_nerdturtle",
+      "rank": "special",
+      "emoji_stem": "2024sept_nerdturtle",
+      "source_image": "2024sept_nerdturtle.gif",
+      "event": "September Holidays 2024",
+      "dates": "1 - 8 Sept 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "237,372",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 13,
+        "mr": 1
+      },
+      "aliases": [
+        "2024sept_nerdturtle",
+        "nerdturtle"
+      ],
+      "asset": "assets/game_emojis/animals/2024sept_nerdturtle.gif"
+    },
+    {
+      "key": "2024sept_hyh",
+      "name": "2024sept_hyh",
+      "rank": "special",
+      "emoji_stem": "2024sept_hyh",
+      "source_image": "2024sept_hyh.gif",
+      "event": "September Holidays 2024",
+      "dates": "1 - 8 Sept 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "237,230",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 10,
+        "wp": 1,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "2024sept_hyh",
+        "doghug"
+      ],
+      "asset": "assets/game_emojis/animals/2024sept_hyh.gif"
+    },
+    {
+      "key": "2024aug_maki",
+      "name": "2024aug_maki",
+      "rank": "special",
+      "emoji_stem": "2024aug_maki",
+      "source_image": "2024aug_maki.gif",
+      "event": "August Holidays 2024",
+      "dates": "1 - 8 Aug 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "216,247",
+      "stats": {
+        "hp": 14,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024aug_maki",
+        "maki"
+      ],
+      "asset": "assets/game_emojis/animals/2024aug_maki.gif"
+    },
+    {
+      "key": "2024aug_cait",
+      "name": "2024aug_cait",
+      "rank": "special",
+      "emoji_stem": "2024aug_cait",
+      "source_image": "2024aug_cait.gif",
+      "event": "August Holidays 2024",
+      "dates": "1 - 8 Aug 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "215,984",
+      "stats": {
+        "hp": 9,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 6,
+        "mr": 1
+      },
+      "aliases": [
+        "2024aug_cait",
+        "catgirl",
+        "cait"
+      ],
+      "asset": "assets/game_emojis/animals/2024aug_cait.gif"
+    },
+    {
+      "key": "2024aug_rakhi",
+      "name": "2024aug_Rakhi",
+      "rank": "special",
+      "emoji_stem": "2024aug_rakhi",
+      "source_image": "2024aug_Rakhi.gif",
+      "event": "August Holidays 2024",
+      "dates": "1 - 8 Aug 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "215,961",
+      "stats": {
+        "hp": 10,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 5,
+        "mr": 1
+      },
+      "aliases": [
+        "2024aug_Rakhi"
+      ],
+      "asset": "assets/game_emojis/animals/2024aug_rakhi.gif"
+    },
+    {
+      "key": "2024july_owo",
+      "name": "2024july_owo",
+      "rank": "special",
+      "emoji_stem": "2024july_owo",
+      "source_image": "2024july_owo.gif",
+      "event": "July Holidays 2024",
+      "dates": "4 - 9 July 2024",
+      "rarity": "15% (From Event Rewards)",
+      "caught": "248,475",
+      "stats": {
+        "hp": 11,
+        "str": 1,
+        "pr": 2,
+        "wp": 3,
+        "mag": 2,
+        "mr": 1
+      },
+      "aliases": [
+        "2024july_owo"
+      ],
+      "asset": "assets/game_emojis/animals/2024july_owo.gif"
+    },
+    {
+      "key": "2024july_seal",
+      "name": "2024july_seal",
+      "rank": "special",
+      "emoji_stem": "2024july_seal",
+      "source_image": "2024july_seal.gif",
+      "event": "July Holidays 2024",
+      "dates": "2 - 9 July 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "213,342",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 3,
+        "wp": 4,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "2024july_seal"
+      ],
+      "asset": "assets/game_emojis/animals/2024july_seal.gif"
+    },
+    {
+      "key": "2024july_4thofjuly",
+      "name": "2024july_4thofjuly",
+      "rank": "special",
+      "emoji_stem": "2024july_4thofjuly",
+      "source_image": "2024july_4thofjuly.gif",
+      "event": "July Holidays 2024",
+      "dates": "2 - 9 July 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "214,458",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 2,
+        "wp": 3,
+        "mag": 5,
+        "mr": 1
+      },
+      "aliases": [
+        "2024july_4thofjuly"
+      ],
+      "asset": "assets/game_emojis/animals/2024july_4thofjuly.gif"
+    },
+    {
+      "key": "2024july_snake",
+      "name": "2024july_snake",
+      "rank": "special",
+      "emoji_stem": "2024july_snake",
+      "source_image": "2024july_snake.gif",
+      "event": "July Holidays 2024",
+      "dates": "2 - 9 July 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "214,362",
+      "stats": {
+        "hp": 9,
+        "str": 7,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024july_snake"
+      ],
+      "asset": "assets/game_emojis/animals/2024july_snake.gif"
+    },
+    {
+      "key": "2024june_pastel",
+      "name": "2024june_pastel",
+      "rank": "special",
+      "emoji_stem": "2024june_pastel",
+      "source_image": "2024june_pastel.gif",
+      "event": "June Holidays 2024",
+      "dates": "24 June - 1 July 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "190,848",
+      "stats": {
+        "hp": 11,
+        "str": 3,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024june_pastel",
+        "pastel",
+        "transrights"
+      ],
+      "asset": "assets/game_emojis/animals/2024june_pastel.gif"
+    },
+    {
+      "key": "2024june_milky",
+      "name": "2024june_milky",
+      "rank": "special",
+      "emoji_stem": "2024june_milky",
+      "source_image": "2024june_milky.gif",
+      "event": "June Holidays 2024",
+      "dates": "24 June - 1 July 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "191,660",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 3,
+        "wp": 3,
+        "mag": 9,
+        "mr": 1
+      },
+      "aliases": [
+        "2024june_milky",
+        "milky",
+        "milkcatto"
+      ],
+      "asset": "assets/game_emojis/animals/2024june_milky.gif"
+    },
+    {
+      "key": "2024june_star",
+      "name": "2024june_star",
+      "rank": "special",
+      "emoji_stem": "2024june_star",
+      "source_image": "2024june_star.gif",
+      "event": "June Holidays 2024",
+      "dates": "24 June - 1 July 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "191,146",
+      "stats": {
+        "hp": 5,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 7,
+        "mr": 1
+      },
+      "aliases": [
+        "2024june_star",
+        "vega"
+      ],
+      "asset": "assets/game_emojis/animals/2024june_star.gif"
+    },
+    {
+      "key": "2024may_mothersday",
+      "name": "2024may_mothersday",
+      "rank": "special",
+      "emoji_stem": "2024may_mothersday",
+      "source_image": "2024may_mothersday.gif",
+      "event": "May Holidays 2024",
+      "dates": "23 - 31 May 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "225,567",
+      "stats": {
+        "hp": 11,
+        "str": 1,
+        "pr": 3,
+        "wp": 2,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2024may_mothersday"
+      ],
+      "asset": "assets/game_emojis/animals/2024may_mothersday.gif"
+    },
+    {
+      "key": "2024may_esd",
+      "name": "2024may_esd",
+      "rank": "special",
+      "emoji_stem": "2024may_esd",
+      "source_image": "2024may_esd.gif",
+      "event": "May Holidays 2024",
+      "dates": "23 - 31 May 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "224,509",
+      "stats": {
+        "hp": 9,
+        "str": 2,
+        "pr": 2,
+        "wp": 5,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024may_esd"
+      ],
+      "asset": "assets/game_emojis/animals/2024may_esd.gif"
+    },
+    {
+      "key": "2024may_flower",
+      "name": "2024may_flower",
+      "rank": "special",
+      "emoji_stem": "2024may_flower",
+      "source_image": "2024may_flower.gif",
+      "event": "May Holidays 2024",
+      "dates": "23 - 31 May 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "224,003",
+      "stats": {
+        "hp": 15,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024may_flower",
+        "may",
+        "mayflower"
+      ],
+      "asset": "assets/game_emojis/animals/2024may_flower.gif"
+    },
+    {
+      "key": "2024april_fools",
+      "name": "2024april_fools",
+      "rank": "special",
+      "emoji_stem": "2024april_fools",
+      "source_image": "2024april_fools.gif",
+      "event": "April Holidays 2024",
+      "dates": "1 - 9 Apr 2024",
+      "rarity": "~13% (From Event Rewards)",
+      "caught": "265,594",
+      "stats": {
+        "hp": 0,
+        "str": 0,
+        "pr": 0,
+        "wp": 1,
+        "mag": 0,
+        "mr": 0
+      },
+      "aliases": [
+        "2024april_fools",
+        "2024worm"
+      ],
+      "asset": "assets/game_emojis/animals/2024april_fools.gif"
+    },
+    {
+      "key": "2024april_eidalfitr",
+      "name": "2024april_eidalfitr",
+      "rank": "special",
+      "emoji_stem": "2024april_eidalfitr",
+      "source_image": "2024april_eidalfitr.gif",
+      "event": "April Holidays 2024",
+      "dates": "1 - 9 Apr 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "191,331",
+      "stats": {
+        "hp": 1,
+        "str": 15,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024april_eidalfitr",
+        "2024eid",
+        "2024ramadan",
+        "shahad"
+      ],
+      "asset": "assets/game_emojis/animals/2024april_eidalfitr.gif"
+    },
+    {
+      "key": "2024april_earthday",
+      "name": "2024april_earthday",
+      "rank": "special",
+      "emoji_stem": "2024april_earthday",
+      "source_image": "2024april_earthday.gif",
+      "event": "April Holidays 2024",
+      "dates": "1 - 9 Apr 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "190,852",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 6,
+        "mag": 9,
+        "mr": 1
+      },
+      "aliases": [
+        "2024april_earthday",
+        "2024earthday"
+      ],
+      "asset": "assets/game_emojis/animals/2024april_earthday.gif"
+    },
+    {
+      "key": "2024spring_patrick",
+      "name": "2024spring_patrick",
+      "rank": "special",
+      "emoji_stem": "2024spring_patrick",
+      "source_image": "2024spring_patrick.gif",
+      "event": "March Holidays 2024",
+      "dates": "20 - 27 Mar 2024",
+      "rarity": "~?% (From Event Rewards)",
+      "caught": "174,078",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 12,
+        "mr": 2
+      },
+      "aliases": [
+        "2024spring_patrick",
+        "2024spring_owo"
+      ],
+      "asset": "assets/game_emojis/animals/2024spring_patrick.gif"
+    },
+    {
+      "key": "2024spring_easter",
+      "name": "2024spring_easter",
+      "rank": "special",
+      "emoji_stem": "2024spring_easter",
+      "source_image": "2024spring_easter.gif",
+      "event": "March Holidays 2024",
+      "dates": "20 - 27 Mar 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "169,082",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 11,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2024spring_easter"
+      ],
+      "asset": "assets/game_emojis/animals/2024spring_easter.gif"
+    },
+    {
+      "key": "2024spring_holi",
+      "name": "2024spring_holi",
+      "rank": "special",
+      "emoji_stem": "2024spring_holi",
+      "source_image": "2024spring_holi.gif",
+      "event": "March Holidays 2024",
+      "dates": "20 - 27 Mar 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "169,673",
+      "stats": {
+        "hp": 6,
+        "str": 1,
+        "pr": 5,
+        "wp": 2,
+        "mag": 1,
+        "mr": 5
+      },
+      "aliases": [
+        "2024spring_holi",
+        "holicat",
+        "holi"
+      ],
+      "asset": "assets/game_emojis/animals/2024spring_holi.gif"
+    },
+    {
+      "key": "2024spring_lamb",
+      "name": "2024spring_lamb",
+      "rank": "special",
+      "emoji_stem": "2024spring_lamb",
+      "source_image": "2024spring_lamb.gif",
+      "event": "March Holidays 2024",
+      "dates": "20 - 27 Mar 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "169,698",
+      "stats": {
+        "hp": 3,
+        "str": 10,
+        "pr": 2,
+        "wp": 3,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024spring_lamb",
+        "lambing"
+      ],
+      "asset": "assets/game_emojis/animals/2024spring_lamb.gif"
+    },
+    {
+      "key": "2024feb_owo",
+      "name": "2024feb_owo",
+      "rank": "special",
+      "emoji_stem": "2024feb_owo",
+      "source_image": "2024feb_owo.gif",
+      "event": "February Holidays 2024",
+      "dates": "14 - 21 Feb 2024",
+      "rarity": "~?% (From Event Rewards)",
+      "caught": "162,479",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 2,
+        "wp": 5,
+        "mag": 8,
+        "mr": 2
+      },
+      "aliases": [
+        "2024feb_owo"
+      ],
+      "asset": "assets/game_emojis/animals/2024feb_owo.gif"
+    },
+    {
+      "key": "2024feb_cny",
+      "name": "2024feb_cny",
+      "rank": "special",
+      "emoji_stem": "2024feb_cny",
+      "source_image": "2024feb_cny.gif",
+      "event": "February Holidays 2024",
+      "dates": "14 - 21 Feb 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "138,581",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 7,
+        "mr": 1
+      },
+      "aliases": [
+        "2024feb_cny",
+        "Lumo"
+      ],
+      "asset": "assets/game_emojis/animals/2024feb_cny.gif"
+    },
+    {
+      "key": "2024feb_fastelavn",
+      "name": "2024feb_fastelavn",
+      "rank": "special",
+      "emoji_stem": "2024feb_fastelavn",
+      "source_image": "2024feb_fastelavn.gif",
+      "event": "February Holidays 2024",
+      "dates": "14 - 21 Feb 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "139,035",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 9,
+        "wp": 1,
+        "mag": 1,
+        "mr": 4
+      },
+      "aliases": [
+        "2024feb_fastelavn",
+        "TheBadCat",
+        "Fastelavn"
+      ],
+      "asset": "assets/game_emojis/animals/2024feb_fastelavn.gif"
+    },
+    {
+      "key": "2024feb_valentines",
+      "name": "2024feb_valentines",
+      "rank": "special",
+      "emoji_stem": "2024feb_valentines",
+      "source_image": "2024feb_valentines.gif",
+      "event": "February Holidays 2024",
+      "dates": "14 - 21 Feb 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "139,330",
+      "stats": {
+        "hp": 12,
+        "str": 1,
+        "pr": 3,
+        "wp": 2,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2024feb_valentines",
+        "Camila"
+      ],
+      "asset": "assets/game_emojis/animals/2024feb_valentines.gif"
+    },
+    {
+      "key": "2023christmas_owo",
+      "name": "2023christmas_owo",
+      "rank": "special",
+      "emoji_stem": "2023christmas_owo",
+      "source_image": "2023christmas_owo.gif",
+      "event": "Christmas 2023",
+      "dates": "25 Dec 2023 - 3 Jan 2024",
+      "rarity": "~?% (From Christmas_Ornaments)",
+      "caught": "422,172",
+      "stats": {
+        "hp": 13,
+        "str": 1,
+        "pr": 4,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2023christmas_owo"
+      ],
+      "asset": "assets/game_emojis/animals/2023christmas_owo.gif"
+    },
+    {
+      "key": "2023christmas_catto",
+      "name": "2023christmas_catto",
+      "rank": "special",
+      "emoji_stem": "2023christmas_catto",
+      "source_image": "2023christmas_catto.gif",
+      "event": "Christmas 2023",
+      "dates": "25 Dec 2023 - 3 Jan 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "208,131",
+      "stats": {
+        "hp": 12,
+        "str": 1,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2023christmas_catto",
+        "catto_in_box"
+      ],
+      "asset": "assets/game_emojis/animals/2023christmas_catto.gif"
+    },
+    {
+      "key": "2023christmas_sheep",
+      "name": "2023christmas_sheep",
+      "rank": "special",
+      "emoji_stem": "2023christmas_sheep",
+      "source_image": "2023christmas_sheep.gif",
+      "event": "Christmas 2023",
+      "dates": "25 Dec 2023 - 3 Jan 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "208,349",
+      "stats": {
+        "hp": 11,
+        "str": 1,
+        "pr": 3,
+        "wp": 3,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2023christmas_sheep",
+        "sheepy"
+      ],
+      "asset": "assets/game_emojis/animals/2023christmas_sheep.gif"
+    },
+    {
+      "key": "2023christmas_reindella",
+      "name": "2023christmas_reindella",
+      "rank": "special",
+      "emoji_stem": "2023christmas_reindella",
+      "source_image": "2023christmas_reindella.gif",
+      "event": "Christmas 2023",
+      "dates": "25 Dec 2023 - 3 Jan 2024",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "208,285",
+      "stats": {
+        "hp": 9,
+        "str": 6,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2023christmas_reindella",
+        "giftreindeer",
+        "2023reindeer",
+        "reindella"
+      ],
+      "asset": "assets/game_emojis/animals/2023christmas_reindella.gif"
+    },
+    {
+      "key": "2023halloween_owo",
+      "name": "2023halloween_owo",
+      "rank": "special",
+      "emoji_stem": "2023halloween_owo",
+      "source_image": "2023halloween_owo.gif",
+      "event": "Halloween 2023",
+      "dates": "31 Oct - 10 Nov 2023",
+      "rarity": "~?% (From Halloween Candies)",
+      "caught": "192,230",
+      "stats": {
+        "hp": 14,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2023halloween_owo"
+      ],
+      "asset": "assets/game_emojis/animals/2023halloween_owo.gif"
+    },
+    {
+      "key": "2023halloween_floofy",
+      "name": "2023halloween_floofy",
+      "rank": "special",
+      "emoji_stem": "2023halloween_floofy",
+      "source_image": "2023halloween_floofy.gif",
+      "event": "Halloween 2023",
+      "dates": "31 Oct - 10 Nov 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "227,114",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 9,
+        "mr": 1
+      },
+      "aliases": [
+        "2023halloween_floofy",
+        "unf",
+        "flowyfluffy"
+      ],
+      "asset": "assets/game_emojis/animals/2023halloween_floofy.gif"
+    },
+    {
+      "key": "2023halloween_diablito",
+      "name": "2023halloween_diablito",
+      "rank": "special",
+      "emoji_stem": "2023halloween_diablito",
+      "source_image": "2023halloween_diablito.gif",
+      "event": "Halloween 2023",
+      "dates": "31 Oct - 10 Nov 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "226,859",
+      "stats": {
+        "hp": 9,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 6,
+        "mr": 1
+      },
+      "aliases": [
+        "2023halloween_diablito",
+        "diablito"
+      ],
+      "asset": "assets/game_emojis/animals/2023halloween_diablito.gif"
+    },
+    {
+      "key": "2023halloween_capybara",
+      "name": "2023halloween_capybara",
+      "rank": "special",
+      "emoji_stem": "2023halloween_capybara",
+      "source_image": "2023halloween_capybara.gif",
+      "event": "Halloween 2023",
+      "dates": "31 Oct - 10 Nov 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "226,851",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 10,
+        "wp": 1,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "2023halloween_capybara",
+        "capybara"
+      ],
+      "asset": "assets/game_emojis/animals/2023halloween_capybara.gif"
+    },
+    {
+      "key": "2023halloween_scarecrow",
+      "name": "2023halloween_scarecrow",
+      "rank": "special",
+      "emoji_stem": "2023halloween_scarecrow",
+      "source_image": "2023halloween_scarecrow.gif",
+      "event": "Halloween 2023",
+      "dates": "31 Oct - 10 Nov 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "226,577",
+      "stats": {
+        "hp": 12,
+        "str": 2,
+        "pr": 3,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2023halloween_scarecrow",
+        "scarecrow",
+        "scare_&_crow"
+      ],
+      "asset": "assets/game_emojis/animals/2023halloween_scarecrow.gif"
+    },
+    {
+      "key": "2023summer_july4",
+      "name": "2023summer_july4",
+      "rank": "special",
+      "emoji_stem": "2023summer_july4",
+      "source_image": "2023summer_july4.gif",
+      "event": "Summer 2023",
+      "dates": "4 - 13 July 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "189,033",
+      "stats": {
+        "hp": 6,
+        "str": 1,
+        "pr": 6,
+        "wp": 2,
+        "mag": 1,
+        "mr": 4
+      },
+      "aliases": [
+        "2023summer_july4"
+      ],
+      "asset": "assets/game_emojis/animals/2023summer_july4.gif"
+    },
+    {
+      "key": "2023summer_cow",
+      "name": "2023summer_cow",
+      "rank": "special",
+      "emoji_stem": "2023summer_cow",
+      "source_image": "2023summer_cow.gif",
+      "event": "Summer 2023",
+      "dates": "4 - 13 July 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "189,208",
+      "stats": {
+        "hp": 1,
+        "str": 9,
+        "pr": 4,
+        "wp": 1,
+        "mag": 1,
+        "mr": 4
+      },
+      "aliases": [
+        "2023summer_cow"
+      ],
+      "asset": "assets/game_emojis/animals/2023summer_cow.gif"
+    },
+    {
+      "key": "2023summer_frogberry",
+      "name": "2023summer_frogberry",
+      "rank": "special",
+      "emoji_stem": "2023summer_frogberry",
+      "source_image": "2023summer_frogberry.gif",
+      "event": "Summer 2023",
+      "dates": "4 - 13 July 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "188,643",
+      "stats": {
+        "hp": 13,
+        "str": 1,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2023summer_frogberry",
+        "frogberry",
+        "ferry"
+      ],
+      "asset": "assets/game_emojis/animals/2023summer_frogberry.gif"
+    },
+    {
+      "key": "2023pride_bat",
+      "name": "2023pride_bat",
+      "rank": "special",
+      "emoji_stem": "2023pride_bat",
+      "source_image": "2023pride_bat.gif",
+      "event": "Pride Month 2023",
+      "dates": "1 - 16 June 2023",
+      "rarity": "?%",
+      "caught": "347,386",
+      "stats": {
+        "hp": 9,
+        "str": 1,
+        "pr": 1,
+        "wp": 7,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2023pride_bat",
+        "bibat",
+        "2023pride_bisexual",
+        "pridebat"
+      ],
+      "asset": "assets/game_emojis/animals/2023pride_bat.gif"
+    },
+    {
+      "key": "2023pride_redpanda",
+      "name": "2023pride_redpanda",
+      "rank": "special",
+      "emoji_stem": "2023pride_redpanda",
+      "source_image": "2023pride_redpanda.gif",
+      "event": "Pride Month 2023",
+      "dates": "1 - 16 June 2023",
+      "rarity": "?%",
+      "caught": "348,728",
+      "stats": {
+        "hp": 5,
+        "str": 5,
+        "pr": 5,
+        "wp": 2,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2023pride_redpanda",
+        "pridepanda"
+      ],
+      "asset": "assets/game_emojis/animals/2023pride_redpanda.gif"
+    },
+    {
+      "key": "2023pride_pridebun",
+      "name": "2023pride_pridebun",
+      "rank": "special",
+      "emoji_stem": "2023pride_pridebun",
+      "source_image": "2023pride_pridebun.gif",
+      "event": "Pride Month 2023",
+      "dates": "1 - 16 June 2023",
+      "rarity": "?%",
+      "caught": "349,090",
+      "stats": {
+        "hp": 8,
+        "str": 7,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2023pride_pridebun",
+        "pridebun"
+      ],
+      "asset": "assets/game_emojis/animals/2023pride_pridebun.gif"
+    },
+    {
+      "key": "3m_swan",
+      "name": "3m_swan",
+      "rank": "special",
+      "emoji_stem": "3m_swan",
+      "source_image": "3m_swan.gif",
+      "event": "3 Million Servers",
+      "dates": "22 - 30 May 2023",
+      "rarity": "?%",
+      "caught": "158,864",
+      "stats": {
+        "hp": 3,
+        "str": 12,
+        "pr": 1,
+        "wp": 2,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "3m_swan"
+      ],
+      "asset": "assets/game_emojis/animals/3m_swan.gif"
+    },
+    {
+      "key": "3m_shark",
+      "name": "3m_shark",
+      "rank": "special",
+      "emoji_stem": "3m_shark",
+      "source_image": "3m_shark.gif",
+      "event": "3 Million Servers",
+      "dates": "22 - 30 May 2023",
+      "rarity": "?%",
+      "caught": "158,915",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 14,
+        "mr": 1
+      },
+      "aliases": [
+        "3m_shark"
+      ],
+      "asset": "assets/game_emojis/animals/3m_shark.gif"
+    },
+    {
+      "key": "3m_specialpanda",
+      "name": "3m_specialpanda",
+      "rank": "special",
+      "emoji_stem": "3m_specialpanda",
+      "source_image": "3m_specialpanda.gif",
+      "event": "3 Million Servers",
+      "dates": "22 - 30 May 2023",
+      "rarity": "?%",
+      "caught": "159,211",
+      "stats": {
+        "hp": 7,
+        "str": 1,
+        "pr": 7,
+        "wp": 1,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "3m_specialpanda"
+      ],
+      "asset": "assets/game_emojis/animals/3m_specialpanda.gif"
+    },
+    {
+      "key": "3m_panda",
+      "name": "3m_panda",
+      "rank": "special",
+      "emoji_stem": "3m_panda",
+      "source_image": "3m_panda.gif",
+      "event": "3 Million Servers",
+      "dates": "22 - 30 May 2023",
+      "rarity": "?%",
+      "caught": "158,284",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 8,
+        "mr": 1
+      },
+      "aliases": [
+        "3m_panda"
+      ],
+      "asset": "assets/game_emojis/animals/3m_panda.gif"
+    },
+    {
+      "key": "3m_owo",
+      "name": "3m_owo",
+      "rank": "special",
+      "emoji_stem": "3m_owo",
+      "source_image": "3m_owo.gif",
+      "event": "3 Million Servers",
+      "dates": "22 - 30 May 2023",
+      "rarity": "~15.63% - ~19.74% (From 3m_Present, depending on the amount of wallpapers received)",
+      "caught": "311,243 (Will increase)",
+      "stats": {
+        "hp": 8,
+        "str": 7,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "3m_owo"
+      ],
+      "asset": "assets/game_emojis/animals/3m_owo.gif"
+    },
+    {
+      "key": "2023easter_alvin",
+      "name": "2023easter_alvin",
+      "rank": "special",
+      "emoji_stem": "2023easter_alvin",
+      "source_image": "2023easter_alvin.gif",
+      "event": "2023 Easter",
+      "dates": "9 - 17 Apr 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "143,199",
+      "stats": {
+        "hp": 8,
+        "str": 8,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2023easter_alvin",
+        "2023easter_Alvin",
+        "Alvin"
+      ],
+      "asset": "assets/game_emojis/animals/2023easter_alvin.gif"
+    },
+    {
+      "key": "2023easter_peep",
+      "name": "2023easter_peep",
+      "rank": "special",
+      "emoji_stem": "2023easter_peep",
+      "source_image": "2023easter_peep.gif",
+      "event": "2023 Easter",
+      "dates": "9 - 17 Apr 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "142,735",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 2,
+        "wp": 6,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2023easter_peep",
+        "2023easter_Peep"
+      ],
+      "asset": "assets/game_emojis/animals/2023easter_peep.gif"
+    },
+    {
+      "key": "2023easter_bunbee",
+      "name": "2023easter_bunbee",
+      "rank": "special",
+      "emoji_stem": "2023easter_bunbee",
+      "source_image": "2023easter_bunbee.gif",
+      "event": "2023 Easter",
+      "dates": "9 - 17 Apr 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "142,972",
+      "stats": {
+        "hp": 3,
+        "str": 2,
+        "pr": 4,
+        "wp": 6,
+        "mag": 4,
+        "mr": 1
+      },
+      "aliases": [
+        "2023easter_bunbee",
+        "2023easter_Bunbee",
+        "Bunbee"
+      ],
+      "asset": "assets/game_emojis/animals/2023easter_bunbee.gif"
+    },
+    {
+      "key": "2023aprilfools_bestdyno",
+      "name": "2023aprilfools_bestdyno",
+      "rank": "special",
+      "emoji_stem": "2023aprilfools_bestdyno",
+      "source_image": "2023aprilfools_bestdyno.gif",
+      "event": "April Fools' Day",
+      "dates": "1 - 9 Apr 2023",
+      "rarity": "?%",
+      "caught": "134,104",
+      "stats": {
+        "hp": 10,
+        "str": 0,
+        "pr": 3,
+        "wp": 4,
+        "mag": 1,
+        "mr": 3
+      },
+      "aliases": [
+        "2023aprilfools_bestdyno",
+        "dyno"
+      ],
+      "asset": "assets/game_emojis/animals/2023aprilfools_bestdyno.gif"
+    },
+    {
+      "key": "2023aprilfools_normalsnail",
+      "name": "2023aprilfools_normalsnail",
+      "rank": "special",
+      "emoji_stem": "2023aprilfools_normalsnail",
+      "source_image": "2023aprilfools_normalsnail.gif",
+      "event": "April Fools' Day",
+      "dates": "1 - 9 Apr 2023",
+      "rarity": "?%",
+      "caught": "132,786",
+      "stats": {
+        "hp": 0,
+        "str": 0,
+        "pr": 0,
+        "wp": 0,
+        "mag": 1,
+        "mr": 0
+      },
+      "aliases": [
+        "2023aprilfools_normalsnail",
+        "2023aprilfools_NormalSnail",
+        "normal_snail"
+      ],
+      "asset": "assets/game_emojis/animals/2023aprilfools_normalsnail.gif"
+    },
+    {
+      "key": "2023patrick_clover",
+      "name": "2023patrick_clover",
+      "rank": "special",
+      "emoji_stem": "2023patrick_clover",
+      "source_image": "2023patrick_clover.gif",
+      "event": "St. Patrick's Day",
+      "dates": "18 - 25 Mar 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "145,252",
+      "stats": {
+        "hp": 5,
+        "str": 10,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2023patrick_clover"
+      ],
+      "asset": "assets/game_emojis/animals/2023patrick_clover.gif"
+    },
+    {
+      "key": "2023patrick_patbee",
+      "name": "2023patrick_patbee",
+      "rank": "special",
+      "emoji_stem": "2023patrick_patbee",
+      "source_image": "2023patrick_patbee.gif",
+      "event": "St. Patrick's Day",
+      "dates": "18 - 25 Mar 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "145,897",
+      "stats": {
+        "hp": 1,
+        "str": 3,
+        "pr": 1,
+        "wp": 1,
+        "mag": 13,
+        "mr": 1
+      },
+      "aliases": [
+        "2023patrick_patbee",
+        "patbee"
+      ],
+      "asset": "assets/game_emojis/animals/2023patrick_patbee.gif"
+    },
+    {
+      "key": "2023patrick_pentrick",
+      "name": "2023patrick_pentrick",
+      "rank": "special",
+      "emoji_stem": "2023patrick_pentrick",
+      "source_image": "2023patrick_pentrick.gif",
+      "event": "St. Patrick's Day",
+      "dates": "18 - 25 Mar 2023",
+      "rarity": "0.005% - 0.05% (Increased over event)",
+      "caught": "145,783",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 13,
+        "mr": 1
+      },
+      "aliases": [
+        "2023patrick_pentrick",
+        "pentrick",
+        "derppenguin"
+      ],
+      "asset": "assets/game_emojis/animals/2023patrick_pentrick.gif"
+    },
+    {
+      "key": "2023bday_cake",
+      "name": "2023bday_cake",
+      "rank": "special",
+      "emoji_stem": "2023bday_cake",
+      "source_image": "2023bday_cake.gif",
+      "event": "5th Anniversary Event",
+      "dates": "10 - 17 Mar 2023",
+      "rarity": "?%",
+      "caught": "138,373",
+      "stats": {
+        "hp": 2,
+        "str": 11,
+        "pr": 1,
+        "wp": 4,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2023bday_cake",
+        "cake"
+      ],
+      "asset": "assets/game_emojis/animals/2023bday_cake.gif"
+    },
+    {
+      "key": "2023bday_cinquwu",
+      "name": "2023bday_cinquwu",
+      "rank": "special",
+      "emoji_stem": "2023bday_cinquwu",
+      "source_image": "2023bday_cinquwu.gif",
+      "event": "5th Anniversary Event",
+      "dates": "10 - 17 Mar 2023",
+      "rarity": "?%",
+      "caught": "137,661",
+      "stats": {
+        "hp": 6,
+        "str": 1,
+        "pr": 4,
+        "wp": 4,
+        "mag": 1,
+        "mr": 4
+      },
+      "aliases": [
+        "2023bday_cinquwu",
+        "2023bday_Cinquwu",
+        "Cinquwu"
+      ],
+      "asset": "assets/game_emojis/animals/2023bday_cinquwu.gif"
+    },
+    {
+      "key": "2023bday_owo",
+      "name": "2023bday_owo",
+      "rank": "special",
+      "emoji_stem": "2023bday_owo",
+      "source_image": "2023bday_owo.gif",
+      "event": "5th Anniversary Event",
+      "dates": "10 - 17 Mar 2023",
+      "rarity": "~11.45% - ~21.13% (From Anniversary Present, depending on the amount of wallpapers received)",
+      "caught": "223,968 (Will increase)",
+      "stats": {
+        "hp": 4,
+        "str": 5,
+        "pr": 1,
+        "wp": 5,
+        "mag": 5,
+        "mr": 1
+      },
+      "aliases": [
+        "2023bday_owo"
+      ],
+      "asset": "assets/game_emojis/animals/2023bday_owo.gif"
+    },
+    {
+      "key": "2022xmas_snowyshrew",
+      "name": "2022xmas_snowyshrew",
+      "rank": "special",
+      "emoji_stem": "2022xmas_snowyshrew",
+      "source_image": "2022xmas_snowyshrew.gif",
+      "event": "2022 Christmas",
+      "dates": "25 Dec 2022 - 18 Jan 2023",
+      "rarity": "0.000125% (25 Dec - 10 Jan) and 0.0075% (10 Jan - 18 Jan)",
+      "caught": "138,447",
+      "stats": {
+        "hp": 2,
+        "str": 13,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2022xmas_snowyshrew",
+        "snowyshrew"
+      ],
+      "asset": "assets/game_emojis/animals/2022xmas_snowyshrew.gif"
+    },
+    {
+      "key": "2022xmas_rabbit",
+      "name": "2022xmas_rabbit",
+      "rank": "special",
+      "emoji_stem": "2022xmas_rabbit",
+      "source_image": "2022xmas_rabbit.gif",
+      "event": "2022 Christmas",
+      "dates": "25 Dec 2022 - 18 Jan 2023",
+      "rarity": "0.000125% (25 Dec - 10 Jan) and 0.0075% (10 Jan - 18 Jan)",
+      "caught": "137,301",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 3,
+        "mag": 12,
+        "mr": 1
+      },
+      "aliases": [
+        "2022xmas_rabbit",
+        "Rabbit2022"
+      ],
+      "asset": "assets/game_emojis/animals/2022xmas_rabbit.gif"
+    },
+    {
+      "key": "2022xmas_polar",
+      "name": "2022xmas_polar",
+      "rank": "special",
+      "emoji_stem": "2022xmas_polar",
+      "source_image": "2022xmas_polar.gif",
+      "event": "2022 Christmas",
+      "dates": "25 Dec 2022 - 18 Jan 2023",
+      "rarity": "0.000125% (25 Dec - 10 Jan) and 0.0075% (10 Jan - 18 Jan)",
+      "caught": "137,589",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 4,
+        "mag": 11,
+        "mr": 1
+      },
+      "aliases": [
+        "2022xmas_polar",
+        "Polarb",
+        "Pbear"
+      ],
+      "asset": "assets/game_emojis/animals/2022xmas_polar.gif"
+    },
+    {
+      "key": "2022xmas_merryduck",
+      "name": "2022xmas_merryduck",
+      "rank": "special",
+      "emoji_stem": "2022xmas_merryduck",
+      "source_image": "2022xmas_merryduck.gif",
+      "event": "2022 Christmas",
+      "dates": "25 Dec 2022 - 18 Jan 2023",
+      "rarity": "0.000125% (25 Dec - 10 Jan) and 0.0075% (10 Jan - 18 Jan)",
+      "caught": "137,928",
+      "stats": {
+        "hp": 8,
+        "str": 4,
+        "pr": 1,
+        "wp": 5,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2022xmas_merryduck",
+        "2022xmas_MerryDuck",
+        "Merryduck"
+      ],
+      "asset": "assets/game_emojis/animals/2022xmas_merryduck.gif"
+    },
+    {
+      "key": "2022hal_zowombie",
+      "name": "2022hal_Zowombie",
+      "rank": "special",
+      "emoji_stem": "2022hal_zowombie",
+      "source_image": "2022hal_Zowombie.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,601",
+      "stats": {
+        "hp": 9,
+        "str": 1,
+        "pr": 1,
+        "wp": 7,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2022hal_Zowombie",
+        "Zowombie"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_zowombie.gif"
+    },
+    {
+      "key": "2022hal_vampire",
+      "name": "2022hal_vampire",
+      "rank": "special",
+      "emoji_stem": "2022hal_vampire",
+      "source_image": "2022hal_vampire.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,320",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 14,
+        "mr": 1
+      },
+      "aliases": [
+        "2022hal_vampire",
+        "vampire"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_vampire.gif"
+    },
+    {
+      "key": "2022hal_spookyspider",
+      "name": "2022hal_SpookySpider",
+      "rank": "special",
+      "emoji_stem": "2022hal_spookyspider",
+      "source_image": "2022hal_SpookySpider.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,484",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 2,
+        "wp": 6,
+        "mag": 5,
+        "mr": 3
+      },
+      "aliases": [
+        "2022hal_SpookySpider",
+        "SpookySpider",
+        "Spooks"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_spookyspider.gif"
+    },
+    {
+      "key": "2022hal_spooky",
+      "name": "2022hal_Spooky",
+      "rank": "special",
+      "emoji_stem": "2022hal_spooky",
+      "source_image": "2022hal_Spooky.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,342",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 9,
+        "mr": 2
+      },
+      "aliases": [
+        "2022hal_Spooky",
+        "Spooky",
+        "Spinx"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_spooky.gif"
+    },
+    {
+      "key": "2022hal_spookybee",
+      "name": "2022hal_Spookybee",
+      "rank": "special",
+      "emoji_stem": "2022hal_spookybee",
+      "source_image": "2022hal_Spookybee.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,615",
+      "stats": {
+        "hp": 1,
+        "str": 13,
+        "pr": 2,
+        "wp": 3,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2022hal_Spookybee",
+        "Spookybee"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_spookybee.gif"
+    },
+    {
+      "key": "2022hal_mummy",
+      "name": "2022hal_mummy",
+      "rank": "special",
+      "emoji_stem": "2022hal_mummy",
+      "source_image": "2022hal_mummy.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,995",
+      "stats": {
+        "hp": 3,
+        "str": 9,
+        "pr": 1,
+        "wp": 4,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2022hal_mummy",
+        "sarcophaguy",
+        "mummy"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_mummy.gif"
+    },
+    {
+      "key": "2022hal_littlegrim",
+      "name": "2022hal_LittleGrim",
+      "rank": "special",
+      "emoji_stem": "2022hal_littlegrim",
+      "source_image": "2022hal_LittleGrim.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,253",
+      "stats": {
+        "hp": 2,
+        "str": 12,
+        "pr": 1,
+        "wp": 3,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2022hal_LittleGrim",
+        "Little_Grim"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_littlegrim.gif"
+    },
+    {
+      "key": "2022hal_funguy",
+      "name": "2022hal_funguy",
+      "rank": "special",
+      "emoji_stem": "2022hal_funguy",
+      "source_image": "2022hal_funguy.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,032",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 4,
+        "mag": 10,
+        "mr": 1
+      },
+      "aliases": [
+        "2022hal_funguy",
+        "funguy"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_funguy.gif"
+    },
+    {
+      "key": "2022hal_dullahan",
+      "name": "2022hal_dullahan",
+      "rank": "special",
+      "emoji_stem": "2022hal_dullahan",
+      "source_image": "2022hal_dullahan.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,546",
+      "stats": {
+        "hp": 2,
+        "str": 14,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2022hal_dullahan",
+        "headless_horseman",
+        "dullahan"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_dullahan.gif"
+    },
+    {
+      "key": "2022hal_catrina",
+      "name": "2022hal_catrina",
+      "rank": "special",
+      "emoji_stem": "2022hal_catrina",
+      "source_image": "2022hal_catrina.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,623",
+      "stats": {
+        "hp": 12,
+        "str": 1,
+        "pr": 1,
+        "wp": 4,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2022hal_catrina",
+        "catrina"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_catrina.gif"
+    },
+    {
+      "key": "2022hal_brokenpumpkin",
+      "name": "2022hal_BrokenPumpkin",
+      "rank": "special",
+      "emoji_stem": "2022hal_brokenpumpkin",
+      "source_image": "2022hal_BrokenPumpkin.gif",
+      "event": "2022 Halloween",
+      "dates": "31 Oct - 28 Nov 2022",
+      "rarity": "0.005%",
+      "caught": "58,510",
+      "stats": {
+        "hp": 5,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 6,
+        "mr": 2
+      },
+      "aliases": [
+        "2022hal_BrokenPumpkin",
+        "BrokenPumpkin"
+      ],
+      "asset": "assets/game_emojis/animals/2022hal_brokenpumpkin.gif"
+    },
+    {
+      "key": "2022pridenb",
+      "name": "2022pridenb",
+      "rank": "special",
+      "emoji_stem": "2022pridenb",
+      "source_image": "2022pridenb.gif",
+      "event": "Pride Month 2022",
+      "dates": "13 Jun - 16 Jul 2022",
+      "rarity": "0.03%",
+      "caught": "359,591",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 7,
+        "mag": 7,
+        "mr": 1
+      },
+      "aliases": [
+        "2022pridenb",
+        "nari"
+      ],
+      "asset": "assets/game_emojis/animals/2022pridenb.gif"
+    },
+    {
+      "key": "2022pridegf",
+      "name": "2022pridegf",
+      "rank": "special",
+      "emoji_stem": "2022pridegf",
+      "source_image": "2022pridegf.gif",
+      "event": "Pride Month 2022",
+      "dates": "13 Jun - 16 Jul 2022",
+      "rarity": "0.03%",
+      "caught": "359,280",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 14,
+        "mr": 1
+      },
+      "aliases": [
+        "2022pridegf",
+        "genderfluid",
+        "genko",
+        "gecko-pride"
+      ],
+      "asset": "assets/game_emojis/animals/2022pridegf.gif"
+    },
+    {
+      "key": "2022prideace",
+      "name": "2022prideace",
+      "rank": "special",
+      "emoji_stem": "2022prideace",
+      "source_image": "2022prideace.gif",
+      "event": "Pride Month 2022",
+      "dates": "13 Jun - 16 Jul 2022",
+      "rarity": "0.03%",
+      "caught": "358,731",
+      "stats": {
+        "hp": 2,
+        "str": 13,
+        "pr": 1,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2022prideace"
+      ],
+      "asset": "assets/game_emojis/animals/2022prideace.gif"
+    },
+    {
+      "key": "2022pridedemi",
+      "name": "2022pridedemi",
+      "rank": "special",
+      "emoji_stem": "2022pridedemi",
+      "source_image": "2022pridedemi.gif",
+      "event": "Pride Month 2022",
+      "dates": "13 Jun - 16 Jul 2022",
+      "rarity": "0.03%",
+      "caught": "359,624",
+      "stats": {
+        "hp": 12,
+        "str": 1,
+        "pr": 1,
+        "wp": 4,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2022pridedemi",
+        "demoo"
+      ],
+      "asset": "assets/game_emojis/animals/2022pridedemi.gif"
+    },
+    {
+      "key": "2022pridebi",
+      "name": "2022pridebi",
+      "rank": "special",
+      "emoji_stem": "2022pridebi",
+      "source_image": "2022pridebi.gif",
+      "event": "Pride Month 2022",
+      "dates": "13 Jun - 16 Jul 2022",
+      "rarity": "0.03%",
+      "caught": "360,011",
+      "stats": {
+        "hp": 3,
+        "str": 10,
+        "pr": 1,
+        "wp": 3,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2022pridebi"
+      ],
+      "asset": "assets/game_emojis/animals/2022pridebi.gif"
+    },
+    {
+      "key": "2022pridebee",
+      "name": "2022pridebee",
+      "rank": "special",
+      "emoji_stem": "2022pridebee",
+      "source_image": "2022pridebee.gif",
+      "event": "Pride Month 2022",
+      "dates": "13 Jun - 16 Jul 2022",
+      "rarity": "0.015%",
+      "caught": "179,694",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 13,
+        "mr": 2
+      },
+      "aliases": [
+        "2022pridebee",
+        "pridebee"
+      ],
+      "asset": "assets/game_emojis/animals/2022pridebee.gif"
+    },
+    {
+      "key": "2022pride",
+      "name": "2022pride",
+      "rank": "special",
+      "emoji_stem": "2022pride",
+      "source_image": "2022pride.gif",
+      "event": "Pride Month 2022",
+      "dates": "13 Jun - 16 Jul 2022",
+      "rarity": "0.06%",
+      "caught": "719,207",
+      "stats": {
+        "hp": 10,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2022pride"
+      ],
+      "asset": "assets/game_emojis/animals/2022pride.gif"
+    },
+    {
+      "key": "2022easter",
+      "name": "2022easter",
+      "rank": "special",
+      "emoji_stem": "2022easter",
+      "source_image": "2022easter.gif",
+      "event": "2022 easter",
+      "dates": "2 - 9 Apr 2022",
+      "rarity": "0.03%",
+      "caught": "465,987",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 6,
+        "mag": 8,
+        "mr": 1
+      },
+      "aliases": [
+        "2022easter",
+        "2022chick",
+        "chickunny"
+      ],
+      "asset": "assets/game_emojis/animals/2022easter.gif"
+    },
+    {
+      "key": "patrickday2022",
+      "name": "Patrickday2022",
+      "rank": "special",
+      "emoji_stem": "patrickday2022",
+      "source_image": "patrickday2022.gif",
+      "event": "St. Patrick's Day",
+      "dates": "17 - 24 Mar 2022",
+      "rarity": "0.03%",
+      "caught": "407,533",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 1,
+        "wp": 8,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "Patrickday2022",
+        "saintpatrick2022",
+        "sp2022",
+        "patrickjr"
+      ],
+      "asset": "assets/game_emojis/animals/patrickday2022.gif"
+    },
+    {
+      "key": "2022valentines",
+      "name": "2022valentines",
+      "rank": "special",
+      "emoji_stem": "2022valentines",
+      "source_image": "2022valentines.gif",
+      "event": "2022 Valentines",
+      "dates": "14 - 21 Feb 2022",
+      "rarity": "?%",
+      "caught": "336,498",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 9,
+        "mr": 1
+      },
+      "aliases": [
+        "2022valentines",
+        "sweet",
+        "2022sweet"
+      ],
+      "asset": "assets/game_emojis/animals/2022valentines.gif"
+    },
+    {
+      "key": "2022valentinesspecial",
+      "name": "2022valentinesspecial",
+      "rank": "special",
+      "emoji_stem": "2022valentinesspecial",
+      "source_image": "2022ValentinesSpecial.gif",
+      "event": "2022 Valentines",
+      "dates": "14 - 21 Feb 2022",
+      "rarity": "?%",
+      "caught": "100,746",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 2,
+        "mag": 13,
+        "mr": 2
+      },
+      "aliases": [
+        "2022valentinesspecial",
+        "sour",
+        "2022sour"
+      ],
+      "asset": "assets/game_emojis/animals/2022valentinesspecial.gif"
+    },
+    {
+      "key": "2021christmasspecial",
+      "name": "2021christmasspecial",
+      "rank": "special",
+      "emoji_stem": "2021christmasspecial",
+      "source_image": "2021christmasspecial.gif",
+      "event": "2021 Christmas",
+      "dates": "25 Dec 2021 - 2 Jan 2022",
+      "rarity": "?%",
+      "caught": "91,581",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 2,
+        "wp": 4,
+        "mag": 9,
+        "mr": 2
+      },
+      "aliases": [
+        "2021christmasspecial",
+        "christmasowo"
+      ],
+      "asset": "assets/game_emojis/animals/2021christmasspecial.gif"
+    },
+    {
+      "key": "2021christmas",
+      "name": "2021christmas",
+      "rank": "special",
+      "emoji_stem": "2021christmas",
+      "source_image": "2021christmas.gif",
+      "event": "2021 Christmas",
+      "dates": "25 Dec 2021 - 2 Jan 2022",
+      "rarity": "0.03%",
+      "caught": "344,002",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 1,
+        "wp": 6,
+        "mag": 7,
+        "mr": 1
+      },
+      "aliases": [
+        "2021christmas",
+        "2021reindeer",
+        "2021rudolph"
+      ],
+      "asset": "assets/game_emojis/animals/2021christmas.gif"
+    },
+    {
+      "key": "2021specialhalloween",
+      "name": "2021specialhalloween",
+      "rank": "special",
+      "emoji_stem": "2021specialhalloween",
+      "source_image": "2021specialhalloween.gif",
+      "event": "2021 Halloween",
+      "dates": "31 Oct - 11 Nov 2021",
+      "rarity": "?%",
+      "caught": "71,080",
+      "stats": {
+        "hp": 9,
+        "str": 6,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2021specialhalloween",
+        "halloweenbunny",
+        "spoopybunny"
+      ],
+      "asset": "assets/game_emojis/animals/2021specialhalloween.gif"
+    },
+    {
+      "key": "2021halloween",
+      "name": "2021halloween",
+      "rank": "special",
+      "emoji_stem": "2021halloween",
+      "source_image": "2021halloween.gif",
+      "event": "2021 Halloween",
+      "dates": "31 Oct - 11 Nov 2021",
+      "rarity": "0.03%",
+      "caught": "401,697",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 7,
+        "mag": 7,
+        "mr": 1
+      },
+      "aliases": [
+        "2021halloween",
+        "halloweenraccoon",
+        "spoopyraccoon"
+      ],
+      "asset": "assets/game_emojis/animals/2021halloween.gif"
+    },
+    {
+      "key": "2021aprilfools",
+      "name": "2021AprilFools",
+      "rank": "special",
+      "emoji_stem": "2021aprilfools",
+      "source_image": "2021AprilFools.gif",
+      "event": "April Fools 2021",
+      "dates": "1 - 8 Apr 2021",
+      "rarity": "0.025%",
+      "caught": "316,449",
+      "stats": {
+        "hp": 0,
+        "str": 1,
+        "pr": 0,
+        "wp": 0,
+        "mag": 0,
+        "mr": 0
+      },
+      "aliases": [
+        "2021AprilFools",
+        "2021bee"
+      ],
+      "asset": "assets/game_emojis/animals/2021aprilfools.gif"
+    },
+    {
+      "key": "leprechaun2",
+      "name": "Leprechaun2",
+      "rank": "special",
+      "emoji_stem": "leprechaun2",
+      "source_image": "Leprechaun2.gif",
+      "event": "St. Patrick's Day 2021",
+      "dates": "17 - 24 Mar 2021",
+      "rarity": "0.025%",
+      "caught": "293,020",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 14,
+        "mr": 1
+      },
+      "aliases": [
+        "Leprechaun2",
+        "saintpatrick2021",
+        "sp2021"
+      ],
+      "asset": "assets/game_emojis/animals/leprechaun2.gif"
+    },
+    {
+      "key": "new_owo",
+      "name": "New_OwO",
+      "rank": "special",
+      "emoji_stem": "new_owo",
+      "source_image": "NewOwO.png",
+      "event": "new look of OwO",
+      "dates": "1 - 8 Mar 2021",
+      "rarity": "0.01%",
+      "caught": "71,025",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 1,
+        "wp": 4,
+        "mag": 11,
+        "mr": 1
+      },
+      "aliases": [
+        "New_OwO"
+      ],
+      "asset": "assets/game_emojis/animals/new_owo.png"
+    },
+    {
+      "key": "2020christmasspecial",
+      "name": "2020christmasspecial",
+      "rank": "special",
+      "emoji_stem": "2020christmasspecial",
+      "source_image": "2020christmasspecial.gif",
+      "event": "2020 Christmas",
+      "dates": "25 Dec 2020 - 2 Jan 2021",
+      "rarity": "?%",
+      "caught": "57,853",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 3,
+        "mag": 12,
+        "mr": 1
+      },
+      "aliases": [
+        "2020christmasspecial",
+        "christmasowo"
+      ],
+      "asset": "assets/game_emojis/animals/2020christmasspecial.gif"
+    },
+    {
+      "key": "1milowo",
+      "name": "1milowo",
+      "rank": "special",
+      "emoji_stem": "1milowo",
+      "source_image": "1milowo.gif",
+      "event": "1 Million Servers",
+      "dates": "25 Dec 2020 - 2 Jan 2021",
+      "rarity": "?%",
+      "caught": "57,693",
+      "stats": {
+        "hp": 4,
+        "str": 9,
+        "pr": 1,
+        "wp": 3,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "1milowo",
+        "1milspecial"
+      ],
+      "asset": "assets/game_emojis/animals/1milowo.gif"
+    },
+    {
+      "key": "2020christmas",
+      "name": "2020christmas",
+      "rank": "special",
+      "emoji_stem": "2020christmas",
+      "source_image": "2020christmas.gif",
+      "event": "2020 Christmas",
+      "dates": "25 De 2020 - 2 Jan 2021",
+      "rarity": "0.03%",
+      "caught": "192,946",
+      "stats": {
+        "hp": 4,
+        "str": 1,
+        "pr": 2,
+        "wp": 5,
+        "mag": 6,
+        "mr": 2
+      },
+      "aliases": [
+        "2020christmas",
+        "2020penguin",
+        "penguinchristmas"
+      ],
+      "asset": "assets/game_emojis/animals/2020christmas.gif"
+    },
+    {
+      "key": "1milpolarbear",
+      "name": "1milpolarbear",
+      "rank": "special",
+      "emoji_stem": "1milpolarbear",
+      "source_image": "1milpolarbear.gif",
+      "event": "1 Million Servers",
+      "dates": "25 Dec 2020 - 2 Jan 2021",
+      "rarity": "0.03%",
+      "caught": "192,844",
+      "stats": {
+        "hp": 7,
+        "str": 4,
+        "pr": 2,
+        "wp": 4,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "1milpolarbear",
+        "1mil",
+        "polarbear"
+      ],
+      "asset": "assets/game_emojis/animals/1milpolarbear.gif"
+    },
+    {
+      "key": "2020specialhalloween",
+      "name": "2020specialhalloween",
+      "rank": "special",
+      "emoji_stem": "2020specialhalloween",
+      "source_image": "2020specialhalloween.gif",
+      "event": "2020 Halloween",
+      "dates": "31 Oct - 11 Nov 2020",
+      "rarity": "?%",
+      "caught": "11,030",
+      "stats": {
+        "hp": 4,
+        "str": 12,
+        "pr": 1,
+        "wp": 2,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2020specialhalloween",
+        "2020cat"
+      ],
+      "asset": "assets/game_emojis/animals/2020specialhalloween.gif"
+    },
+    {
+      "key": "2020halloween",
+      "name": "2020halloween",
+      "rank": "special",
+      "emoji_stem": "2020halloween",
+      "source_image": "2020halloween.gif",
+      "event": "2020 Halloween",
+      "dates": "31 Oct - 11 Nov 2020*",
+      "rarity": "0.03%",
+      "caught": "148,641",
+      "stats": {
+        "hp": 10,
+        "str": 1,
+        "pr": 1,
+        "wp": 6,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2020halloween",
+        "skull",
+        "2020skull"
+      ],
+      "asset": "assets/game_emojis/animals/2020halloween.gif"
+    },
+    {
+      "key": "2020july4",
+      "name": "2020july4",
+      "rank": "special",
+      "emoji_stem": "2020july4",
+      "source_image": "2020july4.gif",
+      "event": "2020 Independence Day",
+      "dates": "4 - 12 July 2020",
+      "rarity": "?%",
+      "caught": "170,628",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 2,
+        "wp": 6,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2020july4",
+        "july4",
+        "independenceday",
+        "independence",
+        "july4cat"
+      ],
+      "asset": "assets/game_emojis/animals/2020july4.gif"
+    },
+    {
+      "key": "500kdino",
+      "name": "500kdino",
+      "rank": "special",
+      "emoji_stem": "500kdino",
+      "source_image": "500kdino.gif",
+      "event": "500,000 servers",
+      "dates": "13 Jun - 2 Jul 2020",
+      "rarity": "0.04%",
+      "caught": "128,348",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 2,
+        "wp": 5,
+        "mag": 7,
+        "mr": 2
+      },
+      "aliases": [
+        "500kdino",
+        "500k",
+        "dino"
+      ],
+      "asset": "assets/game_emojis/animals/500kdino.gif"
+    },
+    {
+      "key": "2020easter",
+      "name": "2020easter",
+      "rank": "special",
+      "emoji_stem": "2020easter",
+      "source_image": "2020easter.gif",
+      "event": "Easter Day",
+      "dates": "13 - 20 Apr 2020",
+      "rarity": "0.04%",
+      "caught": "92,735",
+      "stats": {
+        "hp": 3,
+        "str": 11,
+        "pr": 1,
+        "wp": 3,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2020easter",
+        "easter",
+        "2020bunny"
+      ],
+      "asset": "assets/game_emojis/animals/2020easter.gif"
+    },
+    {
+      "key": "2020aprilfools",
+      "name": "2020aprilfools",
+      "rank": "special",
+      "emoji_stem": "2020aprilfools",
+      "source_image": "2020aprilfools.gif",
+      "event": "April Fools Day",
+      "dates": "1 - 9 Apr 2020",
+      "rarity": "0.04%",
+      "caught": "75,444",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 2,
+        "wp": 3,
+        "mag": 5,
+        "mr": 1
+      },
+      "aliases": [
+        "2020aprilfools",
+        "2020snail"
+      ],
+      "asset": "assets/game_emojis/animals/2020aprilfools.gif"
+    },
+    {
+      "key": "potofgold",
+      "name": "Potofgold",
+      "rank": "special",
+      "emoji_stem": "potofgold",
+      "source_image": "Potofgold.gif",
+      "event": "St. Patrick's Day",
+      "dates": "17 - 24 Mar 2020",
+      "rarity": "0.04%",
+      "caught": "81,040",
+      "stats": {
+        "hp": 13,
+        "str": 1,
+        "pr": 1,
+        "wp": 3,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "Potofgold",
+        "sp2020",
+        "saintpatrick2020"
+      ],
+      "asset": "assets/game_emojis/animals/potofgold.gif"
+    },
+    {
+      "key": "250kpeacock",
+      "name": "250kpeacock",
+      "rank": "special",
+      "emoji_stem": "250kpeacock",
+      "source_image": "250kpeacock.gif",
+      "event": "250,000 servers",
+      "dates": "17 - 25 Jan 2020",
+      "rarity": "0.04%",
+      "caught": "65,300",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 1,
+        "mag": 13,
+        "mr": 1
+      },
+      "aliases": [
+        "250kpeacock",
+        "250k",
+        "250"
+      ],
+      "asset": "assets/game_emojis/animals/250kpeacock.gif"
+    },
+    {
+      "key": "santa",
+      "name": "Santa",
+      "rank": "special",
+      "emoji_stem": "santa",
+      "source_image": "2019santa.gif",
+      "event": "Christmas",
+      "dates": "25 Dec 2019 - 2 Jan 2020",
+      "rarity": "0.04%",
+      "caught": "56,059",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 10,
+        "mr": 1
+      },
+      "aliases": [
+        "Santa",
+        "2019christmas"
+      ],
+      "asset": "assets/game_emojis/animals/santa.gif"
+    },
+    {
+      "key": "2019halloween",
+      "name": "2019halloween",
+      "rank": "special",
+      "emoji_stem": "2019halloween",
+      "source_image": "2019halloween.gif",
+      "event": "Halloween",
+      "dates": "1 - 7 Nov 2019",
+      "rarity": "0.05%",
+      "caught": "45,014",
+      "stats": {
+        "hp": 11,
+        "str": 1,
+        "pr": 1,
+        "wp": 5,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "2019halloween",
+        "Pumpkin",
+        "2019pumpkin"
+      ],
+      "asset": "assets/game_emojis/animals/2019halloween.gif"
+    },
+    {
+      "key": "area51",
+      "name": "Area51",
+      "rank": "special",
+      "emoji_stem": "area51",
+      "source_image": "Area51.gif",
+      "event": "Storm Area 51",
+      "dates": "21 - 28 Sep 2019",
+      "rarity": "0.5%",
+      "caught": "56,056",
+      "stats": {
+        "hp": 8,
+        "str": 5,
+        "pr": 1,
+        "wp": 4,
+        "mag": 1,
+        "mr": 1
+      },
+      "aliases": [
+        "Area51",
+        "Alien"
+      ],
+      "asset": "assets/game_emojis/animals/area51.gif"
+    },
+    {
+      "key": "2019july4",
+      "name": "2019july4",
+      "rank": "special",
+      "emoji_stem": "2019july4",
+      "source_image": "2019july4.gif",
+      "event": "July 4th",
+      "dates": "4 - 11 Jul 2019",
+      "rarity": "0.05%",
+      "caught": "33,822",
+      "stats": {
+        "hp": 3,
+        "str": 10,
+        "pr": 2,
+        "wp": 2,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "2019july4",
+        "July4",
+        "Independenceday"
+      ],
+      "asset": "assets/game_emojis/animals/2019july4.gif"
+    },
+    {
+      "key": "100kbat",
+      "name": "100kbat",
+      "rank": "special",
+      "emoji_stem": "100kbat",
+      "source_image": "100kbat.gif",
+      "event": "100,000 Servers",
+      "dates": "12 - 21 May 2019",
+      "rarity": "?%",
+      "caught": "29,686",
+      "stats": {
+        "hp": 4,
+        "str": 10,
+        "pr": 2,
+        "wp": 1,
+        "mag": 1,
+        "mr": 2
+      },
+      "aliases": [
+        "100kbat",
+        "Bat"
+      ],
+      "asset": "assets/game_emojis/animals/100kbat.gif"
+    },
+    {
+      "key": "2019easter",
+      "name": "2019easter",
+      "rank": "special",
+      "emoji_stem": "2019easter",
+      "source_image": "2019easter.gif",
+      "event": "Easter",
+      "dates": "21 - 29 Apr 2019",
+      "rarity": "0.075%",
+      "caught": "38,540",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 2,
+        "wp": 2,
+        "mag": 9,
+        "mr": 3
+      },
+      "aliases": [
+        "2019easter",
+        "Easter",
+        "2019bunny"
+      ],
+      "asset": "assets/game_emojis/animals/2019easter.gif"
+    },
+    {
+      "key": "leprechaun",
+      "name": "Leprechaun",
+      "rank": "special",
+      "emoji_stem": "leprechaun",
+      "source_image": "Leprechaun.gif",
+      "event": "St. Patrick's Day",
+      "dates": "17 - 25 Mar 2019",
+      "rarity": "0.1%",
+      "caught": "54,893",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 1,
+        "wp": 2,
+        "mag": 11,
+        "mr": 2
+      },
+      "aliases": [
+        "Leprechaun",
+        "Saintpatrick2019",
+        "Sp2019"
+      ],
+      "asset": "assets/game_emojis/animals/leprechaun.gif"
+    },
+    {
+      "key": "glitchheart",
+      "name": "Glitchheart",
+      "rank": "special",
+      "emoji_stem": "glitchheart",
+      "source_image": "Glitchheart.gif",
+      "event": "Valentines Day / Rollback",
+      "dates": "13 - 22 Feb 2019",
+      "rarity": "0.1%",
+      "caught": "56,162",
+      "stats": {
+        "hp": 1,
+        "str": 1,
+        "pr": 2,
+        "wp": 3,
+        "mag": 11,
+        "mr": 2
+      },
+      "aliases": [
+        "Glitchheart",
+        "Heart"
+      ],
+      "asset": "assets/game_emojis/animals/glitchheart.gif"
+    },
+    {
+      "key": "rudolph",
+      "name": "Rudolph",
+      "rank": "special",
+      "emoji_stem": "rudolph",
+      "source_image": "Rudolph.gif",
+      "event": "Christmas",
+      "dates": "11 - 31 Dec 2018",
+      "rarity": "0.2%",
+      "caught": "171,296",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 2,
+        "wp": 2,
+        "mag": 10,
+        "mr": 2
+      },
+      "aliases": [
+        "Rudolph",
+        "Reindeer",
+        "Rudolf"
+      ],
+      "asset": "assets/game_emojis/animals/rudolph.gif"
+    },
+    {
+      "key": "2018halloween",
+      "name": "2018halloween",
+      "rank": "special",
+      "emoji_stem": "2018halloween",
+      "source_image": "2018halloween.gif",
+      "event": "Halloween",
+      "dates": "24 - 31 Oct 2018",
+      "rarity": "0.5%",
+      "caught": "138,844",
+      "stats": {
+        "hp": 2,
+        "str": 2,
+        "pr": 1,
+        "wp": 7,
+        "mag": 7,
+        "mr": 1
+      },
+      "aliases": [
+        "2018halloween",
+        "2018pumpkin"
+      ],
+      "asset": "assets/game_emojis/animals/2018halloween.gif"
+    },
+    {
+      "key": "glitchcrab",
+      "name": "Glitchcrab",
+      "rank": "special",
+      "emoji_stem": "glitchcrab",
+      "source_image": "Glitchcrab.gif",
+      "event": "Blackjack Exploit",
+      "dates": "30 Sep - 8 Oct 2018",
+      "rarity": "0.3%",
+      "caught": "44,363",
+      "stats": {
+        "hp": 2,
+        "str": 1,
+        "pr": 1,
+        "wp": 3,
+        "mag": 12,
+        "mr": 1
+      },
+      "aliases": [
+        "Glitchcrab",
+        "Crab"
+      ],
+      "asset": "assets/game_emojis/animals/glitchcrab.gif"
+    },
+    {
+      "key": "2018july4",
+      "name": "2018july4",
+      "rank": "special",
+      "emoji_stem": "2018july4",
+      "source_image": "2018july4.gif",
+      "event": "July 4th",
+      "dates": "4 - 11 Jul 2018",
+      "rarity": "0.5%",
+      "caught": "8,978",
+      "stats": {
+        "hp": 3,
+        "str": 1,
+        "pr": 2,
+        "wp": 2,
+        "mag": 10,
+        "mr": 2
+      },
+      "aliases": [
+        "2018july4",
+        "2018eagle"
+      ],
+      "asset": "assets/game_emojis/animals/2018july4.gif"
+    },
+    {
+      "key": "glitchshark",
+      "name": "Glitchshark",
+      "rank": "special",
+      "emoji_stem": "glitchshark",
+      "source_image": "Glitchshark.gif",
+      "event": "Slots Exploit",
+      "dates": "June 2018",
+      "rarity": "1 Per User",
+      "caught": "454",
+      "stats": {
+        "hp": 1,
+        "str": 10,
+        "pr": 1,
+        "wp": 1,
+        "mag": 6,
+        "mr": 1
+      },
+      "aliases": [
+        "Glitchshark",
+        "Shark"
+      ],
+      "asset": "assets/game_emojis/animals/glitchshark.gif"
+    },
+    {
+      "key": "10kturtle",
+      "name": "10kturtle",
+      "rank": "special",
+      "emoji_stem": "10kturtle",
+      "source_image": "10kturtle.gif",
+      "event": "10,000 Servers",
+      "dates": "23 - 30 May 2018",
+      "rarity": "1%",
+      "caught": "4,706",
+      "stats": {
+        "hp": 8,
+        "str": 1,
+        "pr": 5,
+        "wp": 1,
+        "mag": 1,
+        "mr": 4
+      },
+      "aliases": [
+        "10kturtle",
+        "Turtle",
+        "10k",
+        "Tortoise",
+        "10ktortoise"
+      ],
+      "asset": "assets/game_emojis/animals/10kturtle.gif"
+    },
+    {
+      "key": "2018easter",
+      "name": "2018easter",
+      "rank": "special",
+      "emoji_stem": "2018easter",
+      "source_image": "2018easter.gif",
+      "event": "Easter",
+      "dates": "31 Mar - 14 Apr 2018",
+      "rarity": "0.5%",
+      "caught": "3,001",
+      "stats": {
+        "hp": 3,
+        "str": 3,
+        "pr": 3,
+        "wp": 4,
+        "mag": 4,
+        "mr": 3
+      },
+      "aliases": [
+        "2018easter",
+        "2018bunny"
+      ],
+      "asset": "assets/game_emojis/animals/2018easter.gif"
+    }
+  ],
+  "rank_assets": {
+    "common": "assets/game_emojis/ranks/common.png",
+    "uncommon": "assets/game_emojis/ranks/uncommon.png",
+    "rare": "assets/game_emojis/ranks/rare.png",
+    "epic": "assets/game_emojis/ranks/epic.png",
+    "mythical": "assets/game_emojis/ranks/mythical.png",
+    "patreon": "assets/game_emojis/ranks/patreon.png",
+    "custom_patreon": "assets/game_emojis/ranks/custom_patreon.gif",
+    "gem": "assets/game_emojis/ranks/gem.gif",
+    "legendary": "assets/game_emojis/ranks/legendary.gif",
+    "fabled": "assets/game_emojis/ranks/fabled.gif",
+    "bot": "assets/game_emojis/ranks/bot.gif",
+    "hidden": "assets/game_emojis/ranks/hidden.gif",
+    "distorted": "assets/game_emojis/ranks/distorted.gif",
+    "special": "assets/game_emojis/ranks/special.png"
+  }
+}

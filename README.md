@@ -1,11 +1,11 @@
 
-## v0.12.0-beta notes
+## v0.13.0-beta notes
 
-`H help` is repaired and kept safely within Discord's embed limits. Server managers can now replace the helper's default `h` prefix with `/helper-prefix` or `H prefix <new prefix>`; every supported helper command follows the server setting while the OwO command prefix remains separate. SKIP stickies can include one random usable custom emoji from the current server. The application emoji catalog now contains 55 standard animals—including Bot rank—29 weapons, 28 passives, and the existing six UI emojis.
+The helper now learns public animal facts from official OwO Dex responses, includes all 173 Special/event animals, and can return a cached Dex when OwO cannot find an animal in the requesting member's zoo. The bot owner can grant trusted expert access for a visual, versioned team-guide editor. HIT and SKIP stickies both keep one random usable server emoji, and the HW guide now explains Neon's `/weapon inv check` reconciliation step.
 
 # OwO Boss Helper
 
-A community Discord bot for OwO guild-boss fights. It generates Neon battle commands, tracks guild-boss timing, saves reusable teams with exact weapon IDs, scans Neon weapon pages for dex queues, and maintains a per-server boss-ticket board.
+A community Discord bot for OwO guild-boss fights. It generates Neon battle commands, tracks guild-boss timing, saves reusable teams with exact weapon IDs, scans Neon weapon pages for dex queues, maintains a public animal Dex catalog, publishes trusted expert team guides, and maintains a per-server boss-ticket board.
 
 Developed and maintained by **Hassaan**.
 
@@ -42,7 +42,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Sends a persistent fighter-role alert once when an active boss is marked HIT.
 - Posts a daily confirmed HIT/SKIP outcome report at the Pacific-midnight reset in a manager-configured channel.
 - Persists up to seven failed daily reports for retry instead of discarding counts during a temporary Discord/channel failure.
-- Adds one random usable custom emoji from the current server when a helper marks an active boss SKIP; servers without a usable custom emoji keep the plain `# SKIP` sticky.
+- Adds one stable random usable custom emoji from the current server when a helper marks an active boss HIT or SKIP; servers without a usable custom emoji keep a plain sticky.
 
 ### Team templates
 
@@ -60,6 +60,24 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Supports concurrent guided sessions by server, channel, and user.
 - Handles already-present animals, occupied positions, missing weapons, retries, skips, and cancellations.
 - Can optionally clean completed command messages when the bot has **Manage Messages**.
+
+### Public animal Dex catalog
+
+- Watches strict animal-Dex responses from the official OwO bot ID and stores public game facts in `animal_dex.db`.
+- Stores animal names, ranks, aliases, global caught totals, economy values, six base stats, descriptions, and public image/emoji metadata.
+- Deliberately does not store the requesting member's personal zoo count, original command content, or source message/channel/server IDs.
+- Seeds all 173 Special/event animals from the checked-in OwO Wiki catalog and learns newer official OwO responses as they are seen.
+- Searches with `H animal dex <animal>` or `/animal-dex`. The existing `H dex` command remains reserved for Neon's weapon-dex queue.
+- If OwO refuses or does not answer because the requesting member does not own the animal, the helper replies with its latest cached public record when available.
+
+### Trusted team guides
+
+- The bot owner grants or revokes global trusted-expert access with `/guide-expert`.
+- Trusted experts create guides with `/team-guide-create` and revise them with `/team-guide-edit`.
+- The private editor uses Discord modals and buttons for guide basics, unique aliases, user-created categories, displayed authors, viability, ease of creation, and all three composition slots.
+- Composition slots support optional animal/weapon ranks, levels, up to three weapon specifications, passives, and notes using the checked-in animal, weapon, passive, and tier emoji catalogs.
+- Search aliases are globally unique, edits increment the guide version, and the last editor is recorded.
+- Everyone can browse with `H guide`, search by name, alias, category, or displayed author with `H guide <query>` or `/team-guide`, and open related teams selected from shared categories.
 
 ### Boss-ticket board
 
@@ -93,8 +111,8 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Keeps manual `w boss t` / `owo boss t` results authoritative and reminds members outside the visible Top 10 to update manually.
 - Removes entries after 48 hours without a manual check or confirmed Top 10 hit while preserving block, tracking, and nickname preferences.
 - Adds `HBT <name, username, mention, or ID>` for fast current-ticket lookups without loading server members.
-- Loads 118 application-owned Discord emojis on startup: six UI emojis, 55 standard animal emojis (Common through Distorted, including Bot rank), 29 weapons, and 28 passives. Existing names are reused and only missing names are created.
-- Excludes Patreon, Custom Patreon, and monthly Special/event animals from this catalog.
+- Loads 305 application-owned Discord emojis on startup: six UI emojis, 55 standard animals, 173 Special/event animals, 29 weapons, 28 passives, and 14 animal-rank icons. Existing names are reused and only missing names are created.
+- Keeps Patreon and Custom Patreon animals in the learned Dex database instead of bulk-uploading their open-ended artwork catalog as application emojis.
 
 ### Neon weapon dex helper
 
@@ -126,6 +144,8 @@ H weapon clear
 `HWD` / `H dex` previews the queue with one **Start dexing session** button. Each active step shows the exact command directly in the channel beneath a small instruction telling the member to copy and send it there. **Skip weapon** and **Stop** remain available while the session is active. When the member sends `ww <weapon_id>` and Neon replies with a blueprint such as `sword 31,7 mtap 77`, the helper marks that weapon saved and learns any available weapon/passive context.
 
 The scanner does not assume one stable emoji ID per weapon or passive. It tags weapon/passive context from Neon filter headers, command context, learned blueprint replies, and known aliases. Unknown rows still remain in the unfiltered dex queue.
+
+After paging through Neon, the `HW` guide also asks members to run their server's OwO inventory command (for example `winv`) and then Neon's `/weapon inv check`. Neon can then compare the live inventory with its tracked list and show any difference before a guided dex session begins.
 
 ### Developer information and operational statistics
 
@@ -558,20 +578,31 @@ boss_cooldown_config.json
 team_templates.db
 team_templates.db-shm
 team_templates.db-wal
+animal_dex.db
+animal_dex.db-shm
+animal_dex.db-wal
+team_guides.db
+team_guides.db-shm
+team_guides.db-wal
 boss_tickets.db
 boss_tickets.db-shm
 boss_tickets.db-wal
 bot_stats.db
 bot_stats.db-shm
 bot_stats.db-wal
+neon_weapons.db
+neon_weapons.db-shm
+neon_weapons.db-wal
 logs/
 ```
 
 These files are ignored by Git.
 
-When moving the bot to another computer or host, copy `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, and `boss_cooldown_config.json` to preserve saved teams, ticket data, personal tracking and nickname preferences, managed nickname restoration state, developer statistics, board configuration, boss watcher state, daily boss counters, and report-channel configuration.
+When moving the bot to another computer or host, copy `.env`, `boss_cooldown_config.json`, and every database listed above. This preserves saved teams, learned public animal facts, trusted guide access and content, ticket data, Neon queues, personal preferences, developer statistics, board configuration, boss watcher state, daily boss counters, and report-channel configuration.
 
 ## Project structure
+
+The v0.13 catalog and guide implementation lives in `cogs/animal_dex.py`, `cogs/game_catalog.py`, and `cogs/team_guides.py`. Checked-in reference data is under `data/`; application-emoji sources are under `assets/game_emojis/`; and the repeatable maintainer importer is `scripts/sync_wiki_game_data.py`.
 
 ```text
 owo-boss-helper-discord-bot/
@@ -609,8 +640,11 @@ Generated locally and ignored by Git:
 ```text
 boss_cooldown_config.json
 team_templates.db
+animal_dex.db
+team_guides.db
 boss_tickets.db
 bot_stats.db
+neon_weapons.db
 ```
 
 ## Updating
@@ -623,7 +657,7 @@ rmdir /s /q cogs\__pycache__ 2>nul
 py bot.py
 ```
 
-Do not delete `.env`, `boss_cooldown_config.json`, `team_templates.db`, `boss_tickets.db`, `bot_stats.db`, or `logs/` during an update.
+Do not delete `.env`, `boss_cooldown_config.json`, any runtime `.db`/`.db-wal`/`.db-shm` file, or `logs/` during an update.
 
 ## Production hosting
 

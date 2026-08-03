@@ -1,4 +1,18 @@
 
+## v0.13.0-beta - Animal Dex and Trusted Team Guides
+
+- Added a public animal catalog that learns only from strict official OwO Dex responses and stores public animal facts without retaining a requester's zoo count or source message metadata.
+- Seeded the catalog with 173 Special/event animals and added cached fallback replies when OwO cannot show an animal that a member does not own.
+- Added `H animal dex <animal>` and `/animal-dex` lookup commands without conflicting with the existing Neon weapon `H dex` command.
+- Added owner-managed trusted guide experts and a private modal/button editor for searchable, versioned three-animal team guides.
+- Added `H guide`, `/team-guide`, `/team-guide-create`, `/team-guide-edit`, and owner-only `/guide-expert`.
+- Expanded application emoji synchronization from 118 to 305 assets: 173 Special/event animals and 14 animal-rank icons join the existing interface, standard-animal, weapon, and passive sets.
+- Added one stable random usable server emoji to HIT stickies, matching SKIP behavior.
+- Expanded the `HW` guide with the OwO inventory plus Neon `/weapon inv check` reconciliation step.
+- Added public weapon/passive reference exports and a repeatable wiki catalog importer for maintainers.
+- Expanded protected backups to include `.env`, `animal_dex.db`, `team_guides.db`, and `neon_weapons.db`.
+- Updated the public bot version to `0.13.0-beta`.
+
 ## v0.12.0-beta - Server Prefixes and Game Emoji Catalog
 
 - Fixed `H help` by removing the obsolete team-cog override that exceeded Discord's 1,024-character embed-field limit.
