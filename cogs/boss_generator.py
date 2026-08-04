@@ -77,6 +77,7 @@ BOSS_TRIGGER_SUFFIXES = {"bossi"}
 
 # Lightweight public helper commands. Whitespace and capitalization are ignored.
 PREFIX_COOLDOWN_TRIGGERS = {"hbosscd", "hbosscooldown"}
+PREFIX_BOSS_REBIRTH_TRIGGERS = {"hbossrebirth", "hbrebirth"}
 PREFIX_SETUP_TRIGGERS = {"hsetup", "hsetupguide"}
 BOSS_DECISION_HIT_TRIGGERS = {"hbosshit", "hsethit"}
 BOSS_DECISION_SKIP_TRIGGERS = {"hbossskip", "hskipboss", "hsetskip"}
@@ -148,6 +149,14 @@ def is_prefix_cooldown_trigger(
 ) -> bool:
     """Accept `H boss cd` and `H boss cooldown`, case-insensitively."""
     return matches_helper_command(content, helper_prefix, PREFIX_COOLDOWN_TRIGGERS)
+
+
+def is_prefix_boss_rebirth_trigger(
+    content: str,
+    helper_prefix: str = HELPER_PREFIX_DEFAULT,
+) -> bool:
+    """Accept `H boss rebirth` and `H brebirth`, case-insensitively."""
+    return matches_helper_command(content, helper_prefix, PREFIX_BOSS_REBIRTH_TRIGGERS)
 
 
 def is_prefix_help_trigger(
@@ -1889,7 +1898,9 @@ class BossGenerator(commands.Cog):
                 f"Daily report channel: {report_status}\n\n"
                 "• `/boss-cooldown-channel` — new boss, defeat, escape, and cooldown alerts.\n"
                 "• `/boss-report-channel` — daily HIT/SKIP totals at Pacific midnight; "
-                "leave the channel empty to disable reports."
+                "leave the channel empty to disable reports.\n"
+                f"• `{helper_command(helper_prefix, 'boss rebirth')}` — repost the latest "
+                "completed daily report in the current channel."
             ),
             inline=False,
         )
@@ -2271,6 +2282,7 @@ class BossGenerator(commands.Cog):
         """Build a Discord-limit-safe, server-prefix-aware command guide."""
         help_command = helper_command(helper_prefix, "help")
         boss_cd = helper_command(helper_prefix, "boss cd")
+        boss_rebirth = helper_command(helper_prefix, "boss rebirth")
         boss_tickets = helper_command(helper_prefix, "boss t")
         boss_list = helper_command(helper_prefix, "boss list")
         boss_lookup = f"{helper_alias(helper_prefix, 'hbt')} <name/mention/ID>"
@@ -2303,7 +2315,8 @@ class BossGenerator(commands.Cog):
                 "or `/boss-cooldown`. Managers "
                 "configure alerts with `/boss-cooldown-channel`, decision helpers with "
                 "`/boss-decision-role`, fighter pings with `/boss-fighter-role`, and "
-                "daily reset reports with `/boss-report-channel`."
+                "daily reset reports with `/boss-report-channel`. Repost the latest "
+                f"completed report with `{boss_rebirth}`."
             ),
             inline=False,
         )
@@ -2345,9 +2358,9 @@ class BossGenerator(commands.Cog):
             name="🐾 Public animal Dex",
             value=(
                 f"Search with `{helper_command(helper_prefix, 'animal dex <animal>')}` or "
-                "`/animal-dex`. The helper learns public stats from official OwO Dex "
-                "responses and can show its latest cached record when an animal is not "
-                "available in the requesting member's zoo."
+                f"`{helper_alias(helper_prefix, 'had')} <animal>`, or `/animal-dex`. "
+                "The helper silently learns public stats from official OwO Dex responses; "
+                "ordinary OwO Dex commands never trigger a duplicate helper reply."
             ),
             inline=False,
         )
@@ -2521,19 +2534,7 @@ class BossGenerator(commands.Cog):
         channel = await self.get_boss_report_channel(guild_id)
         if channel is None:
             return False
-        start, end = boss_report_cycle_bounds(cycle)
-        embed = discord.Embed(
-            title="Daily Guild Boss Report",
-            description=f"Reporting period: <t:{start}:F> to <t:{end}:F>",
-            color=0x5865F2,
-        )
-        embed.add_field(
-            name="Total bosses",
-            value=str(defeated + escaped),
-            inline=False,
-        )
-        embed.add_field(name="Defeated (HIT)", value=str(defeated), inline=True)
-        embed.add_field(name="Escaped (SKIP)", value=str(escaped), inline=True)
+        embed = self.build_boss_daily_report_embed(cycle, defeated, escaped)
         try:
             await channel.send(embed=embed)
             return True
@@ -2544,6 +2545,70 @@ class BossGenerator(commands.Cog):
                 exc,
             )
             return False
+
+    @staticmethod
+    def build_boss_daily_report_embed(
+        cycle: str,
+        defeated: int,
+        escaped: int,
+        *,
+        title: str = "Daily Guild Boss Report",
+    ) -> discord.Embed:
+        start, end = boss_report_cycle_bounds(cycle)
+        embed = discord.Embed(
+            title=title,
+            description=f"Reporting period: <t:{start}:F> to <t:{end}:F>",
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name="Total bosses",
+            value=str(defeated + escaped),
+            inline=False,
+        )
+        embed.add_field(name="Defeated (HIT)", value=str(defeated), inline=True)
+        embed.add_field(name="Escaped (SKIP)", value=str(escaped), inline=True)
+        return embed
+
+    @staticmethod
+    def latest_boss_report(config: dict[str, Any]) -> tuple[str, int, int] | None:
+        report = config.get("boss_report_latest")
+        if not isinstance(report, dict):
+            return None
+        cycle = str(report.get("cycle") or "")
+        try:
+            boss_report_cycle_bounds(cycle)
+            defeated = max(0, int(report.get("defeated") or 0))
+            escaped = max(0, int(report.get("escaped") or 0))
+        except (TypeError, ValueError):
+            return None
+        return cycle, defeated, escaped
+
+    async def send_latest_boss_rebirth(self, message: discord.Message) -> None:
+        guild = message.guild
+        if guild is None:
+            return
+        await self.rollover_boss_report(guild.id)
+        config = self.cooldown_config.get(str(guild.id), {})
+        report = self.latest_boss_report(config)
+        if report is None:
+            await safe_reply(
+                message,
+                "No completed guild-boss rebirth report has been recorded for this server yet. "
+                "The first one becomes available after the next Pacific-midnight reset.",
+                mention_author=False,
+            )
+            return
+        cycle, defeated, escaped = report
+        await safe_reply(
+            message,
+            embed=self.build_boss_daily_report_embed(
+                cycle,
+                defeated,
+                escaped,
+                title="Latest Guild Boss Rebirth",
+            ),
+            mention_author=False,
+        )
 
     @staticmethod
     def queue_pending_boss_report(
@@ -2620,6 +2685,11 @@ class BossGenerator(commands.Cog):
             await self.retry_pending_boss_reports(guild_id, config)
         defeated = int(config.get("boss_report_defeated") or 0)
         escaped = int(config.get("boss_report_escaped") or 0)
+        config["boss_report_latest"] = {
+            "cycle": previous,
+            "defeated": defeated,
+            "escaped": escaped,
+        }
         if config.get("boss_report_channel_id"):
             sent = await self.send_boss_daily_report(
                 guild_id,
@@ -3044,6 +3114,10 @@ class BossGenerator(commands.Cog):
 
                     if is_prefix_cooldown_trigger(message.content, helper_prefix):
                         await self.send_prefix_cooldown_status(message)
+                        return
+
+                    if is_prefix_boss_rebirth_trigger(message.content, helper_prefix):
+                        await self.send_latest_boss_rebirth(message)
                         return
 
                     owo_prefix = await get_guild_owo_prefix(message.guild.id)

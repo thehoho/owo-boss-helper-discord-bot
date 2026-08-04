@@ -6,16 +6,20 @@ import time
 import unittest
 from pathlib import Path
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, patch
 
 import discord
 
 from cogs.animal_dex import (
+    AnimalDex,
+    AnimalDexRecord,
     AnimalDexStore,
+    clean_dex_description,
     is_owo_dex_refusal,
     parse_owo_animal_dex,
     parse_owo_dex_request,
 )
-from cogs.boss_generator import BossGenerator
+from cogs.boss_generator import BossGenerator, is_prefix_boss_rebirth_trigger
 from cogs.game_catalog import (
     PASSIVES,
     RANKS,
@@ -34,6 +38,7 @@ from cogs.team_guides import (
     TeamGuideStore,
     build_guide_embed,
 )
+from cogs.ui_emojis import UIEmojiManager
 
 
 class AnimalDexParserTests(unittest.TestCase):
@@ -65,6 +70,11 @@ class AnimalDexParserTests(unittest.TestCase):
         self.assertEqual((record.hp, record.strength, record.pr), (8, 1, 2))
         self.assertEqual((record.wp, record.mag, record.mr), (3, 5, 1))
         self.assertEqual(record.emoji_name, "snail")
+        self.assertNotIn("Count", record.description)
+
+    def test_bold_count_starts_the_private_details_block(self) -> None:
+        value = "A public description\n\n**Count:** 3/3\n**Rank:** special"
+        self.assertEqual(clean_dex_description(value), "A public description")
 
     def test_parses_custom_patreon_pasted_layout(self) -> None:
         message = self.message(
@@ -98,12 +108,76 @@ class AnimalDexParserTests(unittest.TestCase):
             "hpet dex",
             "h adex",
             "hadex",
+            "h ad",
+            "had",
         }
         self.assertEqual(
             parse_helper_command_argument("?animal dex pridebee", "?", aliases),
             "pridebee",
         )
         self.assertIsNone(parse_helper_command_argument("?dex dagger", "?", aliases))
+        self.assertEqual(parse_helper_command_argument("?ad pridebee", "?", aliases), "pridebee")
+
+    def test_compact_dex_embed_uses_official_stat_order(self) -> None:
+        manager = UIEmojiManager.__new__(UIEmojiManager)
+        manager.emojis = {
+            f"stat_{key}": discord.PartialEmoji(name=f"stat_{key}", id=index)
+            for index, key in enumerate(("hp", "att", "pr", "wp", "mag", "mr"), 100)
+        }
+        bot = SimpleNamespace(ui_emoji_manager=manager)
+        cog = AnimalDex.__new__(AnimalDex)
+        cog.bot = bot
+        record = AnimalDexRecord(
+            animal_key="test",
+            display_name="Test",
+            rank="special",
+            description="Public prose\n\n**Count:** 9/9\n**Rank:** special",
+            aliases=("Test", "test_alias"),
+            total_caught=1234,
+            rarity_text="1,234 total caught",
+            points=500,
+            sell_text="6000 Cowoncy",
+            sacrifice_text="5000 Essence",
+            hp=4,
+            strength=1,
+            pr=10,
+            wp=1,
+            mag=1,
+            mr=3,
+            emoji_name="",
+            emoji_id=None,
+            emoji_animated=False,
+            image_url="",
+            source="owo",
+            updated_at=1,
+        )
+        embed = cog.build_embed(record)
+        description = embed.description or ""
+        self.assertFalse(embed.fields)
+        self.assertNotIn("Count", description)
+        self.assertIn("`test_alias`", description)
+        positions = [description.index(f"<:stat_{key}:{index}>") for index, key in enumerate(("hp", "att", "pr", "wp", "mag", "mr"), 100)]
+        self.assertEqual(positions, sorted(positions))
+
+
+class AnimalDexSilenceTests(unittest.IsolatedAsyncioTestCase):
+    async def test_normal_owo_dex_request_does_not_trigger_helper_output(self) -> None:
+        async def unexpected_output(*args: object, **kwargs: object) -> None:
+            raise AssertionError("ordinary OwO Dex activity must remain silent")
+
+        message = SimpleNamespace(
+            guild=SimpleNamespace(id=1),
+            author=SimpleNamespace(bot=False),
+            content="wd pridebee",
+            channel=SimpleNamespace(send=unexpected_output),
+            reply=unexpected_output,
+        )
+        cog = AnimalDex.__new__(AnimalDex)
+        with patch(
+            "cogs.animal_dex.get_guild_helper_prefix",
+            new=AsyncMock(return_value="h"),
+        ):
+            await cog.on_message(message)
 
 
 class CatalogTests(unittest.TestCase):
@@ -199,6 +273,34 @@ class BossDecisionEmojiTests(unittest.TestCase):
             cog.boss_decision_default_content({"boss_decision": "skip", "boss_skip_emoji": "<:no:2>"}),
             "# SKIP <:no:2>",
         )
+
+
+class BossRebirthTests(unittest.IsolatedAsyncioTestCase):
+    async def test_rollover_keeps_latest_report_without_report_channel(self) -> None:
+        cog = BossGenerator.__new__(BossGenerator)
+        cog.cooldown_config = {
+            "1": {
+                "boss_report_cycle": "2026-08-01",
+                "boss_report_defeated": 10,
+                "boss_report_escaped": 20,
+            }
+        }
+        with patch("cogs.boss_generator.save_cooldown_config"):
+            await cog.rollover_boss_report(1, "2026-08-02")
+        self.assertEqual(
+            cog.latest_boss_report(cog.cooldown_config["1"]),
+            ("2026-08-01", 10, 20),
+        )
+        embed = cog.build_boss_daily_report_embed(
+            "2026-08-01", 10, 20, title="Latest Guild Boss Rebirth"
+        )
+        self.assertEqual(embed.title, "Latest Guild Boss Rebirth")
+        self.assertEqual([field.value for field in embed.fields], ["30", "10", "20"])
+
+    async def test_rebirth_alias_uses_custom_helper_prefix(self) -> None:
+        self.assertTrue(is_prefix_boss_rebirth_trigger("? boss rebirth", "?"))
+        self.assertTrue(is_prefix_boss_rebirth_trigger("?brebirth", "?"))
+        self.assertFalse(is_prefix_boss_rebirth_trigger("h boss rebirth", "?"))
 
 
 if __name__ == "__main__":

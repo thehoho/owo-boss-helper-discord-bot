@@ -1,7 +1,7 @@
 
 ## v0.13.0-beta notes
 
-The helper now learns public animal facts from official OwO Dex responses, includes all 173 Special/event animals, and can return a cached Dex when OwO cannot find an animal in the requesting member's zoo. The bot owner can grant trusted expert access for a visual, versioned team-guide editor. HIT and SKIP stickies both keep one random usable server emoji, and the HW guide now explains Neon's `/weapon inv check` reconciliation step.
+The helper now silently learns public animal facts from official OwO Dex responses, includes all 173 Special/event animals, and exposes its catalog only when a member explicitly uses the helper's Dex command. The bot owner can grant trusted expert access for a visual, versioned team-guide editor. HIT and SKIP stickies both keep one random usable server emoji, and the HW guide now explains Neon's `/weapon inv check` reconciliation step.
 
 # OwO Boss Helper
 
@@ -42,6 +42,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Sends a persistent fighter-role alert once when an active boss is marked HIT.
 - Posts a daily confirmed HIT/SKIP outcome report at the Pacific-midnight reset in a manager-configured channel.
 - Persists up to seven failed daily reports for retry instead of discarding counts during a temporary Discord/channel failure.
+- Keeps the latest completed daily totals per server and reposts them with `H boss rebirth` or `H brebirth`.
 - Adds one stable random usable custom emoji from the current server when a helper marks an active boss HIT or SKIP; servers without a usable custom emoji keep a plain sticky.
 
 ### Team templates
@@ -67,8 +68,9 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Stores animal names, ranks, aliases, global caught totals, economy values, six base stats, descriptions, and public image/emoji metadata.
 - Deliberately does not store the requesting member's personal zoo count, original command content, or source message/channel/server IDs.
 - Seeds all 173 Special/event animals from the checked-in OwO Wiki catalog and learns newer official OwO responses as they are seen.
-- Searches with `H animal dex <animal>` or `/animal-dex`. The existing `H dex` command remains reserved for Neon's weapon-dex queue.
-- If OwO refuses or does not answer because the requesting member does not own the animal, the helper replies with its latest cached public record when available.
+- Searches with `H animal dex <animal>`, `HAD <animal>`, or `/animal-dex`. The existing `H dex` command remains reserved for Neon's weapon-dex queue.
+- Learns ordinary official OwO Dex responses silently. It does not reply to a member's OwO Dex command or refusal, avoiding duplicate output beside dedicated Dex bots.
+- Shows a compact explicit result with copyable aliases and the official HP/ATT/PR then WP/MAG/MR stat layout.
 
 ### Trusted team guides
 
@@ -111,7 +113,8 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Keeps manual `w boss t` / `owo boss t` results authoritative and reminds members outside the visible Top 10 to update manually.
 - Removes entries after 48 hours without a manual check or confirmed Top 10 hit while preserving block, tracking, and nickname preferences.
 - Adds `HBT <name, username, mention, or ID>` for fast current-ticket lookups without loading server members.
-- Loads 305 application-owned Discord emojis on startup: six UI emojis, 55 standard animals, 173 Special/event animals, 29 weapons, 28 passives, and 14 animal-rank icons. Existing names are reused and only missing names are created.
+- Loads 311 configured Discord emojis on startup: six UI emojis, 55 standard animals, 173 Special/event animals, 29 weapons, 28 passives, 14 animal-rank icons, and six official base-stat icons.
+- Crops transparent padding and scales static game artwork to fill the Discord emoji canvas. Revised internal remote names allow the corrected game set to upload without deleting the previous working set.
 - Keeps Patreon and Custom Patreon animals in the learned Dex database instead of bulk-uploading their open-ended artwork catalog as application emojis.
 
 ### Neon weapon dex helper
@@ -263,7 +266,7 @@ boss_escaped.png
 boss_defeated.png
 ```
 
-On startup the bot lists its application-owned emojis, reuses matching names, and creates any missing names from these source PNGs. Application emojis do not require the destination server's **Use External Emojis** permission. If artwork is changed later, delete the old application emoji from the Developer Portal once so the bot can recreate it from the new file.
+On startup the bot lists its application-owned emojis, reuses matching revision names, and creates any missing names from the checked-in sources. Static game artwork is cropped to its visible alpha bounds and scaled into a 128×128 Discord canvas. Application emojis do not require the destination server's **Use External Emojis** permission. A new internal asset revision can replace artwork without deleting the currently working set first.
 
 ## Commands
 
@@ -281,6 +284,8 @@ Open all three pages. The helper captures each visible page number and emits the
 ```text
 H boss cd
 H boss cooldown
+H boss rebirth
+H brebirth
 /boss-cooldown
 ```
 
@@ -300,7 +305,7 @@ Server setup:
 /setup-guide
 ```
 
-`/boss-cooldown-channel` selects the channel for new-boss, defeat, escape, cooldown, and ready alerts. Add one or more decision roles with `/boss-decision-role`; they authorize HIT/SKIP and sticky controls but are not pinged by new-boss announcements. Add one or more fighter roles with `/boss-fighter-role`; they receive one persistent role alert when a helper chooses HIT. Make fighter roles mentionable, or grant the bot **Mention @everyone, @here, and All Roles** in the alert channel. `/boss-report-channel` selects the channel that receives the completed daily outcome report at Pacific midnight. Run `/boss-report-channel` without a channel to disable reports while preserving the current counters. `/setup-guide` shows server managers the complete configuration checklist; `H setup` posts the same guide publicly.
+`/boss-cooldown-channel` selects the channel for new-boss, defeat, escape, cooldown, and ready alerts. Add one or more decision roles with `/boss-decision-role`; they authorize HIT/SKIP and sticky controls but are not pinged by new-boss announcements. Add one or more fighter roles with `/boss-fighter-role`; they receive one persistent role alert when a helper chooses HIT. Make fighter roles mentionable, or grant the bot **Mention @everyone, @here, and All Roles** in the alert channel. `/boss-report-channel` selects the channel that receives the completed daily outcome report at Pacific midnight. Run `/boss-report-channel` without a channel to disable automatic reports while preserving counters and the latest completed report. `H boss rebirth` reposts that latest completed report in the current channel. `/setup-guide` shows server managers the complete configuration checklist; `H setup` posts the same guide publicly.
 
 Channel troubleshooting for server managers:
 

@@ -9,6 +9,7 @@ asset is missing or Discord rejects an upload.
 from __future__ import annotations
 
 import asyncio
+import hashlib
 import io
 import logging
 import re
@@ -27,6 +28,7 @@ GAME_ASSET_DIR = PROJECT_ROOT / "assets" / "game_emojis"
 MAX_EMOJI_BYTES = 256 * 1024
 MAX_APPLICATION_EMOJIS = 2000
 MAX_EMOJI_NAME_LENGTH = 32
+GAME_EMOJI_ASSET_REVISION = 2
 SUPPORTED_ASSET_SUFFIXES = frozenset({".gif", ".jpeg", ".jpg", ".png", ".webp"})
 
 EMOJI_FILES: dict[str, str] = {
@@ -43,6 +45,7 @@ GAME_EMOJI_CATEGORIES: dict[str, str] = {
     "weapon": "weapons",
     "passive": "passives",
     "rank": "ranks",
+    "stat": "stats",
 }
 
 
@@ -66,6 +69,19 @@ def discover_emoji_assets() -> dict[str, Path]:
     return assets
 
 
+def deployed_emoji_name(logical_name: str) -> str:
+    """Return the Discord-side name while keeping stable logical lookups."""
+    if logical_name in EMOJI_FILES:
+        return logical_name
+    prefix = f"v{GAME_EMOJI_ASSET_REVISION}_"
+    candidate = f"{prefix}{logical_name}"
+    if len(candidate) <= MAX_EMOJI_NAME_LENGTH:
+        return candidate
+    digest = hashlib.sha1(logical_name.encode("utf-8")).hexdigest()[:6]
+    available = MAX_EMOJI_NAME_LENGTH - len(prefix) - len(digest) - 1
+    return f"{prefix}{logical_name[:available]}_{digest}"
+
+
 def prepare_emoji_image(path: Path) -> bytes:
     """Normalize source artwork to a centered 128×128 transparent PNG."""
     raw = path.read_bytes()
@@ -81,7 +97,20 @@ def prepare_emoji_image(path: Path) -> bytes:
             ):
                 return raw
             image = source.convert("RGBA")
-            image.thumbnail((128, 128), Image.Resampling.LANCZOS)
+            alpha_bounds = image.getchannel("A").getbbox()
+            if alpha_bounds:
+                image = image.crop(alpha_bounds)
+            scale = min(112 / image.width, 112 / image.height)
+            target_size = (
+                max(1, round(image.width * scale)),
+                max(1, round(image.height * scale)),
+            )
+            resampling = (
+                Image.Resampling.NEAREST
+                if scale >= 1
+                else Image.Resampling.LANCZOS
+            )
+            image = image.resize(target_size, resampling)
             canvas = Image.new("RGBA", (128, 128), (0, 0, 0, 0))
             canvas.alpha_composite(
                 image,
@@ -145,7 +174,8 @@ class UIEmojiManager(commands.Cog):
 
             emoji_assets = discover_emoji_assets()
             for name, path in emoji_assets.items():
-                current = by_name.get(name)
+                remote_name = deployed_emoji_name(name)
+                current = by_name.get(remote_name)
                 if current is not None:
                     self.emojis[name] = self._to_partial(current)
                     reused += 1
@@ -159,7 +189,7 @@ class UIEmojiManager(commands.Cog):
                     logger.warning(
                         "Application emoji capacity reached at %s; could not create %s",
                         MAX_APPLICATION_EMOJIS,
-                        name,
+                        remote_name,
                     )
                     failed.append(name)
                     continue
@@ -177,11 +207,11 @@ class UIEmojiManager(commands.Cog):
 
                 try:
                     emoji = await self.bot.create_application_emoji(
-                        name=name,
+                        name=remote_name,
                         image=image,
                     )
                 except (discord.HTTPException, discord.Forbidden, discord.MissingApplicationID) as exc:
-                    logger.warning("Could not create application emoji %s: %s", name, exc)
+                    logger.warning("Could not create application emoji %s: %s", remote_name, exc)
                     failed.append(name)
                     continue
 

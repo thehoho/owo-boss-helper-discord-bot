@@ -2,11 +2,15 @@
 ## v0.13.0-beta - Animal Dex and Trusted Team Guides
 
 - Added a public animal catalog that learns only from strict official OwO Dex responses and stores public animal facts without retaining a requester's zoo count or source message metadata.
-- Seeded the catalog with 173 Special/event animals and added cached fallback replies when OwO cannot show an animal that a member does not own.
-- Added `H animal dex <animal>` and `/animal-dex` lookup commands without conflicting with the existing Neon weapon `H dex` command.
+- Seeded the catalog with 173 Special/event animals; normal OwO Dex activity teaches the catalog silently without adding duplicate channel replies.
+- Added `H animal dex <animal>`, the compact `HAD <animal>` shortcut, and `/animal-dex` without conflicting with the existing Neon weapon `H dex` command.
+- Reworked animal results into one compact Reaction-style description, removed personal Count text from learned descriptions, made aliases inline-copyable, and ordered the six official stat icons as HP/ATT/PR then WP/MAG/MR.
 - Added owner-managed trusted guide experts and a private modal/button editor for searchable, versioned three-animal team guides.
+- Clarified inside the trusted editor that Basics supports Discord Markdown and that typed animal/weapon/passive/tier aliases resolve into visual emojis through Preview.
 - Added `H guide`, `/team-guide`, `/team-guide-create`, `/team-guide-edit`, and owner-only `/guide-expert`.
-- Expanded application emoji synchronization from 118 to 305 assets: 173 Special/event animals and 14 animal-rank icons join the existing interface, standard-animal, weapon, and passive sets.
+- Expanded application emoji synchronization to 311 configured assets, including six official OwO base-stat icons.
+- Cropped transparent padding and scaled static game artwork to fill Discord's emoji canvas. A revisioned remote-name set activates the corrected artwork without deleting the previous 305 application emojis.
+- Added `H boss rebirth` (`H brebirth`) to repost the latest completed daily HIT/SKIP report for the current server, even when automatic report delivery is disabled.
 - Added one stable random usable server emoji to HIT stickies, matching SKIP behavior.
 - Expanded the `HW` guide with the OwO inventory plus Neon `/weapon inv check` reconciliation step.
 - Added public weapon/passive reference exports and a repeatable wiki catalog importer for maintainers.

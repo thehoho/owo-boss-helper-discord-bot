@@ -475,7 +475,10 @@ def build_editor_embed(draft: GuideDraft) -> discord.Embed:
         missing.append(f"{3 - completed_slots} composition slot(s)")
     description = (
         "Use the buttons below to build a visual, versioned team guide. "
-        "Nothing is published until you press **Publish**.\n\n"
+        "Nothing is published until you press **Publish**.\n"
+        "-# **Basics** accepts Discord Markdown. In each slot, type animal, "
+        "weapon, passive, and tier aliases; **Preview** resolves recognized names "
+        "into the bot's full visual emojis before publishing.\n\n"
         f"**Name:** {draft.name or 'Not set'}\n"
         f"**Aliases:** {', '.join(draft.aliases) or 'Not set'}\n"
         f"**Categories:** {', '.join(draft.categories) or 'Not set'}\n"

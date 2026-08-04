@@ -11,10 +11,12 @@ inventory reconciliation.
   image metadata.
 - The bot never stores the requester's personal zoo count or the source command,
   message, channel, server, or user IDs with an animal record.
-- `H animal dex <animal>` and `/animal-dex` search the catalog without taking
-  over the existing Neon weapon `H dex` command. When OwO cannot display
-  an animal that the requester does not own, the bot can return its latest cached
-  public record.
+- `H animal dex <animal>`, `HAD <animal>`, and `/animal-dex` search the catalog
+  without taking over the existing Neon weapon `H dex` command. Ordinary OwO
+  Dex activity teaches the database silently and never creates a duplicate reply.
+- Explicit animal results use one compact Reaction-style block with copyable
+  aliases and official HP/ATT/PR then WP/MAG/MR icons. Personal Count text is
+  excluded from both storage and display.
 - The owner can grant trusted expert access with `/guide-expert`. Experts use
   `/team-guide-create` and `/team-guide-edit` to publish versioned guides through
   a private modal-and-button editor; everyone browses with `H guide` or
@@ -22,10 +24,16 @@ inventory reconciliation.
 - The guide editor supports unique aliases, user-defined categories, displayed
   authors, Markdown descriptions, viability/ease ratings, and three composition
   slots with animal, level, tier, weapon/passive specifications, and notes.
-- Startup emoji synchronization now discovers 305 assets: six UI icons, 55
-  standard animals, 173 Special/event animals, 29 weapons, 28 passives, and 14
-  animal-rank icons. Existing names are reused and unrelated emojis are never
-  removed.
+- The editor now explains that experts type catalog aliases and use **Preview**
+  to see them resolved into visual emojis before publishing.
+- Startup emoji synchronization now discovers 311 assets: six UI icons, 55
+  standard animals, 173 Special/event animals, 29 weapons, 28 passives, 14
+  animal-rank icons, and six official base-stat icons.
+- Static game artwork is cropped and scaled to fill Discord's emoji canvas. The
+  corrected game set uses revisioned internal names, so the existing 305 emojis
+  remain untouched as rollback protection during the first upload.
+- `H boss rebirth` and `H brebirth` repost the latest completed daily HIT/SKIP
+  report for the current server.
 - Both HIT and SKIP stickies keep one stable random usable custom emoji from the
   current server when one is available.
 - `HW` now explains the `winv` plus Neon `/weapon inv check` comparison step.
@@ -43,13 +51,16 @@ inventory reconciliation.
 
 ## Suggested smoke tests
 
-1. Restart once and confirm startup reports 305 configured emoji assets with no
-   failed uploads. The first restart may take longer while missing images upload.
+1. Restart once and confirm startup reports 311 configured emoji assets with no
+   failed uploads. The first restart may take longer while the corrected game
+   artwork uploads; no existing application emoji is deleted.
 2. Run `H help` and confirm the Trusted team guides and Public animal Dex fields
    appear without an interaction or embed error.
-3. Run `H animal dex 2022pridebee` and `/animal-dex animal:2022pridebee`.
-4. Run a real OwO Dex command for an owned animal, then look it up through the
-   helper. Try an unowned but already-cached animal and confirm the fallback.
+3. Run `HAD 2022pridebee`, `H animal dex 2022pridebee`, and
+   `/animal-dex animal:2022pridebee`; confirm the compact layout and full-size
+   stat icons.
+4. Run a real OwO Dex command and confirm OwO/Reaction Bot can answer while this
+   helper stays silent. Then use `HAD <animal>` to confirm the learned record.
 5. As the configured bot owner, grant one test expert with `/guide-expert`, create
    a three-slot guide, publish it, search its alias, edit it, and confirm its
    version increments. Revoke access afterward if it was only a test.
@@ -57,6 +68,8 @@ inventory reconciliation.
    should keep one server emoji through reposts.
 7. Run `HW` and confirm step 5 shows the server's configured OwO inventory prefix
    and Neon's `/weapon inv check` command.
+8. After at least one completed reset report exists, run `H boss rebirth` and
+   confirm it reposts the latest totals in the current channel.
 
 ## Maintainer reference refresh
 

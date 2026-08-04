@@ -4,8 +4,11 @@ import re
 import sqlite3
 import tempfile
 import unittest
+from io import BytesIO
 from pathlib import Path
 from unittest.mock import patch
+
+from PIL import Image
 
 from cogs import helper_prefix
 from cogs.boss_generator import (
@@ -21,7 +24,12 @@ from cogs.ticket_tracker import (
     is_ticket_settings_command,
     parse_ticket_lookup_query,
 )
-from cogs.ui_emojis import MAX_EMOJI_BYTES, discover_emoji_assets, prepare_emoji_image
+from cogs.ui_emojis import (
+    MAX_EMOJI_BYTES,
+    deployed_emoji_name,
+    discover_emoji_assets,
+    prepare_emoji_image,
+)
 
 
 class HelperPrefixTests(unittest.TestCase):
@@ -110,16 +118,35 @@ class HelpAndEmojiTests(unittest.TestCase):
 
     def test_complete_emoji_catalog_is_discord_safe(self) -> None:
         assets = discover_emoji_assets()
-        self.assertEqual(len(assets), 305)
+        self.assertEqual(len(assets), 311)
         self.assertEqual(sum(name.startswith("pet_") for name in assets), 228)
         self.assertEqual(sum(name.startswith("weapon_") for name in assets), 29)
         self.assertEqual(sum(name.startswith("passive_") for name in assets), 28)
         self.assertEqual(sum(name.startswith("rank_") for name in assets), 14)
+        self.assertEqual(sum(name.startswith("stat_") for name in assets), 6)
         self.assertEqual(len(assets), len(set(assets)))
+        deployed_names = {deployed_emoji_name(name) for name in assets}
+        self.assertEqual(len(deployed_names), len(assets))
         for name, path in assets.items():
             self.assertRegex(name, re.compile(r"^[a-z0-9_]{2,32}$"))
+            self.assertRegex(deployed_emoji_name(name), re.compile(r"^[a-z0-9_]{2,32}$"))
             self.assertTrue(path.is_file(), path)
             self.assertLessEqual(len(prepare_emoji_image(path)), MAX_EMOJI_BYTES, path)
+
+    def test_small_static_artwork_fills_the_discord_canvas(self) -> None:
+        for relative_path in (
+            Path("assets/game_emojis/animals/snail.webp"),
+            Path("assets/game_emojis/weapons/axe.webp"),
+            Path("assets/game_emojis/passives/crit.webp"),
+            Path("assets/game_emojis/stats/hp.png"),
+        ):
+            with Image.open(BytesIO(prepare_emoji_image(relative_path))) as image:
+                bounds = image.convert("RGBA").getchannel("A").getbbox()
+            self.assertIsNotNone(bounds, relative_path)
+            assert bounds is not None
+            width = bounds[2] - bounds[0]
+            height = bounds[3] - bounds[1]
+            self.assertGreaterEqual(max(width, height), 108, relative_path)
 
 
 class RandomSkipEmojiTests(unittest.TestCase):

@@ -1,4 +1,4 @@
-"""Public OwO animal-dex catalog, cache lookup, and missing-zoo fallback."""
+"""Public OwO animal-dex catalog, silent learning, and explicit lookup."""
 
 from __future__ import annotations
 
@@ -25,7 +25,7 @@ from .game_catalog import (
     special_catalog_updated_at,
 )
 from .helper_prefix import get_guild_helper_prefix, parse_helper_command_argument
-from .owo_prefix import get_guild_owo_prefix, normalize_owo_prefix
+from .owo_prefix import normalize_owo_prefix
 from .ui_emojis import ui_emoji_text
 
 
@@ -34,9 +34,13 @@ logger = logging.getLogger(__name__)
 OWO_BOT_ID = 408785106942164992
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "animal_dex.db"
-FALLBACK_DELAY_SECONDS = 4.0
-PENDING_TTL_SECONDS = 15.0
 MAX_DESCRIPTION_LENGTH = 1000
+
+DEX_DETAIL_START_RE = re.compile(
+    r"(?im)^\s*(?:[*_`>#-]+\s*)?"
+    r"(?:count|rank|rarity|alias(?:es)?|points|sell|sacrifice)"
+    r"(?:[*_`]+)?\s*:"
+)
 
 STAT_ALIASES: dict[str, tuple[str, ...]] = {
     "hp": ("hp",),
@@ -91,14 +95,6 @@ class AnimalDexRecord:
     image_url: str
     source: str
     updated_at: int
-
-
-@dataclass
-class PendingDexRequest:
-    message: discord.Message
-    query: str
-    created_at: float
-    task: asyncio.Task[None] | None = None
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -187,6 +183,12 @@ def clean_title(value: str) -> str:
     return re.sub(r"\s+", " ", value).strip(" *_`#")
 
 
+def clean_dex_description(value: str) -> str:
+    """Keep OwO's prose while removing its personal/details block."""
+    description = DEX_DETAIL_START_RE.split(value or "", maxsplit=1)[0]
+    return description.strip()[:MAX_DESCRIPTION_LENGTH]
+
+
 def likely_animal_emoji(text: str) -> tuple[str, int | None, bool]:
     blocked = {
         *STAT_ALIASES["hp"],
@@ -260,8 +262,7 @@ def parse_owo_animal_dex(message: discord.Message) -> AnimalDexRecord | None:
     for embed in message.embeds:
         candidate = str(embed.description or "").strip()
         if candidate:
-            description = re.split(r"(?im)^\s*Count\s*:", candidate, maxsplit=1)[0].strip()
-            description = description[:MAX_DESCRIPTION_LENGTH]
+            description = clean_dex_description(candidate)
             break
 
     # OwO's Count field is tied to the requesting zoo. Keep it out of the
@@ -558,7 +559,6 @@ class AnimalDex(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
         self.store = AnimalDexStore()
-        self.pending: dict[int, list[PendingDexRequest]] = {}
         setattr(bot, "animal_dex_store", self.store)
 
     async def cog_load(self) -> None:
@@ -566,15 +566,10 @@ class AnimalDex(commands.Cog):
         logger.info("Animal dex storage ready at %s", DATABASE_FILE)
 
     def cog_unload(self) -> None:
-        for requests in self.pending.values():
-            for request in requests:
-                if request.task:
-                    request.task.cancel()
-        self.pending.clear()
         if getattr(self.bot, "animal_dex_store", None) is self.store:
             delattr(self.bot, "animal_dex_store")
 
-    def build_embed(self, record: AnimalDexRecord, *, cached_fallback: bool = False) -> discord.Embed:
+    def build_embed(self, record: AnimalDexRecord) -> discord.Embed:
         special = resolve_special_animal(record.display_name)
         emoji_key = str(special.get("emoji_stem", "")) if special else ""
         if not emoji_key:
@@ -582,39 +577,51 @@ class AnimalDex(commands.Cog):
         pet = ui_emoji_text(self.bot, f"pet_{emoji_key}", "🐾")
         rank = resolve_rank(record.rank)
         rank_text = ui_emoji_text(self.bot, rank.emoji_key, "") if rank else ""
-        description = record.description or "Public animal data captured from OwO Dex."
-        if cached_fallback:
-            description = f"{description}\n\n-# OwO could not show this animal from the requested zoo, so this is the latest cached public Dex record."
-        embed = discord.Embed(
-            title=f"{pet} {record.display_name}",
-            description=description[:1500],
-            color=0x57F287 if record.rank == "special" else 0x5865F2,
-        )
+        description_parts: list[str] = []
+        prose = clean_dex_description(record.description)
+        if prose:
+            description_parts.append(f"{prose}\n")
+
         rank_label = record.rank.replace("_", " ").title() or "Unknown"
-        embed.add_field(name="Rank", value=f"{rank_text} {rank_label}".strip(), inline=True)
-        embed.add_field(name="Points", value=f"{record.points:,}" if record.points is not None else "Unknown", inline=True)
-        embed.add_field(name="Total caught", value=f"{record.total_caught:,}" if record.total_caught is not None else (record.rarity_text or "Unknown"), inline=True)
-        aliases = ", ".join(record.aliases[:12]) or record.animal_key
-        embed.add_field(name="Aliases", value=aliases[:1024], inline=False)
-        economy = f"**Sell:** {record.sell_text or 'Unknown'}\n**Sacrifice:** {record.sacrifice_text or 'Unknown'}"
-        embed.add_field(name="Economy", value=economy, inline=False)
+        rank_value = " ".join(part for part in (rank_text, rank_label) if part)
+        rarity = record.rarity_text.strip()
+        if not rarity and record.total_caught is not None:
+            rarity = f"{record.total_caught:,} total caught"
+        aliases = record.aliases[:12] or (record.animal_key,)
+        alias_text = ", ".join(f"`{alias}`" for alias in aliases)
+        description_parts.extend(
+            (
+                f"**Rank:** {rank_value}",
+                f"**Rarity:** {rarity or 'Unknown'}",
+                f"**Aliases:** {alias_text}",
+                f"**Points:** {record.points:,}" if record.points is not None else "**Points:** Unknown",
+                f"**Sell:** {record.sell_text or 'Unknown'}",
+                f"**Sacrifice:** {record.sacrifice_text or 'Unknown'}",
+            )
+        )
         stat_pairs = (
             ("hp", record.hp, "HP"),
-            ("str", record.strength, "STR"),
+            ("att", record.strength, "ATT"),
             ("pr", record.pr, "PR"),
             ("wp", record.wp, "WP"),
             ("mag", record.mag, "MAG"),
             ("mr", record.mr, "MR"),
         )
-        stat_text = "  ".join(
-            f"{ui_emoji_text(self.bot, f'passive_{key}', label)} `{value if value is not None else '?'}`"
+        stat_cells = [
+            f"{ui_emoji_text(self.bot, f'stat_{key}', label)} `{value if value is not None else '?'}`"
             for key, value, label in stat_pairs
+        ]
+        description_parts.append(
+            " ".join(stat_cells[:3]) + "\n" + " ".join(stat_cells[3:])
         )
-        embed.add_field(name="Base stats", value=stat_text, inline=False)
+        embed = discord.Embed(
+            title=f"{pet} {record.display_name}",
+            description="\n".join(description_parts)[:4096],
+            color=0x57F287 if record.rank == "special" else 0x5865F2,
+            timestamp=datetime.fromtimestamp(record.updated_at, tz=timezone.utc),
+        )
         if record.image_url:
             embed.set_thumbnail(url=record.image_url)
-        updated = datetime.fromtimestamp(record.updated_at, tz=timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        embed.set_footer(text=f"Public OwO Dex catalog • Updated {updated}")
         return embed
 
     async def send_lookup(
@@ -622,65 +629,21 @@ class AnimalDex(commands.Cog):
         destination: discord.abc.Messageable,
         query: str,
         *,
-        cached_fallback: bool = False,
         reference: discord.Message | None = None,
     ) -> bool:
         record = await asyncio.to_thread(self.store.find, query)
         if record is None:
-            if not cached_fallback:
-                await destination.send(
-                    f"I do not have a Dex record for `{query}` yet. Dex it with OwO in any shared server to teach the catalog.",
-                    allowed_mentions=discord.AllowedMentions.none(),
-                )
+            await destination.send(
+                f"I do not have a Dex record for `{query}` yet. Dex it with OwO in any shared server to teach the catalog.",
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
             return False
         await destination.send(
-            embed=self.build_embed(record, cached_fallback=cached_fallback),
+            embed=self.build_embed(record),
             reference=reference.to_reference(fail_if_not_exists=False) if reference else None,
             allowed_mentions=discord.AllowedMentions.none(),
         )
         return True
-
-    def _remove_pending(self, request: PendingDexRequest, *, cancel: bool = True) -> None:
-        requests = self.pending.get(request.message.channel.id, [])
-        if request in requests:
-            requests.remove(request)
-        if not requests:
-            self.pending.pop(request.message.channel.id, None)
-        if cancel and request.task and request.task is not asyncio.current_task():
-            request.task.cancel()
-
-    async def delayed_fallback(self, request: PendingDexRequest) -> None:
-        try:
-            await asyncio.sleep(FALLBACK_DELAY_SECONDS)
-            self._remove_pending(request, cancel=False)
-            await self.send_lookup(
-                request.message.channel,
-                request.query,
-                cached_fallback=True,
-                reference=request.message,
-            )
-        except asyncio.CancelledError:
-            return
-        except (discord.Forbidden, discord.HTTPException):
-            logger.debug("Could not send cached animal-dex fallback", exc_info=True)
-
-    def latest_pending(self, channel_id: int, message: discord.Message | None = None) -> PendingDexRequest | None:
-        now = time.monotonic()
-        requests = self.pending.get(channel_id, [])
-        stale = [item for item in requests if now - item.created_at > PENDING_TTL_SECONDS]
-        for item in stale:
-            self._remove_pending(item)
-        requests = self.pending.get(channel_id, [])
-        if message and message.reference and message.reference.message_id:
-            exact = next((item for item in requests if item.message.id == message.reference.message_id), None)
-            if exact:
-                return exact
-        if message:
-            mentioned = {user.id for user in message.mentions}
-            exact = next((item for item in reversed(requests) if item.message.author.id in mentioned), None)
-            if exact:
-                return exact
-        return requests[-1] if requests else None
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
@@ -698,6 +661,8 @@ class AnimalDex(commands.Cog):
                     "hpet dex",
                     "h adex",
                     "hadex",
+                    "h ad",
+                    "had",
                 },
             )
             if direct is not None:
@@ -710,19 +675,9 @@ class AnimalDex(commands.Cog):
                     )
                 return
 
-            owo_prefix = await get_guild_owo_prefix(message.guild.id)
-            query = parse_owo_dex_request(message.content or "", owo_prefix)
-            if query:
-                existing = [
-                    item
-                    for item in self.pending.get(message.channel.id, [])
-                    if item.message.author.id == message.author.id
-                ]
-                for item in existing:
-                    self._remove_pending(item)
-                request = PendingDexRequest(message, query, time.monotonic())
-                self.pending.setdefault(message.channel.id, []).append(request)
-                request.task = asyncio.create_task(self.delayed_fallback(request))
+            # Ordinary OwO Dex requests are observed only through OwO's reply.
+            # Do not answer or schedule fallbacks that would duplicate other
+            # dedicated Dex bots in the channel.
             return
 
         if message.author.id != OWO_BOT_ID:
@@ -730,22 +685,8 @@ class AnimalDex(commands.Cog):
         record = parse_owo_animal_dex(message)
         if record:
             await asyncio.to_thread(self.store.upsert, record)
-            pending = self.latest_pending(message.channel.id, message)
-            if pending:
-                self._remove_pending(pending)
             logger.info("Updated public OwO Dex record for %s", record.animal_key)
             return
-
-        if is_owo_dex_refusal(extract_message_text(message)):
-            pending = self.latest_pending(message.channel.id, message)
-            if pending:
-                self._remove_pending(pending)
-                await self.send_lookup(
-                    message.channel,
-                    pending.query,
-                    cached_fallback=True,
-                    reference=pending.message,
-                )
 
     @commands.Cog.listener()
     async def on_message_edit(self, before: discord.Message, after: discord.Message) -> None:
