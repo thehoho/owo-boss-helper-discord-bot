@@ -32,8 +32,8 @@ inventory reconciliation.
 - Static game artwork is cropped and scaled to fill Discord's emoji canvas. The
   corrected game set uses revisioned internal names, so the existing 305 emojis
   remain untouched as rollback protection during the first upload.
-- `H boss rebirth` and `H brebirth` repost the latest completed daily HIT/SKIP
-  report for the current server.
+- `H boss report` reposts the latest completed daily HIT/SKIP report for the
+  current server.
 - Both HIT and SKIP stickies keep one stable random usable custom emoji from the
   current server when one is available.
 - `HW` now explains the `winv` plus Neon `/weapon inv check` comparison step.
@@ -68,7 +68,7 @@ inventory reconciliation.
    should keep one server emoji through reposts.
 7. Run `HW` and confirm step 5 shows the server's configured OwO inventory prefix
    and Neon's `/weapon inv check` command.
-8. After at least one completed reset report exists, run `H boss rebirth` and
+8. After at least one completed reset report exists, run `H boss report` and
    confirm it reposts the latest totals in the current channel.
 
 ## Maintainer reference refresh

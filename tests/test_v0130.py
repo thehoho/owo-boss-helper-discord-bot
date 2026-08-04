@@ -19,7 +19,7 @@ from cogs.animal_dex import (
     parse_owo_animal_dex,
     parse_owo_dex_request,
 )
-from cogs.boss_generator import BossGenerator, is_prefix_boss_rebirth_trigger
+from cogs.boss_generator import BossGenerator, is_prefix_boss_report_trigger
 from cogs.game_catalog import (
     PASSIVES,
     RANKS,
@@ -275,7 +275,7 @@ class BossDecisionEmojiTests(unittest.TestCase):
         )
 
 
-class BossRebirthTests(unittest.IsolatedAsyncioTestCase):
+class BossReportTests(unittest.IsolatedAsyncioTestCase):
     async def test_rollover_keeps_latest_report_without_report_channel(self) -> None:
         cog = BossGenerator.__new__(BossGenerator)
         cog.cooldown_config = {
@@ -292,15 +292,16 @@ class BossRebirthTests(unittest.IsolatedAsyncioTestCase):
             ("2026-08-01", 10, 20),
         )
         embed = cog.build_boss_daily_report_embed(
-            "2026-08-01", 10, 20, title="Latest Guild Boss Rebirth"
+            "2026-08-01", 10, 20, title="Latest Guild Boss Report"
         )
-        self.assertEqual(embed.title, "Latest Guild Boss Rebirth")
+        self.assertEqual(embed.title, "Latest Guild Boss Report")
         self.assertEqual([field.value for field in embed.fields], ["30", "10", "20"])
 
-    async def test_rebirth_alias_uses_custom_helper_prefix(self) -> None:
-        self.assertTrue(is_prefix_boss_rebirth_trigger("? boss rebirth", "?"))
-        self.assertTrue(is_prefix_boss_rebirth_trigger("?brebirth", "?"))
-        self.assertFalse(is_prefix_boss_rebirth_trigger("h boss rebirth", "?"))
+    async def test_report_command_uses_custom_helper_prefix(self) -> None:
+        self.assertTrue(is_prefix_boss_report_trigger("? boss report", "?"))
+        self.assertTrue(is_prefix_boss_report_trigger("?boss report", "?"))
+        self.assertFalse(is_prefix_boss_report_trigger("h boss report", "?"))
+        self.assertFalse(is_prefix_boss_report_trigger("? boss rebirth", "?"))
 
 
 if __name__ == "__main__":

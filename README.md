@@ -42,7 +42,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Sends a persistent fighter-role alert once when an active boss is marked HIT.
 - Posts a daily confirmed HIT/SKIP outcome report at the Pacific-midnight reset in a manager-configured channel.
 - Persists up to seven failed daily reports for retry instead of discarding counts during a temporary Discord/channel failure.
-- Keeps the latest completed daily totals per server and reposts them with `H boss rebirth` or `H brebirth`.
+- Keeps the latest completed daily totals per server and reposts them with `H boss report`.
 - Adds one stable random usable custom emoji from the current server when a helper marks an active boss HIT or SKIP; servers without a usable custom emoji keep a plain sticky.
 
 ### Team templates
@@ -284,8 +284,7 @@ Open all three pages. The helper captures each visible page number and emits the
 ```text
 H boss cd
 H boss cooldown
-H boss rebirth
-H brebirth
+H boss report
 /boss-cooldown
 ```
 
@@ -305,7 +304,7 @@ Server setup:
 /setup-guide
 ```
 
-`/boss-cooldown-channel` selects the channel for new-boss, defeat, escape, cooldown, and ready alerts. Add one or more decision roles with `/boss-decision-role`; they authorize HIT/SKIP and sticky controls but are not pinged by new-boss announcements. Add one or more fighter roles with `/boss-fighter-role`; they receive one persistent role alert when a helper chooses HIT. Make fighter roles mentionable, or grant the bot **Mention @everyone, @here, and All Roles** in the alert channel. `/boss-report-channel` selects the channel that receives the completed daily outcome report at Pacific midnight. Run `/boss-report-channel` without a channel to disable automatic reports while preserving counters and the latest completed report. `H boss rebirth` reposts that latest completed report in the current channel. `/setup-guide` shows server managers the complete configuration checklist; `H setup` posts the same guide publicly.
+`/boss-cooldown-channel` selects the channel for new-boss, defeat, escape, cooldown, and ready alerts. Add one or more decision roles with `/boss-decision-role`; they authorize HIT/SKIP and sticky controls but are not pinged by new-boss announcements. Add one or more fighter roles with `/boss-fighter-role`; they receive one persistent role alert when a helper chooses HIT. Make fighter roles mentionable, or grant the bot **Mention @everyone, @here, and All Roles** in the alert channel. `/boss-report-channel` selects the channel that receives the completed daily outcome report at Pacific midnight. Run `/boss-report-channel` without a channel to disable automatic reports while preserving counters and the latest completed report. `H boss report` reposts that latest completed report in the current channel. `/setup-guide` shows server managers the complete configuration checklist; `H setup` posts the same guide publicly.
 
 Channel troubleshooting for server managers:
 

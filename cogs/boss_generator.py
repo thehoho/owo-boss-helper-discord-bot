@@ -77,7 +77,7 @@ BOSS_TRIGGER_SUFFIXES = {"bossi"}
 
 # Lightweight public helper commands. Whitespace and capitalization are ignored.
 PREFIX_COOLDOWN_TRIGGERS = {"hbosscd", "hbosscooldown"}
-PREFIX_BOSS_REBIRTH_TRIGGERS = {"hbossrebirth", "hbrebirth"}
+PREFIX_BOSS_REPORT_TRIGGERS = {"hbossreport"}
 PREFIX_SETUP_TRIGGERS = {"hsetup", "hsetupguide"}
 BOSS_DECISION_HIT_TRIGGERS = {"hbosshit", "hsethit"}
 BOSS_DECISION_SKIP_TRIGGERS = {"hbossskip", "hskipboss", "hsetskip"}
@@ -151,12 +151,12 @@ def is_prefix_cooldown_trigger(
     return matches_helper_command(content, helper_prefix, PREFIX_COOLDOWN_TRIGGERS)
 
 
-def is_prefix_boss_rebirth_trigger(
+def is_prefix_boss_report_trigger(
     content: str,
     helper_prefix: str = HELPER_PREFIX_DEFAULT,
 ) -> bool:
-    """Accept `H boss rebirth` and `H brebirth`, case-insensitively."""
-    return matches_helper_command(content, helper_prefix, PREFIX_BOSS_REBIRTH_TRIGGERS)
+    """Accept `H boss report`, with optional whitespace and any configured prefix."""
+    return matches_helper_command(content, helper_prefix, PREFIX_BOSS_REPORT_TRIGGERS)
 
 
 def is_prefix_help_trigger(
@@ -1899,7 +1899,7 @@ class BossGenerator(commands.Cog):
                 "• `/boss-cooldown-channel` — new boss, defeat, escape, and cooldown alerts.\n"
                 "• `/boss-report-channel` — daily HIT/SKIP totals at Pacific midnight; "
                 "leave the channel empty to disable reports.\n"
-                f"• `{helper_command(helper_prefix, 'boss rebirth')}` — repost the latest "
+                f"• `{helper_command(helper_prefix, 'boss report')}` — repost the latest "
                 "completed daily report in the current channel."
             ),
             inline=False,
@@ -2282,7 +2282,7 @@ class BossGenerator(commands.Cog):
         """Build a Discord-limit-safe, server-prefix-aware command guide."""
         help_command = helper_command(helper_prefix, "help")
         boss_cd = helper_command(helper_prefix, "boss cd")
-        boss_rebirth = helper_command(helper_prefix, "boss rebirth")
+        boss_report = helper_command(helper_prefix, "boss report")
         boss_tickets = helper_command(helper_prefix, "boss t")
         boss_list = helper_command(helper_prefix, "boss list")
         boss_lookup = f"{helper_alias(helper_prefix, 'hbt')} <name/mention/ID>"
@@ -2316,7 +2316,7 @@ class BossGenerator(commands.Cog):
                 "configure alerts with `/boss-cooldown-channel`, decision helpers with "
                 "`/boss-decision-role`, fighter pings with `/boss-fighter-role`, and "
                 "daily reset reports with `/boss-report-channel`. Repost the latest "
-                f"completed report with `{boss_rebirth}`."
+                f"completed report with `{boss_report}`."
             ),
             inline=False,
         )
@@ -2583,7 +2583,7 @@ class BossGenerator(commands.Cog):
             return None
         return cycle, defeated, escaped
 
-    async def send_latest_boss_rebirth(self, message: discord.Message) -> None:
+    async def send_latest_boss_report(self, message: discord.Message) -> None:
         guild = message.guild
         if guild is None:
             return
@@ -2593,7 +2593,7 @@ class BossGenerator(commands.Cog):
         if report is None:
             await safe_reply(
                 message,
-                "No completed guild-boss rebirth report has been recorded for this server yet. "
+                "No completed guild-boss report has been recorded for this server yet. "
                 "The first one becomes available after the next Pacific-midnight reset.",
                 mention_author=False,
             )
@@ -2605,7 +2605,7 @@ class BossGenerator(commands.Cog):
                 cycle,
                 defeated,
                 escaped,
-                title="Latest Guild Boss Rebirth",
+                title="Latest Guild Boss Report",
             ),
             mention_author=False,
         )
@@ -3116,8 +3116,8 @@ class BossGenerator(commands.Cog):
                         await self.send_prefix_cooldown_status(message)
                         return
 
-                    if is_prefix_boss_rebirth_trigger(message.content, helper_prefix):
-                        await self.send_latest_boss_rebirth(message)
+                    if is_prefix_boss_report_trigger(message.content, helper_prefix):
+                        await self.send_latest_boss_report(message)
                         return
 
                     owo_prefix = await get_guild_owo_prefix(message.guild.id)

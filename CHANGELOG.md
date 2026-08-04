@@ -10,7 +10,7 @@
 - Added `H guide`, `/team-guide`, `/team-guide-create`, `/team-guide-edit`, and owner-only `/guide-expert`.
 - Expanded application emoji synchronization to 311 configured assets, including six official OwO base-stat icons.
 - Cropped transparent padding and scaled static game artwork to fill Discord's emoji canvas. A revisioned remote-name set activates the corrected artwork without deleting the previous 305 application emojis.
-- Added `H boss rebirth` (`H brebirth`) to repost the latest completed daily HIT/SKIP report for the current server, even when automatic report delivery is disabled.
+- Added `H boss report` to repost the latest completed daily HIT/SKIP report for the current server, even when automatic report delivery is disabled.
 - Added one stable random usable server emoji to HIT stickies, matching SKIP behavior.
 - Expanded the `HW` guide with the OwO inventory plus Neon `/weapon inv check` reconciliation step.
 - Added public weapon/passive reference exports and a repeatable wiki catalog importer for maintainers.
