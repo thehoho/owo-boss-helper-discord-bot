@@ -4009,7 +4009,7 @@ class TicketTracker(commands.Cog):
                 # Ignore unrelated uses of the same common emoji without fetching the
                 # message. This keeps reaction shortcuts cheap in large servers.
                 return
-            channel = await self.get_text_channel(payload.channel_id)
+            channel = await self.get_ticket_board_destination(payload.channel_id)
             if channel is None:
                 return
             try:
@@ -4198,14 +4198,14 @@ class TicketTracker(commands.Cog):
 
     @app_commands.command(
         name="boss-ticket-channel",
-        description="Choose the channel for the server boss-ticket board.",
+        description="Choose the channel or thread for the server boss-ticket board.",
     )
-    @app_commands.describe(channel="Channel where the ticket list should be maintained")
+    @app_commands.describe(channel="Text channel or thread where the ticket list should be maintained")
     @app_commands.default_permissions(manage_guild=True)
     async def boss_ticket_channel(
         self,
         interaction: discord.Interaction,
-        channel: discord.TextChannel,
+        channel: discord.TextChannel | discord.Thread,
     ) -> None:
         if interaction.guild_id is None:
             await interaction.response.send_message(
@@ -4214,6 +4214,20 @@ class TicketTracker(commands.Cog):
             return
 
         await interaction.response.defer(ephemeral=True)
+        if interaction.guild is None:
+            await interaction.followup.send(
+                "I could not resolve this server. Please try again.",
+                ephemeral=True,
+            )
+            return
+        destination_error = await self.ensure_ticket_board_destination(
+            channel,
+            interaction.guild,
+        )
+        if destination_error:
+            await interaction.followup.send(destination_error, ephemeral=True)
+            return
+
         old_config = await self.store.get_config(interaction.guild_id)
         if old_config:
             await self.delete_old_board(old_config[0], old_config[1])
@@ -4513,17 +4527,76 @@ class TicketTracker(commands.Cog):
             message.guild.id,
         )
 
-    async def get_text_channel(self, channel_id: int) -> discord.TextChannel | None:
+    async def get_ticket_board_destination(
+        self,
+        channel_id: int,
+    ) -> discord.TextChannel | discord.Thread | None:
         channel = self.bot.get_channel(channel_id)
         if channel is None:
             try:
                 channel = await self.bot.fetch_channel(channel_id)
             except (discord.Forbidden, discord.NotFound, discord.HTTPException):
                 return None
-        return channel if isinstance(channel, discord.TextChannel) else None
+        if isinstance(channel, (discord.TextChannel, discord.Thread)):
+            return channel
+        return None
+
+    @staticmethod
+    def ticket_board_permission_error(
+        channel: discord.TextChannel | discord.Thread,
+        guild: discord.Guild,
+    ) -> str | None:
+        bot_member = guild.me
+        if bot_member is None:
+            return "I could not resolve my server permissions. Please try again."
+        permissions = channel.permissions_for(bot_member)
+        missing: list[str] = []
+        if not permissions.view_channel:
+            missing.append("View Channel")
+        if isinstance(channel, discord.Thread):
+            if channel.locked:
+                return (
+                    "That thread is locked. Unlock it before configuring the "
+                    "boss-ticket board."
+                )
+            if not permissions.send_messages_in_threads:
+                missing.append("Send Messages in Threads")
+        elif not permissions.send_messages:
+            missing.append("Send Messages")
+        if not permissions.embed_links:
+            missing.append("Embed Links")
+        if not permissions.read_message_history:
+            missing.append("Read Message History")
+        if missing:
+            return (
+                f"I cannot maintain the ticket board in {channel.mention}. "
+                f"Please grant: **{', '.join(missing)}**."
+            )
+        return None
+
+    async def ensure_ticket_board_destination(
+        self,
+        channel: discord.TextChannel | discord.Thread,
+        guild: discord.Guild,
+    ) -> str | None:
+        permission_error = self.ticket_board_permission_error(channel, guild)
+        if permission_error:
+            return permission_error
+        if isinstance(channel, discord.Thread) and channel.archived:
+            try:
+                await channel.edit(
+                    archived=False,
+                    reason="OwO Boss Helper ticket-board refresh",
+                )
+            except (discord.Forbidden, discord.HTTPException):
+                return (
+                    f"I can see {channel.mention}, but I cannot reopen it. "
+                    "Unarchive the thread and make sure I can send messages in threads."
+                )
+        return None
 
     async def delete_old_board(self, channel_id: int, message_ids: list[int]) -> None:
-        channel = await self.get_text_channel(channel_id)
+        channel = await self.get_ticket_board_destination(channel_id)
         if channel is None:
             return
         for message_id in message_ids:
@@ -4641,9 +4714,27 @@ class TicketTracker(commands.Cog):
             if config is None:
                 return
             channel_id, stored_ids = config
-            channel = await self.get_text_channel(channel_id)
+            channel = await self.get_ticket_board_destination(channel_id)
             if channel is None:
-                logger.warning("Ticket board channel for guild %s is unavailable", guild_id)
+                logger.warning(
+                    "Ticket board channel or thread for guild %s is unavailable",
+                    guild_id,
+                )
+                return
+            guild = self.bot.get_guild(guild_id)
+            if guild is None:
+                logger.warning(
+                    "Ticket board guild %s is unavailable during refresh",
+                    guild_id,
+                )
+                return
+            destination_error = await self.ensure_ticket_board_destination(channel, guild)
+            if destination_error:
+                logger.warning(
+                    "Ticket board destination for guild %s is unusable: %s",
+                    guild_id,
+                    destination_error,
+                )
                 return
 
             await self.store.normalize_guild_cycle(guild_id)
@@ -4658,7 +4749,7 @@ class TicketTracker(commands.Cog):
                 )
             except (discord.Forbidden, discord.HTTPException) as exc:
                 logger.warning(
-                    "Could not send replacement ticket board for guild %s: %s",
+                    "Could not send replacement ticket board to configured channel or thread for guild %s: %s",
                     guild_id,
                     exc,
                 )

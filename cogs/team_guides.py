@@ -17,6 +17,10 @@ from discord import app_commands
 from discord.ext import commands
 
 from .game_catalog import (
+    PASSIVES,
+    RANKS,
+    WEAPONS,
+    CatalogEntry,
     normalize_catalog_token,
     resolve_passive,
     resolve_rank,
@@ -24,6 +28,7 @@ from .game_catalog import (
     resolve_weapon,
 )
 from .helper_prefix import get_guild_helper_prefix, parse_helper_command_argument
+from .team_templates import STANDARD_ANIMAL_NAMES, normalize_animal_emoji_alias
 from .ui_emojis import ui_emoji_text
 
 
@@ -34,8 +39,43 @@ DATABASE_FILE = PROJECT_ROOT / "team_guides.db"
 EDITOR_TIMEOUT_SECONDS = 20 * 60
 MAX_GUIDE_NAME = 80
 MAX_GUIDE_DESCRIPTION = 3000
+MAX_FULL_GUIDE = 4000
 MAX_GUIDE_ALIASES = 12
 MAX_GUIDE_CATEGORIES = 8
+FULL_GUIDE_PAGE_LENGTH = 3800
+GUIDE_VARIABLE_RE = re.compile(r"\{([A-Za-z0-9_ -]{1,64})\}")
+GUIDE_STAT_ALIASES = {
+    "hp": "hp",
+    "health": "hp",
+    "hpstat": "hp",
+    "att": "att",
+    "attack": "att",
+    "str": "att",
+    "strength": "att",
+    "attstat": "att",
+    "pr": "pr",
+    "physicalresistance": "pr",
+    "prstat": "pr",
+    "wp": "wp",
+    "weaponpoint": "wp",
+    "weaponpoints": "wp",
+    "wpstat": "wp",
+    "mag": "mag",
+    "magic": "mag",
+    "magstat": "mag",
+    "mr": "mr",
+    "magicresistance": "mr",
+    "magicalresistance": "mr",
+    "mrstat": "mr",
+}
+GUIDE_WEAPON_VARIABLE_ALIASES = {
+    "pdagger": "pd",
+}
+GUIDE_PASSIVE_VARIABLE_ALIASES = {
+    "manamtap": "mtap",
+    "snailpassive": "snail",
+    "pshgen": "hgen",
+}
 
 
 class GuideAliasConflict(ValueError):
@@ -60,6 +100,7 @@ class TeamGuide:
     categories: tuple[str, ...]
     authors: str
     description: str
+    full_guide: str
     viability: int
     ease: int
     slots: tuple[GuideSlot, ...]
@@ -79,6 +120,7 @@ class GuideDraft:
     categories: list[str] = field(default_factory=list)
     authors: str = ""
     description: str = ""
+    full_guide: str = ""
     viability: int = 3
     ease: int = 3
     slots: dict[int, GuideSlot] = field(default_factory=dict)
@@ -141,6 +183,7 @@ class TeamGuideStore:
                     categories_json TEXT NOT NULL,
                     authors TEXT NOT NULL,
                     description TEXT NOT NULL,
+                    full_guide TEXT NOT NULL DEFAULT '',
                     viability INTEGER NOT NULL,
                     ease INTEGER NOT NULL,
                     creator_id INTEGER NOT NULL,
@@ -166,6 +209,14 @@ class TeamGuideStore:
                 CREATE INDEX IF NOT EXISTS idx_team_guides_name ON team_guides(name COLLATE NOCASE);
                 """
             )
+            guide_columns = {
+                str(row["name"])
+                for row in connection.execute("PRAGMA table_info(team_guides)").fetchall()
+            }
+            if "full_guide" not in guide_columns:
+                connection.execute(
+                    "ALTER TABLE team_guides ADD COLUMN full_guide TEXT NOT NULL DEFAULT ''"
+                )
 
     def set_expert(self, user_id: int, display_name: str, enabled: bool, granted_by: int) -> None:
         with self._connect() as connection:
@@ -214,6 +265,7 @@ class TeamGuideStore:
             categories=tuple(json.loads(str(row["categories_json"]))),
             authors=str(row["authors"]),
             description=str(row["description"]),
+            full_guide=str(row["full_guide"]),
             viability=int(row["viability"]),
             ease=int(row["ease"]),
             slots=slots,
@@ -232,6 +284,7 @@ class TeamGuideStore:
         ))[: MAX_GUIDE_ALIASES + 1]
         if not aliases:
             raise ValueError("At least one searchable alias is required.")
+        full_guide = (draft.full_guide or "")[:MAX_FULL_GUIDE]
         now = int(time.time())
         with self._connect() as connection:
             for alias in aliases:
@@ -253,7 +306,7 @@ class TeamGuideStore:
                 connection.execute(
                     """
                     UPDATE team_guides SET
-                        name=?, aliases_json=?, categories_json=?, authors=?, description=?,
+                        name=?, aliases_json=?, categories_json=?, authors=?, description=?, full_guide=?,
                         viability=?, ease=?, updated_by=?, version=?, updated_at=?
                     WHERE guide_id=?
                     """,
@@ -263,6 +316,7 @@ class TeamGuideStore:
                         json.dumps(draft.categories),
                         draft.authors,
                         draft.description,
+                        full_guide,
                         draft.viability,
                         draft.ease,
                         int(editor_id),
@@ -276,9 +330,9 @@ class TeamGuideStore:
                 cursor = connection.execute(
                     """
                     INSERT INTO team_guides(
-                        name, aliases_json, categories_json, authors, description,
+                        name, aliases_json, categories_json, authors, description, full_guide,
                         viability, ease, creator_id, updated_by, version, created_at, updated_at
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 1, ?, ?)
                     """,
                     (
                         draft.name,
@@ -286,6 +340,7 @@ class TeamGuideStore:
                         json.dumps(draft.categories),
                         draft.authors,
                         draft.description,
+                        full_guide,
                         draft.viability,
                         draft.ease,
                         int(editor_id),
@@ -394,6 +449,7 @@ def draft_from_guide(guide: TeamGuide, editor_id: int) -> GuideDraft:
         categories=list(guide.categories),
         authors=guide.authors,
         description=guide.description,
+        full_guide=guide.full_guide,
         viability=guide.viability,
         ease=guide.ease,
         slots={slot.position: slot for slot in guide.slots},
@@ -409,6 +465,158 @@ def animal_emoji_key(animal: str) -> str:
     if special:
         return f"pet_{special.get('emoji_stem', '')}"
     return f"pet_{normalize_catalog_token(animal).replace(' ', '')}"
+
+
+def resolve_compact_catalog_entry(
+    entries: tuple[CatalogEntry, ...],
+    value: str,
+) -> CatalogEntry | None:
+    compact = normalize_catalog_token(value).replace(" ", "")
+    for entry in entries:
+        if any(
+            normalize_catalog_token(alias).replace(" ", "") == compact
+            for alias in entry.aliases
+        ):
+            return entry
+    return None
+
+
+def guide_variable_emoji_key(value: str) -> str | None:
+    compact = normalize_catalog_token(value).replace(" ", "")
+    if compact.startswith("fp"):
+        passive_value = compact[2:]
+        passive_value = GUIDE_PASSIVE_VARIABLE_ALIASES.get(
+            passive_value,
+            passive_value,
+        )
+        passive = resolve_passive(passive_value) or resolve_compact_catalog_entry(
+            PASSIVES,
+            passive_value,
+        )
+        return passive.emoji_key if passive else None
+    if compact.startswith("w"):
+        weapon_value = compact[1:]
+        weapon_value = GUIDE_WEAPON_VARIABLE_ALIASES.get(
+            weapon_value,
+            weapon_value,
+        )
+        weapon = resolve_weapon(weapon_value) or resolve_compact_catalog_entry(
+            WEAPONS,
+            weapon_value,
+        )
+        return weapon.emoji_key if weapon else None
+    if compact.startswith("a"):
+        animal_value = compact[1:]
+        special = resolve_special_animal(animal_value)
+        if special:
+            return f"pet_{special.get('emoji_stem', '')}"
+        animal = normalize_animal_emoji_alias(animal_value)
+        if animal in STANDARD_ANIMAL_NAMES:
+            return animal_emoji_key(animal)
+        return None
+    if compact.startswith("s"):
+        stat = GUIDE_STAT_ALIASES.get(compact[1:])
+        return f"stat_{stat}" if stat else None
+    if compact.startswith("r"):
+        rank_value = compact[1:]
+        rank = resolve_rank(rank_value) or resolve_compact_catalog_entry(
+            RANKS,
+            rank_value,
+        )
+        return rank.emoji_key if rank else None
+    return None
+
+
+def render_guide_markdown(bot: commands.Bot, value: str) -> str:
+    def replace(match: re.Match[str]) -> str:
+        emoji_key = guide_variable_emoji_key(match.group(1))
+        if emoji_key is None:
+            return match.group(0)
+        return ui_emoji_text(bot, emoji_key, match.group(0))
+
+    return GUIDE_VARIABLE_RE.sub(replace, value or "")
+
+
+def unresolved_guide_variables(value: str) -> tuple[str, ...]:
+    unresolved = [
+        match.group(1)
+        for match in GUIDE_VARIABLE_RE.finditer(value or "")
+        if guide_variable_emoji_key(match.group(1)) is None
+    ]
+    return tuple(dict.fromkeys(unresolved))
+
+
+def truncate_rendered_text(value: str, limit: int) -> str:
+    if len(value) <= limit:
+        return value
+    candidate = value[: max(1, limit - 1)]
+    if candidate.rfind("<") > candidate.rfind(">"):
+        candidate = candidate[:candidate.rfind("<")]
+    return candidate.rstrip() + "…"
+
+
+def paginate_guide_markdown(value: str) -> tuple[str, ...]:
+    remaining = value.strip()
+    if not remaining:
+        return ()
+    pages: list[str] = []
+    while len(remaining) > FULL_GUIDE_PAGE_LENGTH:
+        cut = FULL_GUIDE_PAGE_LENGTH
+        if remaining[:cut].rfind("<") > remaining[:cut].rfind(">"):
+            cut = remaining[:cut].rfind("<")
+        newline = remaining.rfind("\n", 0, cut)
+        space = remaining.rfind(" ", 0, cut)
+        if newline >= FULL_GUIDE_PAGE_LENGTH // 2:
+            cut = newline
+        elif space >= FULL_GUIDE_PAGE_LENGTH // 2:
+            cut = space
+        cut = max(1, cut)
+        pages.append(remaining[:cut].rstrip())
+        remaining = remaining[cut:].lstrip()
+    if remaining:
+        pages.append(remaining)
+    return tuple(pages)
+
+
+def build_full_guide_embeds(bot: commands.Bot, guide: TeamGuide) -> tuple[discord.Embed, ...]:
+    rendered = render_guide_markdown(bot, guide.full_guide)
+    pages = paginate_guide_markdown(rendered)
+    embeds: list[discord.Embed] = []
+    for index, page in enumerate(pages, start=1):
+        embed = discord.Embed(
+            title=f"📖 {guide.name} — Full guide"[:256],
+            description=page,
+            color=0x5865F2,
+        )
+        footer = f"Guide v{guide.version}"
+        if len(pages) > 1:
+            footer += f" • Page {index}/{len(pages)}"
+        embed.set_footer(text=footer)
+        embeds.append(embed)
+    return tuple(embeds)
+
+
+def build_emoji_variable_help_embed(bot: commands.Bot) -> discord.Embed:
+    tick = chr(96)
+
+    def example(variable: str) -> str:
+        rendered = render_guide_markdown(bot, variable)
+        return f"{tick}{variable}{tick} → {rendered}"
+
+    description = (
+        "Use optional Neon-style variables anywhere in the summary, full guide, "
+        "or slot notes. Preview resolves known names into the bot's portable "
+        "application emojis. Existing Discord Markdown, Unicode emojis, and custom "
+        "emoji markup stay unchanged.\n\n"
+        f"**Weapons**\n{example('{wsword}')}  {example('{wpdagger}')}  {example('{wascept}')}\n"
+        f"**Passives**\n{example('{fpstr}')}  {example('{fplifesteal}')}  {example('{fpmana_mtap}')}\n"
+        f"**Animals**\n{example('{afish}')}  {example('{agfish}')}  {example('{abeeday}')}\n"
+        f"**Base stats**\n{example('{shp}')}  {example('{satt}')}  {example('{swp}')}  {example('{smag}')}\n"
+        f"**Ranks**\n{example('{rlegendary}')}  {example('{rfabled}')}\n\n"
+        "-# Prefixes: w = weapon, fp = passive, a = animal, s = base stat, r = rank. "
+        "Aliases such as dagger, ascept, lifesteal, gfish, and beeday are accepted."
+    )
+    return discord.Embed(title="💡 Team-guide emoji variables", description=description, color=0xFEE75C)
 
 
 def render_weapon_specs(bot: commands.Bot, value: str) -> str:
@@ -432,9 +640,10 @@ def render_weapon_specs(bot: commands.Bot, value: str) -> str:
 
 def build_guide_embed(bot: commands.Bot, guide: TeamGuide) -> discord.Embed:
     primary_alias = guide.aliases[0] if guide.aliases else normalize_guide_alias(guide.name)
+    rendered_description = render_guide_markdown(bot, guide.description)
     embed = discord.Embed(
         title=f"{guide.name} — {primary_alias}",
-        description=guide.description[:MAX_GUIDE_DESCRIPTION],
+        description=truncate_rendered_text(rendered_description, MAX_GUIDE_DESCRIPTION),
         color=0x57F287,
     )
     properties = (
@@ -453,9 +662,14 @@ def build_guide_embed(bot: commands.Bot, guide: TeamGuide) -> discord.Embed:
         level = f"L.{slot.level}" if slot.level is not None else "Any level"
         line = f"**[{slot.position}]** {level} {pet} **{slot.animal}** {rank_icon}\n{render_weapon_specs(bot, slot.weapons)}"
         if slot.notes:
-            line += f"\n-# {slot.notes[:250]}"
+            rendered_notes = render_guide_markdown(bot, slot.notes)
+            line += f"\n-# {truncate_rendered_text(rendered_notes, 250)}"
         composition.append(line.strip())
-    embed.add_field(name="Composition", value="\n\n".join(composition)[:1024], inline=False)
+    embed.add_field(
+        name="Composition",
+        value=truncate_rendered_text("\n\n".join(composition), 1024),
+        inline=False,
+    )
     embed.set_footer(text=f"Guide v{guide.version} • Created by Discord user {guide.creator_id} • Last editor {guide.updated_by}")
     return embed
 
@@ -473,20 +687,39 @@ def build_editor_embed(draft: GuideDraft) -> discord.Embed:
         missing.append("description")
     if completed_slots < 3:
         missing.append(f"{3 - completed_slots} composition slot(s)")
+    variable_sources = [
+        draft.description,
+        draft.full_guide,
+        *(slot.notes for slot in draft.slots.values()),
+    ]
+    unresolved = tuple(
+        dict.fromkeys(
+            variable
+            for source in variable_sources
+            for variable in unresolved_guide_variables(source)
+        )
+    )
     description = (
         "Use the buttons below to build a visual, versioned team guide. "
         "Nothing is published until you press **Publish**.\n"
-        "-# **Basics** accepts Discord Markdown. In each slot, type animal, "
-        "weapon, passive, and tier aliases; **Preview** resolves recognized names "
-        "into the bot's full visual emojis before publishing.\n\n"
+        "-# **Basics**, **Full guide**, and slot notes accept Discord Markdown. "
+        "Optional Neon-style emoji variables such as {wsword}, {fpstr}, and "
+        "{afish} resolve through **Preview**. Open **Emoji variables** for examples.\n\n"
         f"**Name:** {draft.name or 'Not set'}\n"
         f"**Aliases:** {', '.join(draft.aliases) or 'Not set'}\n"
         f"**Categories:** {', '.join(draft.categories) or 'Not set'}\n"
         f"**Authors:** {draft.authors or 'Not set'}\n"
         f"**Ratings:** Viability {draft.viability}/5 • Ease {draft.ease}/5\n"
-        f"**Composition:** {completed_slots}/3 slots\n\n"
+        f"**Composition:** {completed_slots}/3 slots\n"
+        f"**Full guide:** {len(draft.full_guide)}/{MAX_FULL_GUIDE} characters"
+        f"{' • optional' if not draft.full_guide else ''}\n\n"
         f"**Still required:** {', '.join(missing) if missing else 'Ready to publish'}"
     )
+    if unresolved:
+        description += (
+            "\n\n⚠️ **Unknown emoji variables:** "
+            + ", ".join(f"{{{value}}}" for value in unresolved[:8])
+        )
     return discord.Embed(title="🛠️ Trusted Team Guide Editor", description=description, color=0xFEE75C)
 
 
@@ -517,6 +750,28 @@ class GuideBasicsModal(discord.ui.Modal, title="Team guide basics"):
         self.view.draft.authors = str(self.authors).strip()
         self.view.draft.description = str(self.description).strip()
         await interaction.response.edit_message(embed=build_editor_embed(self.view.draft), view=self.view)
+
+
+class GuideFullTextModal(discord.ui.Modal, title="Optional full team guide"):
+    full_guide = discord.ui.TextInput(
+        label="Detailed guide (Markdown + emoji variables)",
+        style=discord.TextStyle.paragraph,
+        required=False,
+        max_length=MAX_FULL_GUIDE,
+        placeholder="Add detailed notes, alternatives, matchup advice, and weapon quality guidance.",
+    )
+
+    def __init__(self, view: "GuideEditorView") -> None:
+        super().__init__(timeout=300)
+        self.view = view
+        self.full_guide.default = view.draft.full_guide or None
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        self.view.draft.full_guide = str(self.full_guide).strip()
+        await interaction.response.edit_message(
+            embed=build_editor_embed(self.view.draft),
+            view=self.view,
+        )
 
 
 class GuideRatingsModal(discord.ui.Modal, title="Team guide ratings"):
@@ -600,6 +855,10 @@ class GuideEditorView(discord.ui.View):
     async def ratings(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_modal(GuideRatingsModal(self))
 
+    @discord.ui.button(label="Full guide", emoji="📖", style=discord.ButtonStyle.secondary, row=0)
+    async def full_guide(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await interaction.response.send_modal(GuideFullTextModal(self))
+
     @discord.ui.button(label="Slot 1", style=discord.ButtonStyle.secondary, row=1)
     async def slot_1(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_modal(GuideSlotModal(self, 1))
@@ -621,6 +880,7 @@ class GuideEditorView(discord.ui.View):
             categories=tuple(self.draft.categories or ["Uncategorized"]),
             authors=self.draft.authors or interaction.user.display_name,
             description=self.draft.description or "Description not set.",
+            full_guide=self.draft.full_guide,
             viability=self.draft.viability,
             ease=self.draft.ease,
             slots=tuple(self.draft.slots.values()),
@@ -630,7 +890,31 @@ class GuideEditorView(discord.ui.View):
             created_at=int(time.time()),
             updated_at=int(time.time()),
         )
-        await interaction.response.send_message(embed=build_guide_embed(self.cog.bot, preview), ephemeral=True)
+        variable_sources = [
+            preview.description,
+            preview.full_guide,
+            *(slot.notes for slot in preview.slots),
+        ]
+        unresolved = tuple(
+            dict.fromkeys(
+                variable
+                for source in variable_sources
+                for variable in unresolved_guide_variables(source)
+            )
+        )
+        notice = None
+        if unresolved:
+            notice = (
+                "⚠️ Unknown emoji variables stay as text until corrected: "
+                + ", ".join(f"{{{value}}}" for value in unresolved[:8])
+            )
+        await interaction.response.send_message(
+            content=notice,
+            embed=build_guide_embed(self.cog.bot, preview),
+            view=PublicGuideView(self.cog, preview),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     @discord.ui.button(label="Publish", emoji="✅", style=discord.ButtonStyle.success, row=2)
     async def publish(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
@@ -657,6 +941,17 @@ class GuideEditorView(discord.ui.View):
         )
         self.stop()
 
+    @discord.ui.button(label="Emoji variables", emoji="💡", style=discord.ButtonStyle.secondary, row=3)
+    async def emoji_variables(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        await interaction.response.send_message(
+            embed=build_emoji_variable_help_embed(self.cog.bot),
+            ephemeral=True,
+        )
+
     @discord.ui.button(label="Cancel", emoji="✖️", style=discord.ButtonStyle.danger, row=2)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         for item in self.children:
@@ -665,11 +960,81 @@ class GuideEditorView(discord.ui.View):
         self.stop()
 
 
+class FullGuideView(discord.ui.View):
+    def __init__(
+        self,
+        pages: tuple[discord.Embed, ...],
+        user_id: int,
+    ) -> None:
+        super().__init__(timeout=10 * 60)
+        self.pages = pages
+        self.user_id = user_id
+        self.index = 0
+        self.sync_buttons()
+
+    def sync_buttons(self) -> None:
+        self.previous.disabled = self.index <= 0
+        self.next.disabled = self.index >= len(self.pages) - 1
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id != self.user_id:
+            await interaction.response.send_message(
+                "This private full-guide view belongs to another member.",
+                ephemeral=True,
+            )
+            return False
+        return True
+
+    @discord.ui.button(label="Previous", emoji="◀️", style=discord.ButtonStyle.secondary)
+    async def previous(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        self.index = max(0, self.index - 1)
+        self.sync_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.index], view=self)
+
+    @discord.ui.button(label="Next", emoji="▶️", style=discord.ButtonStyle.secondary)
+    async def next(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        self.index = min(len(self.pages) - 1, self.index + 1)
+        self.sync_buttons()
+        await interaction.response.edit_message(embed=self.pages[self.index], view=self)
+
+
 class PublicGuideView(discord.ui.View):
     def __init__(self, cog: "TeamGuides", guide: TeamGuide) -> None:
         super().__init__(timeout=300)
         self.cog = cog
         self.guide = guide
+        if guide.full_guide.strip():
+            full_guide = discord.ui.Button(
+                label="Full guide",
+                emoji="📖",
+                style=discord.ButtonStyle.secondary,
+            )
+            full_guide.callback = self.open_full_guide
+            self.add_item(full_guide)
+
+    async def open_full_guide(self, interaction: discord.Interaction) -> None:
+        pages = build_full_guide_embeds(self.cog.bot, self.guide)
+        if not pages:
+            await interaction.response.send_message(
+                "This team does not have a full guide yet.",
+                ephemeral=True,
+            )
+            return
+        view = FullGuideView(pages, interaction.user.id) if len(pages) > 1 else None
+        await interaction.response.send_message(
+            embed=pages[0],
+            view=view,
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     @discord.ui.button(label="Related teams", emoji="🔍", style=discord.ButtonStyle.secondary)
     async def related(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:

@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 4 August 2026_
+_Last updated: 10 August 2026_
 
 OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 
@@ -15,10 +15,10 @@ The bot stores only the information needed to provide its features and operate s
 - Saved team animals, positions, and weapon IDs.
 - Neon weapon scan entries for public NeonUtil inventory pages, including Discord owner ID, weapon ID, quality values, max-possible status, recognized weapon/passive filters, and learned blueprint text.
 - Public animal facts learned from official OwO Dex responses, including animal name, rank, aliases, global caught total, economy values, six base stats, description, and public image or emoji metadata. The requesting member's personal zoo count and the source message, channel, server, and user IDs are not stored with these records.
-- Trusted guide-expert Discord user IDs and display names, plus published team-guide names, aliases, categories, displayed authors, descriptions, ratings, composition, creator/editor IDs, and version history metadata.
+- Trusted guide-expert Discord user IDs and display names, plus published team-guide names, aliases, categories, displayed authors, summaries, optional full-guide text, ratings, composition, creator/editor IDs, and version history metadata.
 - Reported boss-ticket counts, update sources, last ticket activity times, and automatic expiration times.
 - Public OwO guild-boss message IDs and public `owobot.com` battle-log UUIDs used temporarily to deduplicate confirmed Top 10 ticket uses. The helper does not copy or store the full linked battle-log page.
-- Configured Discord channel and message IDs used for cooldown alerts, daily boss reports, and ticket boards.
+- Configured Discord channel or thread IDs and message IDs used for cooldown alerts, daily boss reports, and ticket boards.
 - Per-server helper and OwO command-prefix settings.
 - Per-server daily totals of confirmed defeated and escaped guild bosses.
 - Operational logs containing events, warnings, and errors.

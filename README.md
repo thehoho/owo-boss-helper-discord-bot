@@ -1,7 +1,7 @@
 
-## v0.13.0-beta notes
+## v0.13.1-beta notes
 
-The helper now silently learns public animal facts from official OwO Dex responses, includes all 173 Special/event animals, and exposes its catalog only when a member explicitly uses the helper's Dex command. The bot owner can grant trusted expert access for a visual, versioned team-guide editor. HIT and SKIP stickies both keep one random usable server emoji, and the HW guide now explains Neon's `/weapon inv check` reconciliation step.
+Trusted experts can now use optional Neon-style emoji variables in summaries, detailed full guides, and slot notes, with a private variable reference and preview warnings for unknown names. Published teams can include an optional private paginated **Full guide** view. Server managers can also configure the persistent boss-ticket board in either a text channel or an accessible Discord thread.
 
 # OwO Boss Helper
 
@@ -76,10 +76,12 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 
 - The bot owner grants or revokes global trusted-expert access with `/guide-expert`.
 - Trusted experts create guides with `/team-guide-create` and revise them with `/team-guide-edit`.
-- The private editor uses Discord modals and buttons for guide basics, unique aliases, user-created categories, displayed authors, viability, ease of creation, and all three composition slots.
-- Composition slots support optional animal/weapon ranks, levels, up to three weapon specifications, passives, and notes using the checked-in animal, weapon, passive, and tier emoji catalogs.
+- The private editor uses Discord modals and buttons for guide basics, unique aliases, user-created categories, displayed authors, viability, ease of creation, an optional detailed full guide, and all three composition slots.
+- Summaries, full guides, and slot notes support Discord Markdown plus optional Neon-style emoji variables: `{w...}` for weapons, `{fp...}` for passives, `{a...}` for animals, `{s...}` for base stats, and `{r...}` for ranks.
+- The editor includes a private **Emoji variables** reference, resolves known variables during **Preview**, and warns about unknown variables without deleting their text.
+- Composition slots continue to support optional animal/weapon ranks, levels, up to three weapon specifications, passives, and notes using the checked-in animal, weapon, passive, and tier emoji catalogs.
 - Search aliases are globally unique, edits increment the guide version, and the last editor is recorded.
-- Everyone can browse with `H guide`, search by name, alias, category, or displayed author with `H guide <query>` or `/team-guide`, and open related teams selected from shared categories.
+- Everyone can browse with `H guide`, search by name, alias, category, or displayed author with `H guide <query>` or `/team-guide`, open related teams, and privately page through an expert's optional **Full guide**.
 
 ### Boss-ticket board
 
@@ -90,7 +92,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
   - `w boss ticket`
 - Associates each OwO response with the requesting Discord user.
 - Stores reported `0/3`–`3/3` counts per server.
-- Maintains one persistent board in a configured channel.
+- Maintains one persistent board in a configured text channel or accessible Discord thread.
 - Shows display name, exact Discord account username, numeric user ID, ticket count, update time, and next replenishment.
 - Keeps the persistent board and manual ticket-list responses in a single Discord message, with Previous and Next buttons for large lists. Pages contain up to 15 entries so custom ticket emoji markup remains safely within Discord embed limits.
 - Keeps the configured board sticky by sending a fresh replacement first and deleting the previous board afterward.
@@ -432,7 +434,7 @@ A server manager runs:
 /boss-ticket-channel
 ```
 
-Choose the channel where the board should be created and maintained.
+Choose either a text channel or a thread where the board should be created and maintained. For threads, the bot needs **View Channel**, **Send Messages in Threads**, **Embed Links**, and **Read Message History**. Locked threads must be unlocked; an accessible archived thread is reopened automatically when the board refreshes.
 
 ### Visual ticket management
 

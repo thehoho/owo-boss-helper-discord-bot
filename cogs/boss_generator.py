@@ -1920,7 +1920,7 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="3️⃣ Boss-ticket board",
             value=(
-                "• `/boss-ticket-channel` — choose the persistent ticket-board channel.\n"
+                "• `/boss-ticket-channel` — choose the persistent ticket-board channel or thread.\n"
                 "• `/boss-ticket-manage` — remove/block tracked users and manage the "
                 "optional nickname-marker feature.\n"
                 "• `/boss-ticket-nickname` — personal nickname-marker control."

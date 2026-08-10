@@ -1,3 +1,13 @@
+## v0.13.1-beta - Guide Variables, Full Guides, and Ticket Threads
+
+- Added optional Neon-style emoji variables to trusted-guide summaries, full-guide text, and slot notes: `{w...}` weapons, `{fp...}` passives, `{a...}` animals, `{s...}` base stats, and `{r...}` ranks.
+- Added a private **Emoji variables** reference to the trusted editor and preview warnings that preserve unknown variable text for correction.
+- Added an optional 4,000-character Markdown full guide with a private **Full guide** button and automatic limit-safe pagination after application emojis are rendered.
+- Added an additive `team_guides.db` migration; existing guides remain valid with an empty optional full-guide field.
+- Expanded `/boss-ticket-channel` to accept text channels and accessible Discord threads, including public, private, and announcement threads.
+- Added destination permission checks, clear locked-thread handling, and automatic reopening of accessible archived ticket-board threads before refresh.
+- Added focused regression coverage for guide migrations, emoji resolution, page limits, slash-command thread types, thread permissions, and archived-thread reopening.
+- Updated the public bot version to `0.13.1-beta`.
 
 ## v0.13.0-beta - Animal Dex and Trusted Team Guides
 
