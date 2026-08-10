@@ -4,7 +4,9 @@ This patch makes trusted team guides easier for existing Neon users to author
 and lets communities keep the persistent boss-ticket board inside a Discord
 thread instead of creating another channel.
 
-## Trusted guide improvements
+## Team guide improvements
+
+- Public help, browse, and search surfaces use the simpler **Team Guides** name; authoring remains restricted to owner-approved trusted experts.
 
 - Summaries, optional full-guide text, and composition-slot notes accept Discord
   Markdown plus optional Neon-style emoji variables.

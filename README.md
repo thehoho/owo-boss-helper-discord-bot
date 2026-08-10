@@ -72,7 +72,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Learns ordinary official OwO Dex responses silently. It does not reply to a member's OwO Dex command or refusal, avoiding duplicate output beside dedicated Dex bots.
 - Shows a compact explicit result with copyable aliases and the official HP/ATT/PR then WP/MAG/MR stat layout.
 
-### Trusted team guides
+### Team guides
 
 - The bot owner grants or revokes global trusted-expert access with `/guide-expert`.
 - Trusted experts create guides with `/team-guide-create` and revise them with `/team-guide-edit`.

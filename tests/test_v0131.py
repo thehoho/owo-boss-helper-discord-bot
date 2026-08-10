@@ -17,6 +17,7 @@ from cogs.team_guides import (
     GuideEditorView,
     GuideSlot,
     TeamGuideStore,
+    TeamGuides,
     build_emoji_variable_help_embed,
     build_full_guide_embeds,
     guide_variable_emoji_key,
@@ -360,9 +361,16 @@ class PublicSurfaceTests(unittest.TestCase):
 
         help_embed = BossGenerator.build_help_embed(boss, "h", "w")
         help_text = "\n".join(field.value for field in help_embed.fields)
+        help_field_names = [field.name for field in help_embed.fields]
         self.assertIn("/boss-ticket-channel", help_text)
         self.assertIn("text channel or thread", help_text.casefold())
         self.assertIn("current channel or thread", help_text.casefold())
+        self.assertIn("📚 Team guides", help_field_names)
+        self.assertNotIn("📚 Trusted team guides", help_field_names)
+
+        guides = TeamGuides.__new__(TeamGuides)
+        guide_embed = TeamGuides.list_embed(guides, [])
+        self.assertEqual(guide_embed.title, "📚 Team Guides")
 
         setup_embed = BossGenerator.build_setup_guide_embed(
             boss,

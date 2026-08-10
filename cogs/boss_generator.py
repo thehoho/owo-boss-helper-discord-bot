@@ -2346,7 +2346,7 @@ class BossGenerator(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="📚 Trusted team guides",
+            name="📚 Team guides",
             value=(
                 f"Browse with `{helper_command(helper_prefix, 'guide')}` or `/team-guide`; "
                 f"search by name, alias, category, or author with "

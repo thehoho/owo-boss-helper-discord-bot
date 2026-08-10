@@ -1,5 +1,6 @@
 ## v0.13.1-beta - Guide Variables, Full Guides, and Ticket Threads
 
+- Renamed public guide headings and search results to **Team Guides** while retaining owner-managed trusted-expert access controls.
 - Added direct trusted-guide emoji variables for every documented weapon/passive alias, normal and ranked animal names, base stats, and ranks; the original `{w...}`, `{fp...}`, `{a...}`, `{s...}`, and `{r...}` forms remain compatible.
 - Added a private **Emoji variables** reference to the trusted editor and preview warnings that preserve unknown variable text for correction.
 - Updated H help, H setup, and H about so the v0.13.1 ticket-board thread support and version are visible before configuration.

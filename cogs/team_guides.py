@@ -1138,7 +1138,7 @@ class TeamGuides(commands.Cog):
         matches = await asyncio.to_thread(self.store.list_guides, query, 15)
         if not matches:
             await destination.send(
-                f"No trusted team guide matched `{query}`. Use `/team-guide` without a search to see recent guides.",
+                f"No team guide matched `{query}`. Use `/team-guide` without a search to see recent guides.",
                 allowed_mentions=discord.AllowedMentions.none(),
             )
             return False
@@ -1148,7 +1148,7 @@ class TeamGuides(commands.Cog):
     def list_embed(self, guides: list[TeamGuide], *, query: str = "") -> discord.Embed:
         if not guides:
             return discord.Embed(
-                title="📚 Trusted Team Guides",
+                title="📚 Team Guides",
                 description="No expert guides have been published yet.",
                 color=0x5865F2,
             )
@@ -1158,7 +1158,7 @@ class TeamGuides(commands.Cog):
             for guide in guides[:15]
         ]
         return discord.Embed(
-            title=f"📚 Trusted Team Guides{f' — {query}' if query else ''}"[:256],
+            title=f"📚 Team Guides{f' — {query}' if query else ''}"[:256],
             description="\n\n".join(lines),
             color=0x5865F2,
         )
@@ -1184,7 +1184,7 @@ class TeamGuides(commands.Cog):
         state = "granted" if enabled else "revoked"
         await interaction.response.send_message(f"✅ Trusted guide access {state} for {member.mention}.", ephemeral=True)
 
-    @app_commands.command(name="team-guide", description="Search or browse trusted battle-team guides.")
+    @app_commands.command(name="team-guide", description="Search or browse battle-team guides.")
     @app_commands.describe(query="Name, alias, category, or author; leave empty to browse")
     async def team_guide(self, interaction: discord.Interaction, query: str | None = None) -> None:
         if query:
@@ -1197,7 +1197,7 @@ class TeamGuides(commands.Cog):
                 return
             matches = await asyncio.to_thread(self.store.list_guides, query, 15)
             if not matches:
-                await interaction.response.send_message(f"No trusted guide matched `{query}`.", ephemeral=True)
+                await interaction.response.send_message(f"No team guide matched `{query}`.", ephemeral=True)
                 return
             await interaction.response.send_message(embed=self.list_embed(matches, query=query))
             return
@@ -1236,7 +1236,7 @@ class TeamGuides(commands.Cog):
             return
         guide = await asyncio.to_thread(self.store.find, query)
         if guide is None:
-            await interaction.response.send_message(f"No trusted guide matched `{query}`.", ephemeral=True)
+            await interaction.response.send_message(f"No team guide matched `{query}`.", ephemeral=True)
             return
         draft = draft_from_guide(guide, interaction.user.id)
         view = GuideEditorView(self, draft)
