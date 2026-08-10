@@ -320,7 +320,7 @@ Channel troubleshooting for server managers:
 H help
 ```
 
-`H help` lists only commands currently supported by the bot, including the setup-guide shortcut, ticket-management panel, optional nickname markers, and the 100-template workflow. It is recognized at the start of the first non-empty line; any text after `H help` is ignored.
+`H help` lists only commands currently supported by the bot, including the setup-guide shortcut, ticket-board setup for a text channel or thread, ticket-management panel, optional nickname markers, and the 100-template workflow. It is recognized at the start of the first non-empty line; any text after `H help` is ignored.
 
 ## Team templates
 

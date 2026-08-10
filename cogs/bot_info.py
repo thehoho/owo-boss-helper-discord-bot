@@ -647,7 +647,7 @@ class BotInfo(commands.Cog):
                 "• Ordered Neon boss commands with detected HP\n"
                 "• Guild-boss timing and cooldown alerts\n"
                 "• Exact weapon-ID team templates\n"
-                "• Per-server boss-ticket boards"
+                "• Per-server boss-ticket boards in channels or threads"
             ),
             inline=False,
         )

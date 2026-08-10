@@ -2,6 +2,7 @@
 
 - Added direct trusted-guide emoji variables for every documented weapon/passive alias, normal and ranked animal names, base stats, and ranks; the original `{w...}`, `{fp...}`, `{a...}`, `{s...}`, and `{r...}` forms remain compatible.
 - Added a private **Emoji variables** reference to the trusted editor and preview warnings that preserve unknown variable text for correction.
+- Updated H help, H setup, and H about so the v0.13.1 ticket-board thread support and version are visible before configuration.
 - Added an optional 4,000-character Markdown full guide with a private **Full guide** button and automatic limit-safe pagination after application emojis are rendered.
 - Added an additive `team_guides.db` migration; existing guides remain valid with an empty optional full-guide field.
 - Expanded `/boss-ticket-channel` to accept text channels and accessible Discord threads, including public, private, and announcement threads.

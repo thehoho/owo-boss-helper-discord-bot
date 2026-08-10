@@ -35,6 +35,7 @@ thread instead of creating another channel.
 - Locked threads are rejected with a clear setup message.
 - Accessible archived threads are reopened automatically before the board is
   refreshed.
+- H help and H setup now state that the persistent ticket board can use a text channel or thread; H about shows the v0.13.1-beta version and thread-board capability.
 - Replacement safety is unchanged: the new board is sent successfully before
   the previous bot-authored board message is deleted.
 

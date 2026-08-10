@@ -1920,7 +1920,7 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="3️⃣ Boss-ticket board",
             value=(
-                "• `/boss-ticket-channel` — choose the persistent ticket-board channel or thread.\n"
+                "• `/boss-ticket-channel` — choose the persistent ticket-board text channel or thread.\n"
                 "• `/boss-ticket-manage` — remove/block tracked users and manage the "
                 "optional nickname-marker feature.\n"
                 "• `/boss-ticket-nickname` — personal nickname-marker control."
@@ -2329,7 +2329,9 @@ class BossGenerator(commands.Cog):
                 f"look up members with `{boss_lookup}`. Managers use `{boss_settings}` "
                 "or `/boss-ticket-manage`. Members use the board's **My settings**, "
                 f"`{boss_nickname}`, or `/boss-ticket-nickname`. Top 10 battle logs "
-                "automatically reconcile tracked hits; inactive entries expire after 48 hours."
+                "automatically reconcile tracked hits; inactive entries expire after 48 hours. "
+                "Managers place the persistent board in a text channel or thread with "
+                "/boss-ticket-channel."
             ),
             inline=False,
         )
@@ -2384,7 +2386,7 @@ class BossGenerator(commands.Cog):
             value=(
                 f"Use `/setup-guide` for a private checklist, or "
                 f"`{helper_command(helper_prefix, 'setup')}` "
-                "to post it in the channel. It covers alert/report channels, ticket "
+                "to post it in the current channel or thread. It covers alert/report channels, ticket "
                 "boards, decision roles, optional fighter pings, permissions, and the "
                 "separate OwO and helper prefixes. Change the helper prefix safely with "
                 "`/helper-prefix`."

@@ -8,6 +8,8 @@ from types import SimpleNamespace
 
 import discord
 
+from cogs.boss_generator import BossGenerator
+from cogs.bot_info import BOT_VERSION, BotInfo
 from cogs.game_catalog import resolve_passive, resolve_weapon
 from cogs.team_guides import (
     FullGuideView,
@@ -347,6 +349,37 @@ def thread_permissions(**overrides: bool) -> SimpleNamespace:
     values.update(overrides)
     return SimpleNamespace(**values)
 
+
+class PublicSurfaceTests(unittest.TestCase):
+    def test_help_setup_and_about_surface_thread_boards_and_version(self) -> None:
+        boss = BossGenerator.__new__(BossGenerator)
+        boss.ui_emoji = lambda _name, fallback: fallback
+        boss.cooldown_config = {}
+        boss.decision_role_ids = lambda _guild_id: []
+        boss.fighter_role_ids = lambda _guild_id: []
+
+        help_embed = BossGenerator.build_help_embed(boss, "h", "w")
+        help_text = "\n".join(field.value for field in help_embed.fields)
+        self.assertIn("/boss-ticket-channel", help_text)
+        self.assertIn("text channel or thread", help_text.casefold())
+        self.assertIn("current channel or thread", help_text.casefold())
+
+        setup_embed = BossGenerator.build_setup_guide_embed(
+            boss,
+            SimpleNamespace(id=123),
+            "h",
+        )
+        setup_text = "\n".join(field.value for field in setup_embed.fields)
+        self.assertIn("ticket-board text channel or thread", setup_text.casefold())
+
+        info = BotInfo.__new__(BotInfo)
+        info.description = "Test description"
+        info.developer_name = "Hassaan"
+        info.bot = SimpleNamespace(guilds=[])
+        about_embed = BotInfo.build_about_embed(info)
+        about_text = "\n".join(field.value for field in about_embed.fields)
+        self.assertIn(BOT_VERSION, about_text)
+        self.assertIn("channels or threads", about_text.casefold())
 
 class TicketThreadTests(unittest.IsolatedAsyncioTestCase):
     async def test_slash_command_accepts_text_and_thread_destinations(self) -> None:
