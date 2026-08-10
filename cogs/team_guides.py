@@ -48,25 +48,31 @@ GUIDE_STAT_ALIASES = {
     "hp": "hp",
     "health": "hp",
     "hpstat": "hp",
+    "hpstats": "hp",
     "att": "att",
     "attack": "att",
     "str": "att",
     "strength": "att",
     "attstat": "att",
+    "attstats": "att",
     "pr": "pr",
     "physicalresistance": "pr",
     "prstat": "pr",
+    "prstats": "pr",
     "wp": "wp",
     "weaponpoint": "wp",
     "weaponpoints": "wp",
     "wpstat": "wp",
+    "wpstats": "wp",
     "mag": "mag",
     "magic": "mag",
     "magstat": "mag",
+    "magstats": "mag",
     "mr": "mr",
     "magicresistance": "mr",
     "magicalresistance": "mr",
     "mrstat": "mr",
+    "mrstats": "mr",
 }
 GUIDE_WEAPON_VARIABLE_ALIASES = {
     "pdagger": "pd",
@@ -481,50 +487,97 @@ def resolve_compact_catalog_entry(
     return None
 
 
+def guide_animal_variable_emoji_key(value: str) -> str | None:
+    special = resolve_special_animal(value)
+    if special:
+        return f"pet_{special.get('emoji_stem', '')}"
+    animal = normalize_animal_emoji_alias(value)
+    if animal in STANDARD_ANIMAL_NAMES:
+        return animal_emoji_key(animal)
+    return None
+
+
 def guide_variable_emoji_key(value: str) -> str | None:
     compact = normalize_catalog_token(value).replace(" ", "")
+
+    # Exact direct aliases win before optional prefixes. Animals take priority
+    # for the two familiar collisions; the specific passive forms remain
+    # available as lwolf and snail_passive.
+    special = resolve_special_animal(compact)
+    if special:
+        return f"pet_{special.get('emoji_stem', '')}"
+    if compact in STANDARD_ANIMAL_NAMES:
+        return animal_emoji_key(compact)
+
+    weapon_value = GUIDE_WEAPON_VARIABLE_ALIASES.get(compact, compact)
+    weapon = resolve_weapon(weapon_value) or resolve_compact_catalog_entry(
+        WEAPONS,
+        weapon_value,
+    )
+    if weapon:
+        return weapon.emoji_key
+
+    passive_value = GUIDE_PASSIVE_VARIABLE_ALIASES.get(compact, compact)
+    passive = resolve_passive(passive_value) or resolve_compact_catalog_entry(
+        PASSIVES,
+        passive_value,
+    )
+    if passive:
+        return passive.emoji_key
+
+    # Keep the original Neon-style prefixes for compatibility and explicit
+    # disambiguation, but only claim a prefix when its value actually resolves.
     if compact.startswith("fp"):
-        passive_value = compact[2:]
         passive_value = GUIDE_PASSIVE_VARIABLE_ALIASES.get(
-            passive_value,
-            passive_value,
+            compact[2:],
+            compact[2:],
         )
         passive = resolve_passive(passive_value) or resolve_compact_catalog_entry(
             PASSIVES,
             passive_value,
         )
-        return passive.emoji_key if passive else None
+        if passive:
+            return passive.emoji_key
     if compact.startswith("w"):
-        weapon_value = compact[1:]
         weapon_value = GUIDE_WEAPON_VARIABLE_ALIASES.get(
-            weapon_value,
-            weapon_value,
+            compact[1:],
+            compact[1:],
         )
         weapon = resolve_weapon(weapon_value) or resolve_compact_catalog_entry(
             WEAPONS,
             weapon_value,
         )
-        return weapon.emoji_key if weapon else None
+        if weapon:
+            return weapon.emoji_key
     if compact.startswith("a"):
-        animal_value = compact[1:]
-        special = resolve_special_animal(animal_value)
-        if special:
-            return f"pet_{special.get('emoji_stem', '')}"
-        animal = normalize_animal_emoji_alias(animal_value)
-        if animal in STANDARD_ANIMAL_NAMES:
-            return animal_emoji_key(animal)
-        return None
+        animal_key = guide_animal_variable_emoji_key(compact[1:])
+        if animal_key:
+            return animal_key
     if compact.startswith("s"):
         stat = GUIDE_STAT_ALIASES.get(compact[1:])
-        return f"stat_{stat}" if stat else None
+        if stat:
+            return f"stat_{stat}"
     if compact.startswith("r"):
         rank_value = compact[1:]
         rank = resolve_rank(rank_value) or resolve_compact_catalog_entry(
             RANKS,
             rank_value,
         )
-        return rank.emoji_key if rank else None
-    return None
+        if rank:
+            return rank.emoji_key
+
+    # Ranked standard animal aliases such as gfish resolve after exact weapon
+    # and passive aliases so ffish and lwolf keep their documented meanings.
+    animal_key = guide_animal_variable_emoji_key(compact)
+    if animal_key:
+        return animal_key
+
+    stat = GUIDE_STAT_ALIASES.get(compact)
+    if stat:
+        return f"stat_{stat}"
+
+    rank = resolve_rank(compact) or resolve_compact_catalog_entry(RANKS, compact)
+    return rank.emoji_key if rank else None
 
 
 def render_guide_markdown(bot: commands.Bot, value: str) -> str:
@@ -604,17 +657,18 @@ def build_emoji_variable_help_embed(bot: commands.Bot) -> discord.Embed:
         return f"{tick}{variable}{tick} → {rendered}"
 
     description = (
-        "Use optional Neon-style variables anywhere in the summary, full guide, "
-        "or slot notes. Preview resolves known names into the bot's portable "
-        "application emojis. Existing Discord Markdown, Unicode emojis, and custom "
-        "emoji markup stay unchanged.\n\n"
-        f"**Weapons**\n{example('{wsword}')}  {example('{wpdagger}')}  {example('{wascept}')}\n"
-        f"**Passives**\n{example('{fpstr}')}  {example('{fplifesteal}')}  {example('{fpmana_mtap}')}\n"
-        f"**Animals**\n{example('{afish}')}  {example('{agfish}')}  {example('{abeeday}')}\n"
-        f"**Base stats**\n{example('{shp}')}  {example('{satt}')}  {example('{swp}')}  {example('{smag}')}\n"
-        f"**Ranks**\n{example('{rlegendary}')}  {example('{rfabled}')}\n\n"
-        "-# Prefixes: w = weapon, fp = passive, a = animal, s = base stat, r = rank. "
-        "Aliases such as dagger, ascept, lifesteal, gfish, and beeday are accepted."
+        "Put a familiar animal, weapon, passive, stat, or rank name inside braces "
+        "anywhere in the summary, full guide, or slot notes. Preview turns known "
+        "names into the bot's portable application emojis. Existing Discord "
+        "Markdown, Unicode emojis, and custom emoji markup stay unchanged.\n\n"
+        f"**Weapons**\n{example('{sword}')}  {example('{pdagger}')}  {example('{arcane}')}\n"
+        f"**Passives**\n{example('{strength}')}  {example('{lifesteal}')}  {example('{mana_mtap}')}\n"
+        f"**Animals**\n{example('{fish}')}  {example('{gfish}')}  {example('{beeday}')}\n"
+        f"**Base stats**\n{example('{hp_stat}')}  {example('{att_stat}')}  {example('{wp_stat}')}  {example('{mag_stat}')}\n"
+        f"**Ranks**\n{example('{legendary}')}  {example('{fabled}')}\n\n"
+        "-# Prefixes remain optional for disambiguation: w = weapon, fp = passive, "
+        "a = animal, s = base stat, r = rank. Bare animal names win: {wolf} is the "
+        "animal, while {lwolf} is Lone Wolf; {snail_passive} selects the passive."
     )
     return discord.Embed(title="💡 Team-guide emoji variables", description=description, color=0xFEE75C)
 
@@ -703,8 +757,8 @@ def build_editor_embed(draft: GuideDraft) -> discord.Embed:
         "Use the buttons below to build a visual, versioned team guide. "
         "Nothing is published until you press **Publish**.\n"
         "-# **Basics**, **Full guide**, and slot notes accept Discord Markdown. "
-        "Optional Neon-style emoji variables such as {wsword}, {fpstr}, and "
-        "{afish} resolve through **Preview**. Open **Emoji variables** for examples.\n\n"
+        "Optional direct emoji variables such as {sword}, {lifesteal}, and "
+        "{fish} resolve through **Preview**. Open **Emoji variables** for examples.\n\n"
         f"**Name:** {draft.name or 'Not set'}\n"
         f"**Aliases:** {', '.join(draft.aliases) or 'Not set'}\n"
         f"**Categories:** {', '.join(draft.categories) or 'Not set'}\n"

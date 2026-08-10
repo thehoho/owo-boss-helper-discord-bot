@@ -1,6 +1,6 @@
 ## v0.13.1-beta - Guide Variables, Full Guides, and Ticket Threads
 
-- Added optional Neon-style emoji variables to trusted-guide summaries, full-guide text, and slot notes: `{w...}` weapons, `{fp...}` passives, `{a...}` animals, `{s...}` base stats, and `{r...}` ranks.
+- Added direct trusted-guide emoji variables for every documented weapon/passive alias, normal and ranked animal names, base stats, and ranks; the original `{w...}`, `{fp...}`, `{a...}`, `{s...}`, and `{r...}` forms remain compatible.
 - Added a private **Emoji variables** reference to the trusted editor and preview warnings that preserve unknown variable text for correction.
 - Added an optional 4,000-character Markdown full guide with a private **Full guide** button and automatic limit-safe pagination after application emojis are rendered.
 - Added an additive `team_guides.db` migration; existing guides remain valid with an empty optional full-guide field.

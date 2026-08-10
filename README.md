@@ -1,7 +1,7 @@
 
 ## v0.13.1-beta notes
 
-Trusted experts can now use optional Neon-style emoji variables in summaries, detailed full guides, and slot notes, with a private variable reference and preview warnings for unknown names. Published teams can include an optional private paginated **Full guide** view. Server managers can also configure the persistent boss-ticket board in either a text channel or an accessible Discord thread.
+Trusted experts can now use familiar direct emoji variables in summaries, detailed full guides, and slot notes, with a private alias reference and preview warnings for unknown names. Published teams can include an optional private paginated **Full guide** view. Server managers can also configure the persistent boss-ticket board in either a text channel or an accessible Discord thread.
 
 # OwO Boss Helper
 
@@ -77,7 +77,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - The bot owner grants or revokes global trusted-expert access with `/guide-expert`.
 - Trusted experts create guides with `/team-guide-create` and revise them with `/team-guide-edit`.
 - The private editor uses Discord modals and buttons for guide basics, unique aliases, user-created categories, displayed authors, viability, ease of creation, an optional detailed full guide, and all three composition slots.
-- Summaries, full guides, and slot notes support Discord Markdown plus optional Neon-style emoji variables: `{w...}` for weapons, `{fp...}` for passives, `{a...}` for animals, `{s...}` for base stats, and `{r...}` for ranks.
+- Summaries, full guides, and slot notes support Discord Markdown plus direct emoji variables such as `{fish}`, `{pdagger}`, `{lifesteal}`, `{wp_stat}`, and `{legendary}`. The original `{w...}`, `{fp...}`, `{a...}`, `{s...}`, and `{r...}` prefixes remain optional for disambiguation.
 - The editor includes a private **Emoji variables** reference, resolves known variables during **Preview**, and warns about unknown variables without deleting their text.
 - Composition slots continue to support optional animal/weapon ranks, levels, up to three weapon specifications, passives, and notes using the checked-in animal, weapon, passive, and tier emoji catalogs.
 - Search aliases are globally unique, edits increment the guide version, and the last editor is recorded.

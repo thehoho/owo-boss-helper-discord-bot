@@ -8,12 +8,13 @@ thread instead of creating another channel.
 
 - Summaries, optional full-guide text, and composition-slot notes accept Discord
   Markdown plus optional Neon-style emoji variables.
-- Variable families are `{w...}` for weapons, `{fp...}` for passives, `{a...}`
-  for animals, `{s...}` for base stats, and `{r...}` for animal/weapon ranks.
+- Familiar names work directly without a category prefix. The original `{w...}` weapons,
+  `{fp...}` passives, `{a...}` animals, `{s...}` stats, and `{r...}` ranks remain compatible.
 - Catalog and familiar compact community aliases work inside variables,
-  including `{wsword}`, `{wpdagger}`, `{wvampstaff}`, `{wascept}`,
-  `{fplifesteal}`, `{fpmana_mtap}`, `{fpsnail_passive}`, `{agfish}`,
-  `{abeeday}`, `{swp_stat}`, and `{rlegendary}`.
+  including `{sword}`, `{pdagger}`, `{vampstaff}`, `{arcane}`,
+  `{lifesteal}`, `{mana_mtap}`, `{snail_passive}`, `{fish}`, `{gfish}`,
+  `{beeday}`, `{wp_stat}`, and `{legendary}`.
+- Bare normal-animal names win the two natural collisions: `{wolf}` and `{snail}` are pets; use `{lwolf}` and `{snail_passive}` for the passives.
 - Existing Discord Markdown, Unicode emojis, custom emoji markup, structured
   composition fields, and already-published guides remain compatible.
 - The private editor includes an **Emoji variables** reference. Preview resolves
@@ -51,7 +52,7 @@ thread instead of creating another channel.
 
 1. Open `/team-guide-create` as a trusted expert and confirm **Emoji variables**
    shows weapon, passive, animal, stat, and rank examples.
-2. Put `{wpdagger}`, `{fplifesteal}`, `{agfish}`, and `{swp_stat}` in a summary, slot note,
+2. Put `{pdagger}`, `{lifesteal}`, `{fish}`, and `{wp_stat}` in a summary, slot note,
    or full guide; Preview should show application emojis.
 3. Add an intentionally unknown variable and confirm Preview warns about it
    while preserving the original text.
