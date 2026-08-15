@@ -16,7 +16,12 @@ from cogs.boss_generator import (
     is_prefix_help_trigger,
     parse_boss_decision_command,
 )
-from cogs.neon_weapons import parse_neon_command
+from cogs.neon_weapons import (
+    ActiveDexSession,
+    NeonWeaponEntry,
+    NeonWeapons,
+    parse_neon_command,
+)
 from cogs.team_templates import parse_team_helper_command
 from cogs.ticket_tracker import (
     is_ticket_list_command,
@@ -104,6 +109,31 @@ class HelperPrefixTests(unittest.TestCase):
 
 
 class HelpAndEmojiTests(unittest.TestCase):
+    def test_dex_session_command_is_a_large_copyable_heading(self) -> None:
+        entries = [
+            NeonWeaponEntry(
+                1, "91A9GB", None, None, True, False, False, "", (), "", 0, 0
+            ),
+            NeonWeaponEntry(
+                1, "900FT5", None, None, True, False, False, "", (), "", 0, 0
+            ),
+        ]
+        session = ActiveDexSession(
+            runner_user_id=1,
+            owner_user_id=1,
+            channel_id=10,
+            entries=entries,
+            owner_display_name="Hassaan",
+            runner_display_name="Hassaan",
+            index=1,
+        )
+        cog = NeonWeapons.__new__(NeonWeapons)
+
+        message = NeonWeapons.build_session_message(cog, session)
+
+        self.assertIn("Copy this command and send it in this channel:", message)
+        self.assertTrue(message.endswith("# `wuse 900FT5`"), message)
+
     def test_help_embed_stays_within_discord_limits(self) -> None:
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback

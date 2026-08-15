@@ -1,5 +1,7 @@
 # OwO Boss Helper v0.13.1-beta
 
+Active `HWD` prompts now show the exact `ww` or `wuse` command as a large Discord heading while preserving inline-code copying on desktop and mobile.
+
 This patch makes trusted team guides easier for existing Neon users to author
 and lets communities keep the persistent boss-ticket board inside a Discord
 thread instead of creating another channel.

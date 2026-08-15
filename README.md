@@ -146,7 +146,7 @@ H weapon stats
 H weapon clear
 ```
 
-`HWD` / `H dex` previews the queue with one **Start dexing session** button. Each active step shows the exact command directly in the channel beneath a small instruction telling the member to copy and send it there. **Skip weapon** and **Stop** remain available while the session is active. When the member sends `ww <weapon_id>` and Neon replies with a blueprint such as `sword 31,7 mtap 77`, the helper marks that weapon saved and learns any available weapon/passive context.
+`HWD` / `H dex` previews the queue with one **Start dexing session** button. Each active step shows the exact command as a large Discord heading beneath a small instruction telling the member to copy and send it in the channel. **Skip weapon** and **Stop** remain available while the session is active. When the member sends `ww <weapon_id>` and Neon replies with a blueprint such as `sword 31,7 mtap 77`, the helper marks that weapon saved and learns any available weapon/passive context.
 
 The scanner does not assume one stable emoji ID per weapon or passive. It tags weapon/passive context from Neon filter headers, command context, learned blueprint replies, and known aliases. Unknown rows still remain in the unfiltered dex queue.
 
@@ -681,11 +681,11 @@ MIT License. See [LICENSE](LICENSE).
 
 ### Guided Neon weapon dex sessions
 
-`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon weapon pages. Select **Start dexing session** to receive one command at a time. Each active prompt displays the current command directly in the channel for easy mobile copying; no extra copy button is required. After the member sends the shown command, the helper waits for Neon to confirm the weapon, waits about two seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
+`HWD`, `H dex`, `H weapon dex`, `H weapondex`, and `HW dex` show queued alternating `ww <weapon_id>` / `wuse <weapon_id>` commands from scanned Neon weapon pages. Select **Start dexing session** to receive one command at a time. Each active prompt displays the current command as a large Discord heading in the channel for easy mobile copying; no extra copy button is required. After the member sends the shown command, the helper waits for Neon to confirm the weapon, waits about two seconds, removes the previous prompt, and posts the next one. Use `H stop` to pause and continue later.
 
 ### Mobile-friendly dex prompts
 
-Guided Neon dex sessions post one short plain-text command at a time, such as `ww CX9974` or `wuse CX9974`, so mobile users can tap/copy it easily. The helper advances only after Neon confirms the shown weapon, waits about two seconds, removes the old prompt, and posts the next one. Use `H stop`, `Hstop`, or `HS` to pause the session.
+Guided Neon dex sessions post one short command as a large Discord heading at a time, such as `ww CX9974` or `wuse CX9974`, so mobile users can tap/copy it easily. The helper advances only after Neon confirms the shown weapon, waits about two seconds, removes the old prompt, and posts the next one. Use `H stop`, `Hstop`, or `HS` to pause the session.
 
 ### Cross-user Neon dexing
 

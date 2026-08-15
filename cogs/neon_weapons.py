@@ -1995,7 +1995,7 @@ class NeonWeapons(commands.Cog):
             f"**{session.owner_display_name}**{runner_note} — "
             f"{session.index + 1}/{len(session.entries)}\n"
             "-# Copy this command and send it in this channel:\n"
-            f"`{command}`"
+            f"# `{command}`"
         )
 
     async def delete_session_prompt(self, channel: discord.abc.Messageable, session: ActiveDexSession) -> None:

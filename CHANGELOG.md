@@ -1,5 +1,6 @@
 ## v0.13.1-beta - Guide Variables, Full Guides, and Ticket Threads
 
+- Enlarged each active `HWD` session command with a Discord heading while keeping the exact command inline-copyable on desktop and mobile.
 - Renamed public guide headings and search results to **Team Guides** while retaining owner-managed trusted-expert access controls.
 - Added direct trusted-guide emoji variables for every documented weapon/passive alias, normal and ranked animal names, base stats, and ranks; the original `{w...}`, `{fp...}`, `{a...}`, `{s...}`, and `{r...}` forms remain compatible.
 - Added a private **Emoji variables** reference to the trusted editor and preview warnings that preserve unknown variable text for correction.
