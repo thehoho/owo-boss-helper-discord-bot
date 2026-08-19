@@ -1,7 +1,7 @@
 
-## v0.13.1-beta notes
+## v0.14.0-beta notes
 
-Trusted experts can now use familiar direct emoji variables in summaries, detailed full guides, and slot notes, with a private alias reference and preview warnings for unknown names. Published teams can include an optional private paginated **Full guide** view. Server managers can also configure the persistent boss-ticket board in either a text channel or an accessible Discord thread.
+Saved teams now include **Smart replace**. It asks the member to show their active OwO team, compares all three animal positions and exact weapon IDs, preserves everything already correct, resolves position swaps safely, and guides only the required commands. Animal adds are immediately followed by their weapon equips to use the team-cooldown window, while weapon commands alternate `ww` / `wuse` / `ww` in both Smart replace and **All commands**.
 
 # OwO Boss Helper
 
@@ -54,9 +54,10 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Reads animal identity from the OwO emoji alias rather than a renameable nickname.
 - Normalizes standard aliases such as `gfish → fish`, `gspider → spider`, and `hlizard → lizard`.
 - Preserves unknown custom-pet aliases exactly.
-- Supports Quick replace and Exact reset.
-- Guides users one command at a time and waits for OwO's response before advancing.
-- Alternates animal-add and weapon-equip commands for faster restoration.
+- Supports difference-only Smart replace, full-packet All commands, and Exact reset.
+- Guides users one command at a time, waits for OwO's response, and pauses only when the next step shares the same team or weapon cooldown.
+- Places each required weapon equip immediately after its animal add so members can use the five-second team-cooldown window efficiently.
+- Alternates weapon equips `ww` / `wuse` / `ww` in Smart replace, Exact reset, and the full **All commands** packet.
 - Equips every saved weapon by the saved animal identifier, such as `ww ALGOB8 snail`, instead of relying on a changeable team position.
 - Supports concurrent guided sessions by server, channel, and user.
 - Handles already-present animals, occupied positions, missing weapons, retries, skips, and cancellations.
@@ -383,21 +384,33 @@ H team delete <number or name>
 
 Choose one of the buttons on a saved team:
 
-- **Quick replace** — overwrites listed positions and equips each saved weapon.
+- **Smart replace** — scans the official current OwO team page and guides only the differences.
 - **Exact reset** — clears positions 1–3, then rebuilds the team.
+- **All commands** — posts the full saved-team command list for advanced manual use.
 
-Quick replace alternates commands:
+Smart replace asks the member to send the configured team display command, such as:
 
 ```text
-wtm a hsnake 1
-ww AZWWZV hsnake
-wtm a 2025dec_daisy 2
-ww DYLYU5 2025dec_daisy
-wtm a 2026feb_huba 3
-ww EEK29J 2026feb_huba
+wtm
 ```
 
-The next command appears immediately after OwO confirms the current one. Saved weapons are equipped to the animal name instead of the position, so the weapon still goes to the right pet even if positions change.
+After the official OwO response arrives, the planner:
+
+1. Keeps animals already in the correct positions.
+2. Keeps exact weapon IDs that already match.
+3. Directly replaces unrelated occupants when the desired animal is absent.
+4. Opens an animal-position swap cycle with one safe delete, then rotates the animals into place.
+5. Emits only missing weapon changes, alternating `ww` and `wuse` when more than one is needed.
+6. Waits five seconds between required team commands that share OwO's cooldown.
+
+For example, if only two weapons differ, the guided session contains only:
+
+```text
+ww AZWWZV snake
+wuse DYLYU5 eagle
+```
+
+Saved weapons target the animal name instead of the position. The final prompt still asks the member to run the configured team display command and verify all three animals and weapon IDs before battling.
 
 Skip the current step:
 
@@ -698,7 +711,7 @@ When a user clicks Neon's reaction on an OwO `ww` weapon-list message, the helpe
 
 ### Team command export
 
-Saved team views include an **All commands** button. It posts the clean quick-replace command list publicly in the channel so advanced users can copy only the commands they need.
+Saved team views include an **All commands** button. It posts the complete saved-team restore list publicly so advanced users can manually choose commands without starting Smart replace.
 
 ### Neon emoji context enrichment
 
@@ -761,7 +774,7 @@ HT prefix o
 H team prefix g
 ```
 
-After setting `HT prefix o`, guided team restore commands use `otm ...` and `ow <weapon_id> <animal>`. Only members with **Manage Server** can change the prefix, but anyone can run `HT prefix` to check the current setting.
+After setting `HT prefix o`, Smart replace asks for `otm`; generated team edits use `otm ...`, and alternating weapon changes use `ow <weapon_id> <animal>` / `ouse <weapon_id> <animal>`. Only members with **Manage Server** can change the prefix, but anyone can run `HT prefix` to check the current setting.
 
 ### Combined Neon dex filters
 

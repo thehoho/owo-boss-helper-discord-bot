@@ -1,3 +1,20 @@
+## v0.14.0-beta - Smart Team Replacement
+
+- Replaced the saved-team **Quick replace** button with **Smart replace**.
+- Added a five-minute per-user scan flow that asks for the configured OwO team display command and reads only the following official OwO team response.
+- Compared all three current animal positions and exact weapon IDs with the selected saved template.
+- Preserved already-correct animals and weapons instead of replaying every saved command.
+- Added a deterministic position planner that directly overwrites unrelated occupants and resolves two- or three-animal swap cycles with one safe opening delete.
+- Added a fail-closed message for the OwO edge case where moving the only remaining team animal would require a temporary pet.
+- Interleaved each changed animal's weapon equip immediately after its team add, using the five-second team-cooldown window for faster guided restoration.
+- Alternated all generated weapon equips `ww` / `wuse` / `ww`, including Smart replace, Exact reset, and the public **All commands** packet.
+- Added five-second pacing in every guided team mode only when consecutive steps share one OwO cooldown family; interleaved add/equip steps continue immediately.
+- Kept **Exact reset**, **All commands**, editing, per-server OwO prefixes, guided skips/cancellation, and final team verification available.
+- Updated saved-team cards, `HT help`, `H help`, `H setup`, `H about`, and README guidance for the new flow.
+- Added focused coverage for exact matches, weapon-only changes, missing animals, two- and three-position cycles, custom prefixes, team-page parsing, `wuse` confirmations, and cooldown pacing.
+- No database migration or additional Discord permission is required. Smart scanning uses the already-required Message Content intent.
+- Updated the public bot version to `0.14.0-beta`.
+
 ## v0.13.1-beta - Guide Variables, Full Guides, and Ticket Threads
 
 - Enlarged each active `HWD` session command with a Discord heading while keeping the exact command inline-copyable on desktop and mobile.

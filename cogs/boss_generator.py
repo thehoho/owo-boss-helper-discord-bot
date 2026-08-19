@@ -1941,7 +1941,7 @@ class BossGenerator(commands.Cog):
             name="5️⃣ Member guides",
             value=(
                 f"• `{helper_command(helper_prefix, 'help')}` — current command overview.\n"
-                f"• `{team_short} help` — saved-team setup and restore guide.\n"
+                f"• `{team_short} help` — saved teams, Smart replace, and Exact reset.\n"
                 f"• `{weapon_short}` / `{helper_command(helper_prefix, 'weapons')}` "
                 "— Neon weapon scanning setup.\n"
                 f"• `{dex_short}` — preview the dex queue and open guided commands."
@@ -2341,7 +2341,9 @@ class BossGenerator(commands.Cog):
                 f"Use `{team_short} C <name>` to save, `{team_short}` or "
                 f"`{team_short}<number>` to open, `{team_short} U <slot/name>` to "
                 f"update, `{team_short} D <slot/name>` to delete, and "
-                f"`{team_short} help` for the full guide."
+                f"`{team_short} help` for the full guide. A saved team's **Smart "
+                "replace** button scans the current OwO team and shows only required "
+                "animal or weapon changes."
             ),
             inline=False,
         )

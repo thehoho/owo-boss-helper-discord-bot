@@ -39,6 +39,8 @@ TEMPLATE_PAGE_SIZE = 25
 MAX_TEMPLATE_NAME_LENGTH = 40
 DELETE_CONFIRMED_USER_COMMANDS = True
 GUIDED_SESSION_TIMEOUT_SECONDS = 15 * 60
+SMART_REPLACE_SCAN_TIMEOUT_SECONDS = 5 * 60
+SMART_REPLACE_TEAM_DELAY_SECONDS = 5.0
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 OWO_PREFIX_DEFAULT = "w"
@@ -274,6 +276,18 @@ class TeamTemplate:
     updated_at: int
 
 
+@dataclass(frozen=True)
+class SmartReplacePlan:
+    commands: tuple[str, ...]
+    team_change_count: int
+    weapon_change_count: int
+    already_correct_positions: tuple[int, ...]
+
+
+class SmartReplacePlanningError(ValueError):
+    """Raised when OwO cannot safely reach the saved layout automatically."""
+
+
 @dataclass
 class GuidedTeamSession:
     user_id: int
@@ -300,6 +314,26 @@ class GuidedTeamSession:
         if 0 <= self.next_index < len(self.commands):
             return self.commands[self.next_index]
         return None
+
+
+@dataclass
+class SmartReplaceScanSession:
+    user_id: int
+    guild_id: int
+    channel_id: int
+    template_id: int
+    template_slot: int
+    template_name: str
+    identity_tokens: tuple[str, ...]
+    owo_prefix: str = OWO_PREFIX_DEFAULT
+    helper_prefix: str = HELPER_PREFIX_DEFAULT
+    ready_for_user: bool = True
+    waiting_for_owo: bool = False
+    command_message_id: int | None = None
+    prompt_message_id: int | None = None
+    command_sent_at: float = 0.0
+    display_command: str = ""
+    last_activity: float = 0.0
 
 
 def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
@@ -541,17 +575,33 @@ def owo_team_command(prefix: str, *parts: object) -> str:
     return f"{base} {suffix}" if suffix else base
 
 
-def owo_weapon_command(prefix: str, weapon_id: str, animal: str) -> str:
-    return f"{prefix or OWO_PREFIX_DEFAULT}w {weapon_id} {animal}"
+def owo_weapon_command(
+    prefix: str,
+    weapon_id: str,
+    animal: str,
+    *,
+    use_alias: bool = False,
+) -> str:
+    command = "use" if use_alias else "w"
+    return f"{prefix or OWO_PREFIX_DEFAULT}{command} {weapon_id} {animal}"
 
 
 def interleaved_member_commands(template: TeamTemplate, owo_prefix: str = OWO_PREFIX_DEFAULT) -> list[str]:
-    """Alternate team edits and weapon equips to avoid same-action cooldowns."""
+    """Interleave team edits and alternate OwO's independent weapon aliases."""
     commands: list[str] = []
+    weapon_index = 0
     for member in template.members:
         commands.append(owo_team_command(owo_prefix, "a", member.animal, member.position))
         if member.weapon_id:
-            commands.append(owo_weapon_command(owo_prefix, member.weapon_id, member.animal))
+            commands.append(
+                owo_weapon_command(
+                    owo_prefix,
+                    member.weapon_id,
+                    member.animal,
+                    use_alias=bool(weapon_index % 2),
+                )
+            )
+            weapon_index += 1
     return commands
 
 
@@ -563,6 +613,189 @@ def exact_reset_commands(template: TeamTemplate, owo_prefix: str = OWO_PREFIX_DE
 
 def quick_replace_commands(template: TeamTemplate, owo_prefix: str = OWO_PREFIX_DEFAULT) -> list[str]:
     return interleaved_member_commands(template, owo_prefix)
+
+def _animal_identity(value: str) -> str:
+    return (value or "").strip().casefold()
+
+
+def build_smart_replace_plan(
+    template: TeamTemplate,
+    current_members: Iterable[TeamMember],
+    owo_prefix: str = OWO_PREFIX_DEFAULT,
+) -> SmartReplacePlan:
+    """Build the smallest safe restore plan supported by OwO's team rules.
+
+    OwO position updates overwrite the current occupant, but it rejects an add when
+    that animal is still present in another position. The planner therefore keeps
+    correct positions, directly overwrites unrelated occupants, and opens each
+    position cycle with one deletion before rotating the animals into place.
+    """
+    target_by_position = {member.position: member for member in template.members}
+    current_by_position = {member.position: member for member in current_members}
+    if len(target_by_position) != len(template.members):
+        raise SmartReplacePlanningError("The saved team contains duplicate positions.")
+
+    target_animals = [_animal_identity(member.animal) for member in template.members]
+    if len(set(target_animals)) != len(target_animals):
+        raise SmartReplacePlanningError("The saved team contains the same animal more than once.")
+
+    state = dict(current_by_position)
+    weapon_by_animal = {
+        _animal_identity(member.animal): member.weapon_id.upper()
+        for member in current_by_position.values()
+    }
+    already_correct = tuple(
+        position
+        for position, target in sorted(target_by_position.items())
+        if position in state
+        and _animal_identity(state[position].animal) == _animal_identity(target.animal)
+    )
+    # Store the added animal beside each team command. This lets the final packet
+    # place that animal's required weapon command immediately after its add, using
+    # the otherwise-idle team cooldown window instead of collecting equips at the end.
+    team_commands: list[tuple[str, str | None]] = []
+
+    # At most three target slots exist. The guard is defensive against malformed
+    # payloads and makes a future parser regression fail closed instead of looping.
+    for _ in range(12):
+        unresolved = [
+            position
+            for position, target in sorted(target_by_position.items())
+            if position not in state
+            or _animal_identity(state[position].animal) != _animal_identity(target.animal)
+        ]
+        if not unresolved:
+            break
+
+        present_positions = {
+            _animal_identity(member.animal): position
+            for position, member in state.items()
+        }
+        ready_position = next(
+            (
+                position
+                for position in unresolved
+                if _animal_identity(target_by_position[position].animal)
+                not in present_positions
+            ),
+            None,
+        )
+        if ready_position is not None:
+            target = target_by_position[ready_position]
+            animal_key = _animal_identity(target.animal)
+            team_commands.append(
+                (
+                    owo_team_command(owo_prefix, "a", target.animal, ready_position),
+                    animal_key,
+                )
+            )
+            state[ready_position] = TeamMember(
+                position=ready_position,
+                animal=target.animal,
+                weapon_id=weapon_by_animal.get(animal_key, ""),
+            )
+            continue
+
+        # Every unresolved target animal is still occupying another target slot: a
+        # permutation cycle. Free one source slot, then normal overwrite steps can
+        # rotate the rest of the cycle without any duplicate-animal rejection.
+        cycle_target = target_by_position[unresolved[0]]
+        source_position = present_positions[_animal_identity(cycle_target.animal)]
+        if len(state) <= 1:
+            raise SmartReplacePlanningError(
+                "OwO will not remove the final animal from a team. Add any temporary "
+                "animal, show the team again, then retry Smart replace."
+            )
+        team_commands.append(
+            (owo_team_command(owo_prefix, "d", source_position), None)
+        )
+        state.pop(source_position, None)
+    else:
+        raise SmartReplacePlanningError("The current team layout could not be resolved safely.")
+
+    weapon_targets: dict[str, TeamMember] = {}
+    for target in sorted(template.members, key=lambda member: member.position):
+        target_weapon = target.weapon_id.upper()
+        if not target_weapon:
+            continue
+        animal_key = _animal_identity(target.animal)
+        if weapon_by_animal.get(animal_key, "") == target_weapon:
+            continue
+        weapon_targets[animal_key] = target
+
+    commands: list[str] = []
+    equipped_animals: set[str] = set()
+    weapon_index = 0
+
+    def append_weapon(target: TeamMember) -> None:
+        nonlocal weapon_index
+        commands.append(
+            owo_weapon_command(
+                owo_prefix,
+                target.weapon_id.upper(),
+                target.animal,
+                use_alias=bool(weapon_index % 2),
+            )
+        )
+        weapon_index += 1
+
+    for team_command, added_animal in team_commands:
+        commands.append(team_command)
+        target = weapon_targets.get(added_animal or "")
+        if target is not None:
+            append_weapon(target)
+            equipped_animals.add(added_animal or "")
+
+    # Correctly positioned animals can still need a different weapon. Append those
+    # remaining equips in position order while continuing the same alias alternation.
+    for target in sorted(template.members, key=lambda member: member.position):
+        animal_key = _animal_identity(target.animal)
+        if animal_key not in weapon_targets or animal_key in equipped_animals:
+            continue
+        append_weapon(target)
+        equipped_animals.add(animal_key)
+
+    return SmartReplacePlan(
+        commands=tuple(commands),
+        team_change_count=len(team_commands),
+        weapon_change_count=len(weapon_targets),
+        already_correct_positions=already_correct,
+    )
+
+
+def is_smart_team_display_command(value: str, owo_prefix: str) -> bool:
+    """Accept the non-destructive OwO commands that display one current team."""
+    normalized = normalize_owo_command(value)
+    prefix = re.escape(owo_prefix or OWO_PREFIX_DEFAULT)
+    return bool(
+        re.fullmatch(rf"{prefix}(?:tm|team)(?:\s+display)?", normalized)
+        or re.fullmatch(rf"{prefix}(?:teams|squads)", normalized)
+        or re.fullmatch(rf"{prefix}(?:setteam|useteams)\s+[1-3]", normalized)
+    )
+
+
+def _owo_cooldown_family(command: str) -> str:
+    name = normalize_owo_command(command).split(" ", 1)[0]
+    if any(
+        name.endswith(suffix)
+        for suffix in ("setteam", "useteams", "teams", "squads", "team", "tm")
+    ):
+        return "team"
+    if name.endswith("use"):
+        return "use"
+    if name.endswith("w"):
+        return "weapon"
+    return name
+
+
+def smart_replace_transition_delay(previous: str, following: str) -> float:
+    """Return a safe pause only when consecutive commands share an OwO cooldown."""
+    previous_family = _owo_cooldown_family(previous)
+    following_family = _owo_cooldown_family(following)
+    if previous_family == following_family and previous_family in {"team", "weapon", "use"}:
+        return SMART_REPLACE_TEAM_DELAY_SECONDS
+    return 0.0
+
 
 
 def format_command_packet(
@@ -649,7 +882,7 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
     if any(phrase in lowered for phrase in retry_phrases):
         return "retry"
 
-    if re.match(r"^\S+w\s+", normalized):
+    if re.match(r"^\S+(?:w|use)\s+", normalized):
         if any(
             phrase in lowered
             for phrase in (
@@ -1499,26 +1732,21 @@ class TemplateActionView(OwnedView):
         self.cog = cog
         self.template = template
 
-    @discord.ui.button(label="Quick replace", emoji="⚡", style=discord.ButtonStyle.primary)
-    async def quick_replace(
+    @discord.ui.button(label="Smart replace", emoji="🧠", style=discord.ButtonStyle.primary)
+    async def smart_replace(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
         owo_prefix = await self.cog.store.get_guild_owo_prefix(interaction.guild_id or 0)
-        helper_prefix = await get_guild_helper_prefix(interaction.guild_id)
-        commands = quick_replace_commands(self.template, owo_prefix)
-        packet = format_command_packet(
-            f"Quick replace — #{self.template.slot} {self.template.name}",
-            commands,
-            "This replaces positions directly. If an animal already exists in a "
-            "different slot, OwO may reject the add step; the helper will catch that "
-            "brief error and tell you how to move it. Unmentioned positions remain unchanged.",
-            owo_prefix=owo_prefix,
-            helper_prefix=helper_prefix,
+        await interaction.response.send_message(
+            (
+                f"🧠 **Smart replace — #{self.template.slot} {self.template.name}**\n"
+                f"Follow the new prompt in this channel and send `{owo_team_command(owo_prefix)}`. "
+                "I will compare OwO's current team page with this saved team, then show "
+                "only the animal moves and weapon changes you actually need."
+            ),
+            ephemeral=True,
         )
-        await interaction.response.send_message(packet, ephemeral=True)
-        await self.cog.start_guided_session(
-            interaction, self.template, commands, "Quick replace", owo_prefix=owo_prefix
-        )
+        await self.cog.start_smart_replace_scan(interaction, self.template, owo_prefix)
 
     @discord.ui.button(label="Exact reset", emoji="🔄", style=discord.ButtonStyle.success)
     async def exact_reset(
@@ -1908,8 +2136,9 @@ class TemplateSelect(discord.ui.Select):
             title=f"🐾 #{template.slot} — {template.name}",
             description=(
                 f"Saved from **{template.source_title}**\n\n{member_lines}\n\n"
-                "Choose **Quick replace** to overwrite the listed positions, or "
-                "**Exact reset** to clear all positions first."
+                "Choose **Smart replace** to scan your current OwO team and change "
+                "only the differences, or **Exact reset** to clear all positions "
+                "first."
             ),
             color=0x5865F2,
         )
@@ -2008,6 +2237,8 @@ class TeamTemplates(commands.Cog):
         self.reaction_instruction_cooldowns: dict[tuple[int, int], float] = {}
         self.guided_sessions: dict[tuple[int, int, int], GuidedTeamSession] = {}
         self.guided_timeout_tasks: dict[tuple[int, int, int], asyncio.Task[None]] = {}
+        self.smart_replace_scans: dict[tuple[int, int, int], SmartReplaceScanSession] = {}
+        self.smart_replace_timeout_tasks: dict[tuple[int, int, int], asyncio.Task[None]] = {}
 
     async def cog_load(self) -> None:
         await self.store.initialize()
@@ -2017,6 +2248,10 @@ class TeamTemplates(commands.Cog):
         for task in self.guided_timeout_tasks.values():
             task.cancel()
         self.guided_timeout_tasks.clear()
+        for task in self.smart_replace_timeout_tasks.values():
+            task.cancel()
+        self.smart_replace_timeout_tasks.clear()
+        self.smart_replace_scans.clear()
         self.guided_sessions.clear()
 
     @staticmethod
@@ -2056,6 +2291,112 @@ class TeamTemplates(commands.Cog):
             )
         except asyncio.CancelledError:
             return
+
+    def clear_smart_replace_scan(
+        self, key: tuple[int, int, int]
+    ) -> SmartReplaceScanSession | None:
+        session = self.smart_replace_scans.pop(key, None)
+        task = self.smart_replace_timeout_tasks.pop(key, None)
+        if task and task is not asyncio.current_task():
+            task.cancel()
+        return session
+
+    def reset_smart_replace_timeout(
+        self, key: tuple[int, int, int], session: SmartReplaceScanSession
+    ) -> None:
+        old_task = self.smart_replace_timeout_tasks.pop(key, None)
+        if old_task and old_task is not asyncio.current_task():
+            old_task.cancel()
+        self.smart_replace_timeout_tasks[key] = asyncio.create_task(
+            self.expire_smart_replace_scan(key, session)
+        )
+
+    async def expire_smart_replace_scan(
+        self, key: tuple[int, int, int], session: SmartReplaceScanSession
+    ) -> None:
+        try:
+            await asyncio.sleep(SMART_REPLACE_SCAN_TIMEOUT_SECONDS)
+            if self.smart_replace_scans.get(key) is not session:
+                return
+            self.smart_replace_scans.pop(key, None)
+            self.smart_replace_timeout_tasks.pop(key, None)
+            logger.info(
+                "Expired Smart replace scan for user %s in channel %s",
+                session.user_id,
+                session.channel_id,
+            )
+        except asyncio.CancelledError:
+            return
+
+    async def start_smart_replace_scan(
+        self,
+        interaction: discord.Interaction,
+        template: TeamTemplate,
+        owo_prefix: str,
+    ) -> None:
+        if interaction.guild_id is None or interaction.channel_id is None:
+            return
+        channel = interaction.channel
+        if channel is None or not isinstance(channel, discord.abc.Messageable):
+            return
+
+        key = self.guided_key(
+            interaction.guild_id, interaction.channel_id, interaction.user.id
+        )
+        self.clear_guided_session(key)
+        self.clear_smart_replace_scan(key)
+        identity_sources = [
+            getattr(interaction.user, "display_name", ""),
+            getattr(interaction.user, "global_name", ""),
+            getattr(interaction.user, "name", ""),
+        ]
+        identity_tokens = tuple(
+            sorted(
+                {
+                    token.lower()
+                    for source in identity_sources
+                    for token in re.findall(r"[A-Za-z0-9_]{4,}", source or "")
+                },
+                key=len,
+                reverse=True,
+            )
+        )
+        helper_prefix = await get_guild_helper_prefix(interaction.guild_id)
+        session = SmartReplaceScanSession(
+            user_id=interaction.user.id,
+            guild_id=interaction.guild_id,
+            channel_id=interaction.channel_id,
+            template_id=template.template_id,
+            template_slot=template.slot,
+            template_name=template.name,
+            identity_tokens=identity_tokens,
+            owo_prefix=owo_prefix,
+            helper_prefix=helper_prefix,
+            last_activity=time.monotonic(),
+        )
+        self.smart_replace_scans[key] = session
+        self.reset_smart_replace_timeout(key, session)
+        prompt = await channel.send(
+            (
+                f"<@{session.user_id}> 🧠 **Smart replace — team "
+                f"#{session.template_slot} `{session.template_name}`**\n"
+                "Show the active team you want to update by sending:\n"
+                f"# `{owo_team_command(owo_prefix)}`\n"
+                "Wait for the official OwO reply. I will scan its three positions and "
+                "weapon IDs, keep everything already correct, and start a guided session "
+                "containing only the required changes.\n"
+                f"Use `{helper_alias(helper_prefix, 'ht')} cancel` to stop."
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True, roles=False, everyone=False, replied_user=False
+            ),
+        )
+        session.prompt_message_id = prompt.id
+        logger.info(
+            "Started Smart replace scan for user %s using team #%s",
+            session.user_id,
+            session.template_slot,
+        )
 
     async def start_guided_session(
         self,
@@ -2305,6 +2646,196 @@ class TeamTemplates(commands.Cog):
         )
         return True
 
+    async def handle_smart_replace_user_command(self, message: discord.Message) -> bool:
+        if message.guild is None:
+            return False
+        key = self.guided_key(message.guild.id, message.channel.id, message.author.id)
+        session = self.smart_replace_scans.get(key)
+        if session is None or not session.ready_for_user or session.waiting_for_owo:
+            return False
+        if not is_smart_team_display_command(message.content or "", session.owo_prefix):
+            return False
+
+        session.ready_for_user = False
+        session.waiting_for_owo = True
+        session.display_command = normalize_owo_command(message.content or "")
+        session.command_message_id = message.id
+        session.command_sent_at = time.monotonic()
+        session.last_activity = session.command_sent_at
+        self.reset_smart_replace_timeout(key, session)
+
+        previous_prompt_id = session.prompt_message_id
+        session.prompt_message_id = None
+        await self.delete_message_safely(message.channel, previous_prompt_id)
+        logger.info(
+            "User %s sent Smart replace team display command in channel %s",
+            message.author.id,
+            message.channel.id,
+        )
+        return True
+
+    def find_smart_replace_scan_for_owo_message(
+        self, message: discord.Message, text: str
+    ) -> tuple[
+        tuple[int, int, int], SmartReplaceScanSession, ParsedTeamMessage
+    ] | None:
+        if message.guild is None:
+            return None
+        parsed = parse_team_message_detailed(text)
+        if parsed is None:
+            return None
+
+        waiting: list[tuple[tuple[int, int, int], SmartReplaceScanSession]] = []
+        for key, session in self.smart_replace_scans.items():
+            if session.guild_id != message.guild.id or session.channel_id != message.channel.id:
+                continue
+            if not session.waiting_for_owo:
+                continue
+            if time.monotonic() - session.command_sent_at <= 45:
+                waiting.append((key, session))
+        if not waiting:
+            return None
+
+        reference_id = (
+            message.reference.message_id
+            if message.reference is not None
+            else None
+        )
+        if reference_id is not None:
+            for key, session in waiting:
+                if session.command_message_id == reference_id:
+                    return key, session, parsed
+
+        mentioned_ids = {user.id for user in message.mentions}
+        if mentioned_ids:
+            mentioned = [item for item in waiting if item[1].user_id in mentioned_ids]
+            if mentioned:
+                key, session = min(mentioned, key=lambda item: item[1].command_sent_at)
+                return key, session, parsed
+
+        lowered_text = text.lower()
+        identified = [
+            item
+            for item in waiting
+            if any(token in lowered_text for token in item[1].identity_tokens)
+        ]
+        if identified:
+            key, session = min(identified, key=lambda item: item[1].command_sent_at)
+            return key, session, parsed
+
+        # Team pages normally include the requester's display name. FIFO is retained
+        # for very short names and older OwO layouts that expose no reply or mention.
+        key, session = min(waiting, key=lambda item: item[1].command_sent_at)
+        return key, session, parsed
+
+    async def handle_smart_replace_owo_team(self, message: discord.Message) -> bool:
+        text = extract_message_text(message)
+        found = self.find_smart_replace_scan_for_owo_message(message, text)
+        if found is None:
+            return False
+        key, scan, parsed = found
+        self.clear_smart_replace_scan(key)
+
+        if DELETE_CONFIRMED_USER_COMMANDS:
+            await self.delete_message_safely(
+                message.channel,
+                scan.command_message_id,
+                member_message=True,
+            )
+
+        template = await self.store.get(scan.user_id, scan.template_id)
+        if template is None:
+            await message.channel.send(
+                f"<@{scan.user_id}> ⚠️ That saved team was changed or deleted. Open it again and restart Smart replace.",
+                allowed_mentions=discord.AllowedMentions(
+                    users=True, roles=False, everyone=False, replied_user=False
+                ),
+            )
+            return True
+
+        try:
+            plan = build_smart_replace_plan(template, parsed.members, scan.owo_prefix)
+        except SmartReplacePlanningError as exc:
+            await message.channel.send(
+                f"<@{scan.user_id}> ⚠️ **Smart replace could not build a safe plan:** {exc}",
+                allowed_mentions=discord.AllowedMentions(
+                    users=True, roles=False, everyone=False, replied_user=False
+                ),
+            )
+            return True
+
+        if not plan.commands:
+            await message.channel.send(
+                (
+                    f"<@{scan.user_id}> ✅ **Team #{template.slot} `{template.name}` already matches.**\n"
+                    "Every saved animal position and weapon ID is already correct. "
+                    f"You can verify it again with `{owo_team_command(scan.owo_prefix)}`."
+                ),
+                allowed_mentions=discord.AllowedMentions(
+                    users=True, roles=False, everyone=False, replied_user=False
+                ),
+            )
+            return True
+
+        guided = GuidedTeamSession(
+            user_id=scan.user_id,
+            guild_id=scan.guild_id,
+            channel_id=scan.channel_id,
+            template_id=template.template_id,
+            template_slot=template.slot,
+            template_name=template.name,
+            identity_tokens=scan.identity_tokens,
+            mode="Smart replace",
+            commands=plan.commands,
+            owo_prefix=scan.owo_prefix,
+            helper_prefix=scan.helper_prefix,
+            last_activity=time.monotonic(),
+        )
+        self.clear_guided_session(key)
+        self.guided_sessions[key] = guided
+        self.reset_guided_timeout(key, guided)
+
+        correct_text = (
+            ", ".join(str(position) for position in plan.already_correct_positions)
+            if plan.already_correct_positions
+            else "none"
+        )
+        initial_delay = smart_replace_transition_delay(
+            scan.display_command, guided.commands[0]
+        )
+        wait_text = (
+            f"\n⏳ Waiting **{int(initial_delay)} seconds** before the first team edit so OwO's team cooldown can clear."
+            if initial_delay
+            else ""
+        )
+        await message.channel.send(
+            (
+                f"<@{scan.user_id}> 🧠 **Smart scan complete for team #{template.slot} `{template.name}`.**\n"
+                f"Already-correct animal positions: **{correct_text}**\n"
+                f"Required changes: **{plan.team_change_count}** team edit(s), "
+                f"**{plan.weapon_change_count}** weapon change(s).\n"
+                "Only those required commands will be shown. Weapon changes alternate "
+                "between `ww` and `wuse`."
+                f"{wait_text}"
+            ),
+            allowed_mentions=discord.AllowedMentions(
+                users=True, roles=False, everyone=False, replied_user=False
+            ),
+        )
+        if initial_delay:
+            await asyncio.sleep(initial_delay)
+            if self.guided_sessions.get(key) is not guided:
+                return True
+
+        await self.send_guided_step(message.channel, guided)
+        logger.info(
+            "Built Smart replace plan for user %s: %s team edits, %s weapon changes",
+            scan.user_id,
+            plan.team_change_count,
+            plan.weapon_change_count,
+        )
+        return True
+
     def find_guided_session_for_owo_message(
         self, message: discord.Message, text: str
     ) -> tuple[tuple[int, int, int], GuidedTeamSession, str] | None:
@@ -2377,6 +2908,7 @@ class TeamTemplates(commands.Cog):
         if found is None:
             return False
         key, session, status = found
+        completed_command = session.expected_command or ""
         user_command_message_id = session.command_message_id
         session.waiting_for_owo = False
         session.command_message_id = None
@@ -2448,8 +2980,16 @@ class TeamTemplates(commands.Cog):
             await self.finish_guided_session(channel, key, session)
             return True
 
-        # No artificial delay: alternating add/equip commands avoids the repeated
-        # action cooldown, and the next prompt appears as soon as OwO responds.
+        if status == "success":
+            following = session.expected_command or ""
+            delay = smart_replace_transition_delay(completed_command, following)
+            if delay:
+                await asyncio.sleep(delay)
+                if self.guided_sessions.get(key) is not session:
+                    return True
+
+        # Every guided mode pauses only when two required commands share one OwO
+        # cooldown family. Interleaved team/equip steps continue immediately.
         await self.send_guided_step(channel, session, notice=notice)
         return True
 
@@ -2508,10 +3048,12 @@ class TeamTemplates(commands.Cog):
         if message.guild is None:
             return
         key = self.guided_key(message.guild.id, message.channel.id, message.author.id)
-        session = self.clear_guided_session(key)
+        guided_session = self.clear_guided_session(key)
+        smart_session = self.clear_smart_replace_scan(key)
+        session = guided_session or smart_session
         if session is None:
             await message.reply(
-                "You do not have an active guided team setup in this channel.",
+                "You do not have an active team setup or Smart replace scan in this channel.",
                 mention_author=False,
             )
             return
@@ -2522,7 +3064,7 @@ class TeamTemplates(commands.Cog):
                 message.channel, message.id, member_message=True
             )
         await message.channel.send(
-            f"<@{message.author.id}> 🛑 Stopped the guided setup for team "
+            f"<@{message.author.id}> 🛑 Stopped the team setup for team "
             f"**#{session.template_slot} {session.template_name}**.",
             allowed_mentions=discord.AllowedMentions(
                 users=True, roles=False, everyone=False, replied_user=False
@@ -2637,10 +3179,12 @@ class TeamTemplates(commands.Cog):
         embed.add_field(
             name="Guided setup",
             value=(
-                "Choose **Quick replace** or **Exact reset**. The helper shows the full "
-                "packet, then posts one command at a time. Animal adds and weapon equips "
-                "alternate, and weapon equips use the animal name instead of the team position. "
-                "Use **All commands** to post a public, clean command list in one message. "
+                "Choose **Smart replace**, send the requested OwO team command, and the "
+                "helper compares all three positions and weapon IDs before showing only "
+                "the required changes. Consecutive weapon changes alternate `ww` and "
+                "`wuse`; repeated team edits wait for OwO's cooldown. **Exact reset** "
+                "still rebuilds every position. Use **All commands** to post the full "
+                "saved-team command list publicly in one message. "
                 "Discord does not allow true drag-and-drop inside bot messages, so "
                 f"ordering uses buttons, `{team_short} move`, and `{team_short} swap`."
             ),
@@ -3132,10 +3676,10 @@ class TeamTemplates(commands.Cog):
             title=f"🐾 #{template.slot} — {template.name}",
             description=(
                 f"Saved from **{template.source_title}**\n\n{member_lines}\n\n"
-                "Choose **Quick replace** to overwrite the listed positions, "
-                "**Exact reset** to clear all three positions first, or **Edit team** "
-                "to change one animal/weapon, rename it, or move it in your saved order. "
-                "Guided mode posts each command as OwO confirms the previous one."
+                "Choose **Smart replace** to scan the current team and change only the "
+                "different animals or weapon IDs, **Exact reset** to rebuild all three "
+                "positions, or **Edit team** to change the saved template. Guided mode "
+                "posts each required command as OwO confirms the previous one."
             ),
             color=0x5865F2,
         )
@@ -3299,6 +3843,7 @@ class TeamTemplates(commands.Cog):
                 # same channel; reply/mention matching is preferred, with FIFO as a
                 # fallback for OwO responses that contain neither.
                 await self.handle_guided_owo_confirmation(message)
+                await self.handle_smart_replace_owo_team(message)
 
                 text = extract_message_text(message)
                 if parse_team_message(text) is not None:
@@ -3309,6 +3854,9 @@ class TeamTemplates(commands.Cog):
                 return
 
             if message.guild is None:
+                return
+
+            if await self.handle_smart_replace_user_command(message):
                 return
 
             if await self.handle_guided_user_command(message):

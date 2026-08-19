@@ -1,0 +1,370 @@
+from __future__ import annotations
+
+import asyncio
+import time
+import unittest
+from types import SimpleNamespace
+
+from cogs.bot_info import BOT_VERSION
+from cogs.team_templates import (
+    SMART_REPLACE_TEAM_DELAY_SECONDS,
+    SmartReplacePlanningError,
+    SmartReplaceScanSession,
+    TeamMember,
+    TeamTemplate,
+    TeamTemplates,
+    build_smart_replace_plan,
+    classify_team_confirmation,
+    exact_reset_commands,
+    interleaved_member_commands,
+    is_smart_team_display_command,
+    parse_team_message_detailed,
+    smart_replace_transition_delay,
+)
+
+
+def saved_template(*members: TeamMember) -> TeamTemplate:
+    return TeamTemplate(
+        template_id=7,
+        user_id=42,
+        slot=1,
+        name="Boss team",
+        source_title="Hassaan's team",
+        members=tuple(members),
+        created_at=1,
+        updated_at=1,
+    )
+
+
+def team_member(position: int, animal: str, weapon_id: str) -> TeamMember:
+    return TeamMember(position=position, animal=animal, weapon_id=weapon_id)
+
+
+class SmartReplacePlannerTests(unittest.TestCase):
+    def test_weapon_only_plan_keeps_all_animals_and_alternates_aliases(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "owo", "CCC333"),
+        )
+        current = (
+            team_member(1, "snake", "OLD111"),
+            team_member(2, "eagle", "OLD222"),
+            team_member(3, "owo", "CCC333"),
+        )
+
+        plan = build_smart_replace_plan(target, current)
+
+        self.assertEqual(plan.team_change_count, 0)
+        self.assertEqual(plan.weapon_change_count, 2)
+        self.assertEqual(plan.already_correct_positions, (1, 2, 3))
+        self.assertEqual(plan.commands, ("ww AAA111 snake", "wuse BBB222 eagle"))
+
+    def test_two_animal_swap_opens_cycle_once_then_rotates(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "owo", "CCC333"),
+        )
+        current = (
+            team_member(1, "eagle", "BBB222"),
+            team_member(2, "snake", "AAA111"),
+            team_member(3, "owo", "CCC333"),
+        )
+
+        plan = build_smart_replace_plan(target, current)
+
+        self.assertEqual(
+            plan.commands,
+            ("wtm d 2", "wtm a snake 1", "wtm a eagle 2"),
+        )
+        self.assertEqual(plan.team_change_count, 3)
+        self.assertEqual(plan.weapon_change_count, 0)
+        self.assertEqual(plan.already_correct_positions, (3,))
+
+    def test_three_animal_cycle_needs_one_delete_and_three_adds(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "owo", "CCC333"),
+        )
+        current = (
+            team_member(1, "eagle", "BBB222"),
+            team_member(2, "owo", "CCC333"),
+            team_member(3, "snake", "AAA111"),
+        )
+
+        plan = build_smart_replace_plan(target, current, "o")
+
+        self.assertEqual(
+            plan.commands,
+            ("otm d 3", "otm a snake 1", "otm a eagle 2", "otm a owo 3"),
+        )
+        self.assertEqual(plan.weapon_change_count, 0)
+
+    def test_missing_animals_directly_overwrite_unrelated_positions(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "owo", "CCC333"),
+        )
+        current = (
+            team_member(1, "snake", "AAA111"),
+            team_member(3, "panda", "PAN123"),
+        )
+
+        plan = build_smart_replace_plan(target, current)
+
+        self.assertEqual(
+            plan.commands,
+            (
+                "wtm a eagle 2",
+                "ww BBB222 eagle",
+                "wtm a owo 3",
+                "wuse CCC333 owo",
+            ),
+        )
+        self.assertEqual(plan.team_change_count, 2)
+        self.assertEqual(plan.weapon_change_count, 2)
+
+    def test_exact_match_generates_no_commands(self) -> None:
+        members = (
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "owo", "CCC333"),
+        )
+        plan = build_smart_replace_plan(saved_template(*members), members)
+        self.assertEqual(plan.commands, ())
+        self.assertEqual(plan.already_correct_positions, (1, 2, 3))
+
+    def test_moving_the_only_current_animal_fails_closed(self) -> None:
+        target = saved_template(team_member(1, "snake", "AAA111"))
+        current = (team_member(2, "snake", "AAA111"),)
+        with self.assertRaisesRegex(SmartReplacePlanningError, "final animal"):
+            build_smart_replace_plan(target, current)
+
+
+class SmartReplaceCommandTests(unittest.TestCase):
+    def test_release_version(self) -> None:
+        self.assertEqual(BOT_VERSION, "0.14.0-beta")
+
+    def test_team_display_commands_respect_configured_prefix(self) -> None:
+        for command in ("otm", "oteam", "oteam display", "oteams", "osetteam 2"):
+            with self.subTest(command=command):
+                self.assertTrue(is_smart_team_display_command(command, "o"))
+        for command in ("wtm", "otm a snake 1", "osetteam 9", "obattle"):
+            with self.subTest(command=command):
+                self.assertFalse(is_smart_team_display_command(command, "o"))
+
+    def test_shared_team_commands_wait_but_weapon_aliases_can_alternate(self) -> None:
+        self.assertEqual(
+            smart_replace_transition_delay("wtm", "wtm d 2"),
+            SMART_REPLACE_TEAM_DELAY_SECONDS,
+        )
+        self.assertEqual(
+            smart_replace_transition_delay("wteam", "wtm a snake 1"),
+            SMART_REPLACE_TEAM_DELAY_SECONDS,
+        )
+        self.assertEqual(smart_replace_transition_delay("ww AAA111 snake", "wuse BBB222 eagle"), 0)
+        self.assertEqual(
+            smart_replace_transition_delay("ww AAA111 snake", "ww BBB222 eagle"),
+            SMART_REPLACE_TEAM_DELAY_SECONDS,
+        )
+
+    def test_interleaved_add_and_equip_use_the_team_cooldown_window(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+        )
+        current = (
+            team_member(1, "panda", "PAN123"),
+            team_member(2, "camel", "CAM123"),
+        )
+
+        plan = build_smart_replace_plan(target, current)
+
+        self.assertEqual(
+            plan.commands,
+            (
+                "wtm a snake 1",
+                "ww AAA111 snake",
+                "wtm a eagle 2",
+                "wuse BBB222 eagle",
+            ),
+        )
+        self.assertEqual(
+            smart_replace_transition_delay(plan.commands[0], plan.commands[1]), 0
+        )
+        self.assertEqual(
+            smart_replace_transition_delay(plan.commands[1], plan.commands[2]), 0
+        )
+
+    def test_exact_reset_alternates_equips_after_its_deletes(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "owo", "CCC333"),
+        )
+
+        self.assertEqual(
+            exact_reset_commands(target),
+            [
+                "wtm d 1",
+                "wtm d 2",
+                "wtm d 3",
+                "wtm a snake 1",
+                "ww AAA111 snake",
+                "wtm a eagle 2",
+                "wuse BBB222 eagle",
+                "wtm a owo 3",
+                "ww CCC333 owo",
+            ],
+        )
+
+    def test_all_commands_alternate_weapon_aliases(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "owo", "CCC333"),
+        )
+
+        self.assertEqual(
+            interleaved_member_commands(target),
+            [
+                "wtm a snake 1",
+                "ww AAA111 snake",
+                "wtm a eagle 2",
+                "wuse BBB222 eagle",
+                "wtm a owo 3",
+                "ww CCC333 owo",
+            ],
+        )
+
+    def test_wuse_confirmation_is_accepted(self) -> None:
+        self.assertEqual(
+            classify_team_confirmation(
+                "Eagle is now wielding the selected weapon.",
+                "wuse BBB222 eagle",
+            ),
+            "success",
+        )
+
+    def test_team_page_parser_keeps_positions_and_weapon_ids(self) -> None:
+        payload = """
+Hassaan's team
+owo team add {animal} {pos}
+[1] <:hsnake:100> Snake
+Lvl 50
+AAA111 <:weapon:101> 99%
+[2] <:deagle:102> Eagle
+Lvl 50
+BBB222 <:weapon:103> 98%
+[3] <:customowo:104> 4millionowo
+Lvl 50
+CCC333 <:weapon:105> 97%
+Current Streak: 0
+"""
+        parsed = parse_team_message_detailed(payload)
+        self.assertIsNotNone(parsed)
+        assert parsed is not None
+        self.assertEqual(
+            parsed.members,
+            (
+                team_member(1, "snake", "AAA111"),
+                team_member(2, "eagle", "BBB222"),
+                team_member(3, "customowo", "CCC333"),
+            ),
+        )
+        self.assertEqual(parsed.missing_positions, ())
+        self.assertEqual(parsed.missing_weapon_positions, ())
+
+
+class _FakePartialMessage:
+    def __init__(self) -> None:
+        self.deleted = False
+
+    async def delete(self) -> None:
+        self.deleted = True
+
+
+class _FakeChannel:
+    def __init__(self, channel_id: int) -> None:
+        self.id = channel_id
+        self.sent: list[dict[str, object]] = []
+        self.partials: dict[int, _FakePartialMessage] = {}
+
+    async def send(self, content: str | None = None, **kwargs: object) -> SimpleNamespace:
+        self.sent.append({"content": content, **kwargs})
+        return SimpleNamespace(id=1000 + len(self.sent))
+
+    def get_partial_message(self, message_id: int) -> _FakePartialMessage:
+        return self.partials.setdefault(message_id, _FakePartialMessage())
+
+
+class _FakeStore:
+    def __init__(self, template: TeamTemplate) -> None:
+        self.template = template
+
+    async def get(self, user_id: int, template_id: int) -> TeamTemplate | None:
+        if user_id == self.template.user_id and template_id == self.template.template_id:
+            return self.template
+        return None
+
+
+class SmartReplaceIntegrationTests(unittest.IsolatedAsyncioTestCase):
+    async def test_official_team_reply_starts_difference_only_guided_session(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "customowo", "CCC333"),
+        )
+        channel = _FakeChannel(20)
+        cog = TeamTemplates(SimpleNamespace())
+        cog.store = _FakeStore(target)
+        key = cog.guided_key(10, channel.id, target.user_id)
+        cog.smart_replace_scans[key] = SmartReplaceScanSession(
+            user_id=target.user_id,
+            guild_id=10,
+            channel_id=channel.id,
+            template_id=target.template_id,
+            template_slot=target.slot,
+            template_name=target.name,
+            identity_tokens=("hassaan",),
+            waiting_for_owo=True,
+            ready_for_user=False,
+            command_message_id=55,
+            command_sent_at=time.monotonic(),
+            display_command="wtm",
+        )
+        payload = """
+Hassaan's team
+owo team add {animal} {pos}
+[1] <:hsnake:100> Snake
+OLD111 <:weapon:101> 99%
+[2] <:deagle:102> Eagle
+OLD222 <:weapon:103> 98%
+[3] <:customowo:104> 4millionowo
+CCC333 <:weapon:105> 97%
+Current Streak: 0
+"""
+        message = SimpleNamespace(
+            content=payload,
+            embeds=[],
+            components=[],
+            guild=SimpleNamespace(id=10),
+            channel=channel,
+            reference=None,
+            mentions=[],
+        )
+
+        handled = await cog.handle_smart_replace_owo_team(message)
+
+        self.assertTrue(handled)
+        self.assertNotIn(key, cog.smart_replace_scans)
+        self.assertEqual(
+            cog.guided_sessions[key].commands,
+            ("ww AAA111 snake", "wuse BBB222 eagle"),
+        )
+        self.assertIn("`ww AAA111 snake`", str(channel.sent[-1]["content"]))
+        await cog.cog_unload()
+        await asyncio.sleep(0)
