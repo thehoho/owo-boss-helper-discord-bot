@@ -1,8 +1,15 @@
+## v0.14.3-beta - TapDeck Naming Correction
+
+- Corrected the public command spelling to `H TapDeck` and `/tapdeck` in help, documentation, and release notes.
+- Removed obsolete misspelled prefix and slash-command forms.
+- Kept `H Grind` as the short descriptive alias and preserved the dynamic GitHub release resolver and download buttons.
+- Updated the public version to `0.14.3-beta`; no database migration or additional permission is required.
+
 ## v0.14.2-beta - TapDeck Command Hotfix
 
 - Replaced the TapDeck card with concise factual wording and removed the unnecessary automation comparison and cache implementation detail from the public message.
 - Kept the dynamic latest-release and APK buttons unchanged.
-- Changed compact team parsing so arbitrary name searches require a separator, preventing `HTapDeck` / `HTabDeck` from also firing an `HT` team lookup.
+- Changed compact team parsing so arbitrary name searches require a separator, preventing `HTapDeck` from also firing an `HT` team lookup.
 - Preserved documented compact team actions such as `HTC`, `HTD`, and numbered slots such as `HT3`.
 - Updated the public version to `0.14.2-beta`; no database migration or new permission is required.
 
@@ -13,7 +20,7 @@
 - Re-fetches and reparses the latest OwO message on confirmation, so OwO's button-edited team page—not a stale first page—drives the difference-only plan.
 - Uses only the remaining portion of the team cooldown after confirmation instead of always waiting another full five seconds.
 - Added isolated `HRNG` / `H RNG` and `/rng` commands with inclusive one- or two-bound rolls, full integers, and K/M/B/T abbreviations.
-- Added `H Grind`, `H TabDeck`, and `/tabdeck` with verified public-source and privacy links plus a daily-cached GitHub lookup for the newest TapDeck Lite APK.
+- Added `H Grind`, `H TapDeck`, and `/tapdeck` with verified public-source and privacy links plus a daily-cached GitHub lookup for the newest TapDeck Lite APK.
 - Updated `H help`, `H about`, README, tests, and the public version to `0.14.1-beta`.
 - No database migration or additional Discord permission is required.
 ## v0.14.0-beta - Smart Team Replacement

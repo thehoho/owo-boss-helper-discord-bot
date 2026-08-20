@@ -14,15 +14,16 @@ from cogs.rng import (
     parse_rng_range,
     roll_inclusive,
 )
-from cogs.tabdeck import (
-    TABDECK_LATEST_RELEASE_API_URL,
-    TABDECK_LATEST_RELEASE_URL,
-    TABDECK_PREFIX_ALIASES,
-    TABDECK_REPOSITORY_URL,
+from cogs.tapdeck import (
+    TAPDECK_LATEST_RELEASE_API_URL,
+    TAPDECK_LATEST_RELEASE_URL,
+    TAPDECK_PREFIX_ALIASES,
+    TAPDECK_REPOSITORY_URL,
+    TapDeckInfo,
     TapDeckLinks,
     TapDeckRelease,
     TapDeckReleaseError,
-    build_tabdeck_embed,
+    build_tapdeck_embed,
     parse_latest_release_payload,
 )
 from cogs.team_templates import parse_team_helper_command
@@ -73,10 +74,10 @@ class TapDeckTests(unittest.TestCase):
         self.release = TapDeckRelease(
             tag_name="v9.8.7",
             release_url=(
-                "https://github.com/thehoho/TabDeck-Lite/releases/tag/v9.8.7"
+                "https://github.com/thehoho/TapDeck-Lite/releases/tag/v9.8.7"
             ),
             apk_url=(
-                "https://github.com/thehoho/TabDeck-Lite/releases/download/"
+                "https://github.com/thehoho/TapDeck-Lite/releases/download/"
                 "v9.8.7/TapDeck-Lite-9.8.7.apk"
             ),
         )
@@ -89,7 +90,7 @@ class TapDeckTests(unittest.TestCase):
                 {
                     "name": "SHA256SUMS.txt",
                     "browser_download_url": (
-                        "https://github.com/thehoho/TabDeck-Lite/releases/download/"
+                        "https://github.com/thehoho/TapDeck-Lite/releases/download/"
                         "v9.8.7/SHA256SUMS.txt"
                     ),
                 },
@@ -100,7 +101,7 @@ class TapDeckTests(unittest.TestCase):
             ],
         }
         self.assertEqual(parse_latest_release_payload(payload), self.release)
-        self.assertTrue(TABDECK_LATEST_RELEASE_API_URL.endswith("/releases/latest"))
+        self.assertTrue(TAPDECK_LATEST_RELEASE_API_URL.endswith("/releases/latest"))
 
     def test_release_payload_rejects_untrusted_or_missing_apk_urls(self) -> None:
         with self.assertRaises(TapDeckReleaseError):
@@ -116,7 +117,7 @@ class TapDeckTests(unittest.TestCase):
                 {
                     "tag_name": "v1.0.0",
                     "html_url": (
-                        "https://github.com/thehoho/TabDeck-Lite/releases/tag/v1.0.0"
+                        "https://github.com/thehoho/TapDeck-Lite/releases/tag/v1.0.0"
                     ),
                     "assets": [
                         {
@@ -131,14 +132,14 @@ class TapDeckTests(unittest.TestCase):
         dynamic_urls = {str(child.url) for child in TapDeckLinks(self.release).children}
         self.assertIn(self.release.apk_url, dynamic_urls)
         self.assertIn(self.release.release_url, dynamic_urls)
-        self.assertIn(TABDECK_REPOSITORY_URL, dynamic_urls)
+        self.assertIn(TAPDECK_REPOSITORY_URL, dynamic_urls)
 
         fallback_urls = {str(child.url) for child in TapDeckLinks().children}
-        self.assertIn(TABDECK_LATEST_RELEASE_URL, fallback_urls)
+        self.assertIn(TAPDECK_LATEST_RELEASE_URL, fallback_urls)
         self.assertNotIn(self.release.apk_url, fallback_urls)
 
     def test_approved_public_copy_is_concise_and_factual(self) -> None:
-        embed = build_tabdeck_embed(self.release)
+        embed = build_tapdeck_embed(self.release)
         text = "\n".join(
             [embed.title or "", embed.description or ""]
             + [field.value for field in embed.fields]
@@ -158,19 +159,20 @@ class TapDeckTests(unittest.TestCase):
         self.assertNotIn("automation", text.casefold())
         self.assertNotIn("cached for", text.casefold())
 
-    def test_tabdeck_prefix_respects_custom_server_prefix(self) -> None:
+    def test_tapdeck_prefix_and_slash_names_are_spelled_correctly(self) -> None:
         self.assertEqual(
-            parse_helper_command_argument("b grind", "b", TABDECK_PREFIX_ALIASES),
+            parse_helper_command_argument("b grind", "b", TAPDECK_PREFIX_ALIASES),
             "",
         )
         self.assertEqual(
-            parse_helper_command_argument("btabdeck", "b", TABDECK_PREFIX_ALIASES),
+            parse_helper_command_argument("btapdeck", "b", TAPDECK_PREFIX_ALIASES),
             "",
         )
 
-    def test_compact_tabdeck_aliases_do_not_become_team_queries(self) -> None:
+        self.assertEqual(TapDeckInfo.tapdeck.name, "tapdeck")
+
+    def test_compact_tapdeck_aliases_do_not_become_team_queries(self) -> None:
         self.assertIsNone(parse_team_helper_command("htapdeck", "h"))
-        self.assertIsNone(parse_team_helper_command("htabdeck", "h"))
         self.assertIsNone(parse_team_helper_command("btapdeck", "b"))
         self.assertEqual(
             parse_team_helper_command("ht apdeck", "h"),
@@ -185,13 +187,15 @@ class TapDeckTests(unittest.TestCase):
 
 class PublicSurfaceTests(unittest.TestCase):
     def test_version_and_help_include_the_whole_batch(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.2-beta")
+        self.assertEqual(BOT_VERSION, "0.14.3-beta")
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback
         embed = BossGenerator.build_help_embed(cog, "b", "o")
         text = "\n".join(field.value for field in embed.fields)
         self.assertIn("brng", text)
         self.assertIn("b grind", text)
+        self.assertIn("b tapdeck", text)
+        self.assertIn("/tapdeck", text)
         self.assertIn("Team 1", text)
         self.assertIn("Team 2", text)
         self.assertLessEqual(max(len(field.value) for field in embed.fields), 1024)

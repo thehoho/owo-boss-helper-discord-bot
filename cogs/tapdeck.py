@@ -18,19 +18,17 @@ from .helper_prefix import get_guild_helper_prefix, parse_helper_command_argumen
 
 logger = logging.getLogger(__name__)
 
-TABDECK_REPOSITORY_URL = "https://github.com/thehoho/TabDeck-Lite"
-TABDECK_LATEST_RELEASE_URL = f"{TABDECK_REPOSITORY_URL}/releases/latest"
-TABDECK_LATEST_RELEASE_API_URL = (
-    "https://api.github.com/repos/thehoho/TabDeck-Lite/releases/latest"
+TAPDECK_REPOSITORY_URL = "https://github.com/thehoho/TapDeck-Lite"
+TAPDECK_LATEST_RELEASE_URL = f"{TAPDECK_REPOSITORY_URL}/releases/latest"
+TAPDECK_LATEST_RELEASE_API_URL = (
+    "https://api.github.com/repos/thehoho/TapDeck-Lite/releases/latest"
 )
-TABDECK_PRIVACY_URL = "https://thehoho.github.io/TabDeck-Lite/privacy"
-TABDECK_RELEASE_CACHE_SECONDS = 24 * 60 * 60
-TABDECK_RELEASE_RETRY_SECONDS = 15 * 60
-TABDECK_PREFIX_ALIASES = {
+TAPDECK_PRIVACY_URL = "https://thehoho.github.io/TapDeck-Lite/privacy"
+TAPDECK_RELEASE_CACHE_SECONDS = 24 * 60 * 60
+TAPDECK_RELEASE_RETRY_SECONDS = 15 * 60
+TAPDECK_PREFIX_ALIASES = {
     "h grind",
     "hgrind",
-    "h tabdeck",
-    "htabdeck",
     "h tapdeck",
     "htapdeck",
 }
@@ -75,7 +73,7 @@ def parse_latest_release_payload(payload: Any) -> TapDeckRelease:
         raise TapDeckReleaseError("GitHub's release tag contains unsafe characters.")
     if not isinstance(release_url, str) or not _is_trusted_github_url(
         release_url,
-        "/thehoho/TabDeck-Lite/releases/tag/",
+        "/thehoho/TapDeck-Lite/releases/tag/",
     ):
         raise TapDeckReleaseError("GitHub's release page URL is missing or invalid.")
     if not isinstance(assets, list):
@@ -91,7 +89,7 @@ def parse_latest_release_payload(payload: Any) -> TapDeckRelease:
             continue
         if not isinstance(download_url, str) or not _is_trusted_github_url(
             download_url,
-            "/thehoho/TabDeck-Lite/releases/download/",
+            "/thehoho/TapDeck-Lite/releases/download/",
         ):
             continue
         preferred_name = name.casefold().startswith("tapdeck-lite-")
@@ -120,20 +118,20 @@ class TapDeckReleaseResolver:
         now = time.monotonic()
         if (
             self._cached_release is not None
-            and now - self._cached_at < TABDECK_RELEASE_CACHE_SECONDS
+            and now - self._cached_at < TAPDECK_RELEASE_CACHE_SECONDS
         ):
             return self._cached_release
-        if now - self._last_attempt_at < TABDECK_RELEASE_RETRY_SECONDS:
+        if now - self._last_attempt_at < TAPDECK_RELEASE_RETRY_SECONDS:
             return self._cached_release
 
         async with self._lock:
             now = time.monotonic()
             if (
                 self._cached_release is not None
-                and now - self._cached_at < TABDECK_RELEASE_CACHE_SECONDS
+                and now - self._cached_at < TAPDECK_RELEASE_CACHE_SECONDS
             ):
                 return self._cached_release
-            if now - self._last_attempt_at < TABDECK_RELEASE_RETRY_SECONDS:
+            if now - self._last_attempt_at < TAPDECK_RELEASE_RETRY_SECONDS:
                 return self._cached_release
             self._last_attempt_at = now
 
@@ -143,7 +141,7 @@ class TapDeckReleaseResolver:
                     headers={"User-Agent": "OwO-Boss-Helper/TapDeck-release-check"}
                 ) as session:
                     async with session.get(
-                        TABDECK_LATEST_RELEASE_API_URL,
+                        TAPDECK_LATEST_RELEASE_API_URL,
                         headers={
                             "Accept": "application/vnd.github+json",
                             "X-GitHub-Api-Version": "2022-11-28",
@@ -198,28 +196,28 @@ class TapDeckLinks(discord.ui.View):
                 discord.ui.Button(
                     label="Open latest release",
                     emoji="📱",
-                    url=TABDECK_LATEST_RELEASE_URL,
+                    url=TAPDECK_LATEST_RELEASE_URL,
                 )
             )
         self.add_item(
             discord.ui.Button(
                 label="Public source",
                 emoji="🔍",
-                url=TABDECK_REPOSITORY_URL,
+                url=TAPDECK_REPOSITORY_URL,
             )
         )
         self.add_item(
             discord.ui.Button(
                 label="Privacy",
                 emoji="🔒",
-                url=TABDECK_PRIVACY_URL,
+                url=TAPDECK_PRIVACY_URL,
             )
         )
 
 
-def build_tabdeck_embed(release: TapDeckRelease | None = None) -> discord.Embed:
+def build_tapdeck_embed(release: TapDeckRelease | None = None) -> discord.Embed:
     release_url = (
-        release.release_url if release is not None else TABDECK_LATEST_RELEASE_URL
+        release.release_url if release is not None else TAPDECK_LATEST_RELEASE_URL
     )
     embed = discord.Embed(
         title="📱 TapDeck Lite, one tap, one command",
@@ -284,7 +282,7 @@ class TapDeckInfo(commands.Cog):
         argument = parse_helper_command_argument(
             message.content or "",
             helper_prefix,
-            TABDECK_PREFIX_ALIASES,
+            TAPDECK_PREFIX_ALIASES,
         )
         if argument is None:
             return
@@ -297,7 +295,7 @@ class TapDeckInfo(commands.Cog):
             return
         release = await self.latest_release()
         await message.reply(
-            embed=build_tabdeck_embed(release),
+            embed=build_tapdeck_embed(release),
             view=TapDeckLinks(release),
             mention_author=False,
             allowed_mentions=discord.AllowedMentions.none(),
@@ -308,12 +306,12 @@ class TapDeckInfo(commands.Cog):
             message.guild.id,
         )
 
-    @app_commands.command(name="tabdeck", description="Learn about and download TapDeck Lite for Android.")
-    async def tabdeck(self, interaction: discord.Interaction) -> None:
+    @app_commands.command(name="tapdeck", description="Learn about and download TapDeck Lite for Android.")
+    async def tapdeck(self, interaction: discord.Interaction) -> None:
         await interaction.response.defer()
         release = await self.latest_release()
         await interaction.followup.send(
-            embed=build_tabdeck_embed(release),
+            embed=build_tapdeck_embed(release),
             view=TapDeckLinks(release),
         )
 

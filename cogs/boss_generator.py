@@ -2398,8 +2398,8 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="📱 TapDeck Lite for Android",
             value=(
-                f"Use `{grind_command}`, `{helper_command(helper_prefix, 'tabdeck')}`, "
-                "or `/tabdeck` for the public source, privacy details, and latest GitHub APK "
+                f"Use `{grind_command}`, `{helper_command(helper_prefix, 'tapdeck')}`, "
+                "or `/tapdeck` for the public source, privacy details, and latest GitHub APK "
                 "download. It is a separate one-tap/one-command shortcut keyboard."
             ),
             inline=False,

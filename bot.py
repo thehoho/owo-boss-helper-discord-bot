@@ -115,7 +115,7 @@ async def main() -> None:
         logger.info("Neon weapon scanner loaded")
         await bot.load_extension("cogs.rng")
         logger.info("Random-number helper loaded")
-        await bot.load_extension("cogs.tabdeck")
+        await bot.load_extension("cogs.tapdeck")
         logger.info("TapDeck Lite information card loaded")
         await bot.load_extension("cogs.bot_info")
         logger.info("Bot information and developer statistics loaded")

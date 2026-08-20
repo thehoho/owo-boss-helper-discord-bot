@@ -26,7 +26,7 @@ This update makes Smart replace explicit and confirmation-safe, adds a small inc
 
 ## TapDeck Lite card
 
-- `H Grind`, `H TabDeck`, and `/tabdeck` open the information card.
+- `H Grind`, `H TapDeck`, and `/tapdeck` open the information card.
 - Custom server helper prefixes are respected.
 - The card links to the public source and hosted privacy policy, and resolves the newest APK from GitHub's public latest-release API with a 24-hour in-memory cache.
 - Publicly verifiable repository claims include zero Android permissions, no Internet capability, app-private local command storage, disabled cloud backup, and no ads, analytics, accounts, or tracking.
@@ -48,5 +48,5 @@ This update makes Smart replace explicit and confirmation-safe, adds a small inc
 3. Press **No, choose again** and verify the same saved template returns to team selection.
 4. Test `HRNG 1M`, `HRNG 100K, 2.5M`, and `/rng` with one and two bounds.
 5. Confirm successful RNG output is digits only and lies inside the inclusive range.
-6. Open `H Grind` and `/tabdeck`; verify the newest GitHub release tag, direct APK link, source link, and privacy link.
+6. Open `H Grind` and `/tapdeck`; verify the newest GitHub release tag, direct APK link, source link, and privacy link.
 7. Run `H help` and `H about`; verify the new commands and `0.14.1-beta` version.

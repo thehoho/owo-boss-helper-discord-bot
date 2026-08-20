@@ -1,11 +1,15 @@
 
+## v0.14.3-beta notes
+
+Corrected the TapDeck name everywhere members can read or type it. The information card now opens with `H Grind`, `H TapDeck`, or `/tapdeck`; obsolete misspelled command forms were removed.
+
 ## v0.14.2-beta notes
 
 TapDeck's information card now uses shorter factual wording, while retaining its dynamic latest-release buttons. The team-template parser now requires a separator before free-text name searches, preventing compact commands such as `HTapDeck` from also firing an `HT` team lookup; documented compact team actions and numbered slots remain unchanged.
 
 ## v0.14.1-beta notes
 
-Smart replace now asks members to choose the current active team, Team 1, or Team 2, then confirms and re-fetches the latest OwO message before comparing it. The bot also adds an inclusive `HRNG` / `/rng` randomizer and an `H Grind` / `/tabdeck` information card for the separate open-source TapDeck Lite Android keyboard. Its download button resolves the newest APK from GitHub and caches the result for up to 24 hours.
+Smart replace now asks members to choose the current active team, Team 1, or Team 2, then confirms and re-fetches the latest OwO message before comparing it. The bot also adds an inclusive `HRNG` / `/rng` randomizer and an `H Grind` / `/tapdeck` information card for the separate open-source TapDeck Lite Android keyboard. Its download button resolves the newest APK from GitHub and caches the result for up to 24 hours.
 
 ## v0.14.0-beta notes
 
@@ -80,7 +84,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 
 ### TapDeck Lite Android card
 
-- Opens with `H Grind`, `H TabDeck`, or `/tabdeck`, respecting each server's custom helper prefix.
+- Opens with `H Grind`, `H TapDeck`, or `/tapdeck`, respecting each server's custom helper prefix.
 - Resolves the newest APK from GitHub's public latest-release API, caches it for up to 24 hours, and falls back safely to GitHub's permanent latest-release page.
 - Describes the separate app's one-manual-tap/one-command boundary, offline design, zero-permission manifest, and local-only command storage.
 - Includes a careful rules note and normal Android sideload/third-party-keyboard warning.
