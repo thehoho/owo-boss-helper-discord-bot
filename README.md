@@ -1,4 +1,8 @@
 
+## v0.14.2-beta notes
+
+TapDeck's information card now uses shorter factual wording, while retaining its dynamic latest-release buttons. The team-template parser now requires a separator before free-text name searches, preventing compact commands such as `HTapDeck` from also firing an `HT` team lookup; documented compact team actions and numbered slots remain unchanged.
+
 ## v0.14.1-beta notes
 
 Smart replace now asks members to choose the current active team, Team 1, or Team 2, then confirms and re-fetches the latest OwO message before comparing it. The bot also adds an inclusive `HRNG` / `/rng` randomizer and an `H Grind` / `/tabdeck` information card for the separate open-source TapDeck Lite Android keyboard. Its download button resolves the newest APK from GitHub and caches the result for up to 24 hours.

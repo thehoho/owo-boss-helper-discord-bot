@@ -218,27 +218,16 @@ class TapDeckLinks(discord.ui.View):
 
 
 def build_tabdeck_embed(release: TapDeckRelease | None = None) -> discord.Embed:
-    if release is None:
-        release_line = (
-            "Use **Open latest release** to let GitHub take you to the newest "
-            "available download."
-        )
-        release_url = TABDECK_LATEST_RELEASE_URL
-    else:
-        release_line = (
-            f"Latest GitHub release: **{release.tag_name}**. The APK link was "
-            "resolved directly from GitHub and is cached for up to 24 hours."
-        )
-        release_url = release.release_url
-
+    release_url = (
+        release.release_url if release is not None else TABDECK_LATEST_RELEASE_URL
+    )
     embed = discord.Embed(
-        title="📱 TapDeck Lite — one tap, one command",
+        title="📱 TapDeck Lite, one tap, one command",
         url=release_url,
         description=(
-            "A compact Android shortcut keyboard for command-based Discord chats. "
-            "Configure up to 20 keys, then one manual tap inserts or sends only the "
-            "selected command—never an automated sequence.\n\n"
-            f"{release_line}"
+            "A compact Android shortcut keyboard for command-based Discord chats/bots. "
+            "Configure up to 20 keys, then one manual tap inserts and sends the "
+            "selected command."
         ),
         color=0x70E1B5,
     )
@@ -257,16 +246,15 @@ def build_tabdeck_embed(release: TapDeckRelease | None = None) -> discord.Embed:
         value=(
             "The public source documents **zero Android permissions**, no Internet "
             "capability, no ads/analytics/tracking, disabled cloud backup, and command "
-            "storage only in app-private local preferences. GitHub releases include a "
-            "SHA-256 checksum."
+            "storage only in app-private local preferences."
         ),
         inline=False,
     )
     embed.add_field(
         name="Rules and installation",
         value=(
-            "The demonstrated **one manual tap = one command** workflow was reviewed by "
-            "an OwO administrator and described as following the rules. Rules can change, "
+            "The demonstrated **one tap = one command** workflow was reviewed by an "
+            "OwO administrator and described as following the rules. Rules can change, "
             "so users remain responsible for following current OwO and Discord rules.\n\n"
             "TapDeck Lite is distributed from GitHub rather than Google Play, so Android "
             "will show normal unknown-source and third-party-keyboard warnings. Review the "

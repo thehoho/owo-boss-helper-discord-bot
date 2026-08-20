@@ -25,6 +25,7 @@ from cogs.tabdeck import (
     build_tabdeck_embed,
     parse_latest_release_payload,
 )
+from cogs.team_templates import parse_team_helper_command
 
 
 class RngTests(unittest.TestCase):
@@ -136,17 +137,26 @@ class TapDeckTests(unittest.TestCase):
         self.assertIn(TABDECK_LATEST_RELEASE_URL, fallback_urls)
         self.assertNotIn(self.release.apk_url, fallback_urls)
 
-    def test_verified_public_claims_and_daily_cache_are_visible(self) -> None:
+    def test_approved_public_copy_is_concise_and_factual(self) -> None:
         embed = build_tabdeck_embed(self.release)
         text = "\n".join(
             [embed.title or "", embed.description or ""]
             + [field.value for field in embed.fields]
         )
-        self.assertIn("one tap, one command", text.casefold())
+        self.assertEqual(embed.title, "📱 TapDeck Lite, one tap, one command")
+        self.assertEqual(
+            embed.description,
+            "A compact Android shortcut keyboard for command-based Discord chats/bots. "
+            "Configure up to 20 keys, then one manual tap inserts and sends the "
+            "selected command.",
+        )
+        self.assertIn("one tap = one command", text.casefold())
         self.assertIn("zero android permissions", text.casefold())
         self.assertIn("no internet capability", text.casefold())
-        self.assertIn("cached for up to 24 hours", text.casefold())
         self.assertIn("only if you trust", text.casefold())
+        self.assertNotIn("automated", text.casefold())
+        self.assertNotIn("automation", text.casefold())
+        self.assertNotIn("cached for", text.casefold())
 
     def test_tabdeck_prefix_respects_custom_server_prefix(self) -> None:
         self.assertEqual(
@@ -158,10 +168,24 @@ class TapDeckTests(unittest.TestCase):
             "",
         )
 
+    def test_compact_tabdeck_aliases_do_not_become_team_queries(self) -> None:
+        self.assertIsNone(parse_team_helper_command("htapdeck", "h"))
+        self.assertIsNone(parse_team_helper_command("htabdeck", "h"))
+        self.assertIsNone(parse_team_helper_command("btapdeck", "b"))
+        self.assertEqual(
+            parse_team_helper_command("ht apdeck", "h"),
+            ("open_query", "apdeck"),
+        )
+        self.assertEqual(
+            parse_team_helper_command("htc raid", "h"),
+            ("create", "raid"),
+        )
+        self.assertEqual(parse_team_helper_command("ht3", "h"), ("open", "3"))
+
 
 class PublicSurfaceTests(unittest.TestCase):
     def test_version_and_help_include_the_whole_batch(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.1-beta")
+        self.assertEqual(BOT_VERSION, "0.14.2-beta")
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback
         embed = BossGenerator.build_help_embed(cog, "b", "o")

@@ -200,7 +200,9 @@ def parse_team_helper_command(
     if prefix is None:
         return None
 
-    rest = text[len(prefix):].strip()
+    raw_remainder = text[len(prefix):]
+    attached_remainder = bool(raw_remainder and not raw_remainder[0].isspace())
+    rest = raw_remainder.strip()
     if not rest:
         return "list", None
     if rest.isdigit():
@@ -212,6 +214,8 @@ def parse_team_helper_command(
         re.IGNORECASE,
     )
     if not action_match:
+        if attached_remainder:
+            return None
         return "open_query", rest
 
     action = action_match.group(1).lower()

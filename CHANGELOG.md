@@ -1,3 +1,11 @@
+## v0.14.2-beta - TapDeck Command Hotfix
+
+- Replaced the TapDeck card with concise factual wording and removed the unnecessary automation comparison and cache implementation detail from the public message.
+- Kept the dynamic latest-release and APK buttons unchanged.
+- Changed compact team parsing so arbitrary name searches require a separator, preventing `HTapDeck` / `HTabDeck` from also firing an `HT` team lookup.
+- Preserved documented compact team actions such as `HTC`, `HTD`, and numbered slots such as `HT3`.
+- Updated the public version to `0.14.2-beta`; no database migration or new permission is required.
+
 ## v0.14.1-beta - Confirmed Smart Replace, RNG, and TapDeck Lite
 
 - Changed Smart replace selection to show the configured OwO commands for the current active team, Team 1, and Team 2.
