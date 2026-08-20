@@ -2291,6 +2291,8 @@ class BossGenerator(commands.Cog):
         team_short = helper_alias(helper_prefix, "ht")
         weapon_short = helper_alias(helper_prefix, "hw")
         dex_short = helper_alias(helper_prefix, "hwd")
+        rng_short = helper_alias(helper_prefix, "hrng")
+        grind_command = helper_command(helper_prefix, "grind")
 
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
@@ -2342,8 +2344,9 @@ class BossGenerator(commands.Cog):
                 f"`{team_short}<number>` to open, `{team_short} U <slot/name>` to "
                 f"update, `{team_short} D <slot/name>` to delete, and "
                 f"`{team_short} help` for the full guide. A saved team's **Smart "
-                "replace** button scans the current OwO team and shows only required "
-                "animal or weapon changes."
+                "replace** button lets the member choose the active team, Team 1, or "
+                "Team 2, confirms the exact OwO page, then shows only required animal "
+                "or weapon changes."
             ),
             inline=False,
         )
@@ -2380,6 +2383,24 @@ class BossGenerator(commands.Cog):
                 f"`{dex_short} skip` for missing weapons and "
                 f"`{helper_command(helper_prefix, 'stop')}` to pause. "
                 f"`{weapon_short} stats` shows queue totals."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🎲 Random number",
+            value=(
+                f"Use `{rng_short} <maximum>` or `{rng_short} <minimum>, <maximum>`, "
+                f"or `/rng`. Compact values work, for example `{rng_short} 1M` and "
+                f"`{rng_short} 100K, 2.5M`; the result is posted as full digits."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="📱 TapDeck Lite for Android",
+            value=(
+                f"Use `{grind_command}`, `{helper_command(helper_prefix, 'tabdeck')}`, "
+                "or `/tabdeck` for the public source, privacy details, and latest GitHub APK "
+                "download. It is a separate one-tap/one-command shortcut keyboard."
             ),
             inline=False,
         )

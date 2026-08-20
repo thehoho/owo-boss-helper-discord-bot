@@ -1,4 +1,8 @@
 
+## v0.14.1-beta notes
+
+Smart replace now asks members to choose the current active team, Team 1, or Team 2, then confirms and re-fetches the latest OwO message before comparing it. The bot also adds an inclusive `HRNG` / `/rng` randomizer and an `H Grind` / `/tabdeck` information card for the separate open-source TapDeck Lite Android keyboard. Its download button resolves the newest APK from GitHub and caches the result for up to 24 hours.
+
 ## v0.14.0-beta notes
 
 Saved teams now include **Smart replace**. It asks the member to show their active OwO team, compares all three animal positions and exact weapon IDs, preserves everything already correct, resolves position swaps safely, and guides only the required commands. Animal adds are immediately followed by their weapon equips to use the team-cooldown window, while weapon commands alternate `ww` / `wuse` / `ww` in both Smart replace and **All commands**.
@@ -54,7 +58,8 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Reads animal identity from the OwO emoji alias rather than a renameable nickname.
 - Normalizes standard aliases such as `gfish → fish`, `gspider → spider`, and `hlizard → lizard`.
 - Preserves unknown custom-pet aliases exactly.
-- Supports difference-only Smart replace, full-packet All commands, and Exact reset.
+- Supports confirmation-safe Smart replace for the active team, Team 1, or Team 2; the confirmation re-fetches button-edited OwO messages before planning.
+- Keeps full-packet All commands and Exact reset available.
 - Guides users one command at a time, waits for OwO's response, and pauses only when the next step shares the same team or weapon cooldown.
 - Places each required weapon equip immediately after its animal add so members can use the five-second team-cooldown window efficiently.
 - Alternates weapon equips `ww` / `wuse` / `ww` in Smart replace, Exact reset, and the full **All commands** packet.
@@ -62,6 +67,19 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Supports concurrent guided sessions by server, channel, and user.
 - Handles already-present animals, occupied positions, missing weapons, retries, skips, and cancellations.
 - Can optionally clean completed command messages when the bot has **Manage Messages**.
+
+### Random number helper
+
+- Rolls an inclusive whole number with `/rng` or prefix commands such as `HRNG 1M` and `HRNG 100K, 2.5M`.
+- Accepts full integers plus K, M, B, and T abbreviations without floating-point rounding.
+- Treats one value as the maximum with a default minimum of 1 and posts successful results as digits only.
+
+### TapDeck Lite Android card
+
+- Opens with `H Grind`, `H TabDeck`, or `/tabdeck`, respecting each server's custom helper prefix.
+- Resolves the newest APK from GitHub's public latest-release API, caches it for up to 24 hours, and falls back safely to GitHub's permanent latest-release page.
+- Describes the separate app's one-manual-tap/one-command boundary, offline design, zero-permission manifest, and local-only command storage.
+- Includes a careful rules note and normal Android sideload/third-party-keyboard warning.
 
 ### Public animal Dex catalog
 

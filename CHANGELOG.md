@@ -1,3 +1,13 @@
+## v0.14.1-beta - Confirmed Smart Replace, RNG, and TapDeck Lite
+
+- Changed Smart replace selection to show the configured OwO commands for the current active team, Team 1, and Team 2.
+- Added an owner-only **Yes, replace this team** / **No, choose again** confirmation after the official OwO team response.
+- Re-fetches and reparses the latest OwO message on confirmation, so OwO's button-edited team page—not a stale first page—drives the difference-only plan.
+- Uses only the remaining portion of the team cooldown after confirmation instead of always waiting another full five seconds.
+- Added isolated `HRNG` / `H RNG` and `/rng` commands with inclusive one- or two-bound rolls, full integers, and K/M/B/T abbreviations.
+- Added `H Grind`, `H TabDeck`, and `/tabdeck` with verified public-source and privacy links plus a daily-cached GitHub lookup for the newest TapDeck Lite APK.
+- Updated `H help`, `H about`, README, tests, and the public version to `0.14.1-beta`.
+- No database migration or additional Discord permission is required.
 ## v0.14.0-beta - Smart Team Replacement
 
 - Replaced the saved-team **Quick replace** button with **Smart replace**.

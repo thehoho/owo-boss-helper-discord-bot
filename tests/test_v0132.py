@@ -146,13 +146,13 @@ class SmartReplacePlannerTests(unittest.TestCase):
 
 class SmartReplaceCommandTests(unittest.TestCase):
     def test_release_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.0-beta")
+        self.assertEqual(BOT_VERSION, "0.14.1-beta")
 
     def test_team_display_commands_respect_configured_prefix(self) -> None:
-        for command in ("otm", "oteam", "oteam display", "oteams", "osetteam 2"):
+        for command in ("otm", "oteam", "oteam display", "osetteam 1", "osetteam 2"):
             with self.subTest(command=command):
                 self.assertTrue(is_smart_team_display_command(command, "o"))
-        for command in ("wtm", "otm a snake 1", "osetteam 9", "obattle"):
+        for command in ("wtm", "oteams", "otm a snake 1", "osetteam 3", "osetteam 9", "obattle"):
             with self.subTest(command=command):
                 self.assertFalse(is_smart_team_display_command(command, "o"))
 
@@ -292,6 +292,8 @@ class _FakeChannel:
         self.id = channel_id
         self.sent: list[dict[str, object]] = []
         self.partials: dict[int, _FakePartialMessage] = {}
+        self.fetched: dict[int, object] = {}
+        self.fetch_calls: list[int] = []
 
     async def send(self, content: str | None = None, **kwargs: object) -> SimpleNamespace:
         self.sent.append({"content": content, **kwargs})
@@ -299,6 +301,34 @@ class _FakeChannel:
 
     def get_partial_message(self, message_id: int) -> _FakePartialMessage:
         return self.partials.setdefault(message_id, _FakePartialMessage())
+
+    async def fetch_message(self, message_id: int) -> object:
+        self.fetch_calls.append(message_id)
+        return self.fetched[message_id]
+
+
+class _FakeInteractionResponse:
+    def __init__(self) -> None:
+        self.deferred = False
+
+    async def defer(self, *, ephemeral: bool = False) -> None:
+        self.deferred = ephemeral
+
+
+class _FakeFollowup:
+    def __init__(self) -> None:
+        self.sent: list[tuple[str, bool]] = []
+
+    async def send(self, content: str, *, ephemeral: bool = False) -> None:
+        self.sent.append((content, ephemeral))
+
+
+class _FakeInteraction:
+    def __init__(self, channel: _FakeChannel) -> None:
+        self.channel = channel
+        self.response = _FakeInteractionResponse()
+        self.followup = _FakeFollowup()
+        self.message = None
 
 
 class _FakeStore:
@@ -312,7 +342,7 @@ class _FakeStore:
 
 
 class SmartReplaceIntegrationTests(unittest.IsolatedAsyncioTestCase):
-    async def test_official_team_reply_starts_difference_only_guided_session(self) -> None:
+    async def test_confirmation_refetches_latest_button_edited_team(self) -> None:
         target = saved_template(
             team_member(1, "snake", "AAA111"),
             team_member(2, "eagle", "BBB222"),
@@ -322,7 +352,7 @@ class SmartReplaceIntegrationTests(unittest.IsolatedAsyncioTestCase):
         cog = TeamTemplates(SimpleNamespace())
         cog.store = _FakeStore(target)
         key = cog.guided_key(10, channel.id, target.user_id)
-        cog.smart_replace_scans[key] = SmartReplaceScanSession(
+        scan = SmartReplaceScanSession(
             user_id=target.user_id,
             guild_id=10,
             channel_id=channel.id,
@@ -336,7 +366,8 @@ class SmartReplaceIntegrationTests(unittest.IsolatedAsyncioTestCase):
             command_sent_at=time.monotonic(),
             display_command="wtm",
         )
-        payload = """
+        cog.smart_replace_scans[key] = scan
+        first_payload = """
 Hassaan's team
 owo team add {animal} {pos}
 [1] <:hsnake:100> Snake
@@ -347,8 +378,9 @@ OLD222 <:weapon:103> 98%
 CCC333 <:weapon:105> 97%
 Current Streak: 0
 """
-        message = SimpleNamespace(
-            content=payload,
+        first_message = SimpleNamespace(
+            id=77,
+            content=first_payload,
             embeds=[],
             components=[],
             guild=SimpleNamespace(id=10),
@@ -357,14 +389,44 @@ Current Streak: 0
             mentions=[],
         )
 
-        handled = await cog.handle_smart_replace_owo_team(message)
+        handled = await cog.handle_smart_replace_owo_team(first_message)
 
         self.assertTrue(handled)
-        self.assertNotIn(key, cog.smart_replace_scans)
-        self.assertEqual(
-            cog.guided_sessions[key].commands,
-            ("ww AAA111 snake", "wuse BBB222 eagle"),
+        self.assertIn(key, cog.smart_replace_scans)
+        self.assertNotIn(key, cog.guided_sessions)
+        self.assertEqual(scan.owo_response_message_id, 77)
+        self.assertIn("Is this the OwO team", str(channel.sent[-1]["content"]))
+
+        # Simulate the member using OwO's own message buttons before confirming.
+        latest_payload = """
+Hassaan's team
+owo team add {animal} {pos}
+[1] <:hsnake:100> Snake
+OLD111 <:weapon:101> 99%
+[2] <:deagle:102> Eagle
+BBB222 <:weapon:103> 98%
+[3] <:customowo:104> 4millionowo
+CCC333 <:weapon:105> 97%
+Current Streak: 0
+"""
+        channel.fetched[77] = SimpleNamespace(
+            id=77,
+            content=latest_payload,
+            embeds=[],
+            components=[],
         )
+        interaction = _FakeInteraction(channel)
+        await cog.confirm_smart_replace_from_interaction(
+            interaction,
+            key,
+            scan,
+            77,
+        )
+
+        self.assertEqual(channel.fetch_calls, [77])
+        self.assertTrue(interaction.response.deferred)
+        self.assertNotIn(key, cog.smart_replace_scans)
+        self.assertEqual(cog.guided_sessions[key].commands, ("ww AAA111 snake",))
         self.assertIn("`ww AAA111 snake`", str(channel.sent[-1]["content"]))
         await cog.cog_unload()
         await asyncio.sleep(0)

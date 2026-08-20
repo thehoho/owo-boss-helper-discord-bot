@@ -333,6 +333,7 @@ class SmartReplaceScanSession:
     prompt_message_id: int | None = None
     command_sent_at: float = 0.0
     display_command: str = ""
+    owo_response_message_id: int | None = None
     last_activity: float = 0.0
 
 
@@ -764,13 +765,29 @@ def build_smart_replace_plan(
 
 
 def is_smart_team_display_command(value: str, owo_prefix: str) -> bool:
-    """Accept the non-destructive OwO commands that display one current team."""
+    """Accept the three Smart replace choices, plus the full current-team alias."""
     normalized = normalize_owo_command(value)
     prefix = re.escape(owo_prefix or OWO_PREFIX_DEFAULT)
     return bool(
         re.fullmatch(rf"{prefix}(?:tm|team)(?:\s+display)?", normalized)
-        or re.fullmatch(rf"{prefix}(?:teams|squads)", normalized)
-        or re.fullmatch(rf"{prefix}(?:setteam|useteams)\s+[1-3]", normalized)
+        or re.fullmatch(rf"{prefix}setteam\s+[12]", normalized)
+    )
+
+
+def smart_replace_selection_text(session: SmartReplaceScanSession) -> str:
+    prefix = session.owo_prefix or OWO_PREFIX_DEFAULT
+    cancel = helper_alias(session.helper_prefix, "ht")
+    return (
+        f"<@{session.user_id}> 🧠 **Smart replace — team "
+        f"#{session.template_slot} `{session.template_name}`**\n"
+        "Choose the OwO team you want to replace by sending one command:\n"
+        f"`{owo_team_command(prefix)}` — current active team\n"
+        f"`{prefix}setteam 1` — Team 1\n"
+        f"`{prefix}setteam 2` — Team 2\n\n"
+        "After OwO shows it, you can switch the displayed team with OwO's own "
+        "buttons. I will ask for confirmation and re-read the latest version of "
+        "that OwO message before comparing anything.\n"
+        f"Use `{cancel} cancel` to stop."
     )
 
 
@@ -1652,6 +1669,64 @@ class GuidedStepView(discord.ui.View):
         )
 
 
+class SmartReplaceConfirmView(discord.ui.View):
+    """Confirm the exact, possibly button-edited OwO team before planning."""
+
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        session: SmartReplaceScanSession,
+        response_message_id: int,
+    ) -> None:
+        super().__init__(timeout=SMART_REPLACE_SCAN_TIMEOUT_SECONDS)
+        self.cog = cog
+        self.owner_id = session.user_id
+        self.key = cog.guided_key(
+            session.guild_id, session.channel_id, session.user_id
+        )
+        self.session = session
+        self.response_message_id = response_message_id
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.owner_id:
+            return True
+        await interaction.response.send_message(
+            "This Smart replace confirmation belongs to another user.",
+            ephemeral=True,
+        )
+        return False
+
+    @discord.ui.button(
+        label="Yes, replace this team",
+        emoji="✅",
+        style=discord.ButtonStyle.success,
+    )
+    async def confirm(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await self.cog.confirm_smart_replace_from_interaction(
+            interaction,
+            self.key,
+            self.session,
+            self.response_message_id,
+        )
+
+    @discord.ui.button(
+        label="No, choose again",
+        emoji="↩️",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def choose_again(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        await self.cog.retry_smart_replace_selection_from_interaction(
+            interaction,
+            self.key,
+            self.session,
+            self.response_message_id,
+        )
+
+
 class MissingWeaponConfirmView(OwnedView):
     """Require an explicit choice before saving a team with missing weapons."""
 
@@ -1740,9 +1815,8 @@ class TemplateActionView(OwnedView):
         await interaction.response.send_message(
             (
                 f"🧠 **Smart replace — #{self.template.slot} {self.template.name}**\n"
-                f"Follow the new prompt in this channel and send `{owo_team_command(owo_prefix)}`. "
-                "I will compare OwO's current team page with this saved team, then show "
-                "only the animal moves and weapon changes you actually need."
+                "Follow the new prompt in this channel, choose the current team, Team 1, "
+                "or Team 2, then confirm the exact OwO team message before I compare it."
             ),
             ephemeral=True,
         )
@@ -2377,16 +2451,7 @@ class TeamTemplates(commands.Cog):
         self.smart_replace_scans[key] = session
         self.reset_smart_replace_timeout(key, session)
         prompt = await channel.send(
-            (
-                f"<@{session.user_id}> 🧠 **Smart replace — team "
-                f"#{session.template_slot} `{session.template_name}`**\n"
-                "Show the active team you want to update by sending:\n"
-                f"# `{owo_team_command(owo_prefix)}`\n"
-                "Wait for the official OwO reply. I will scan its three positions and "
-                "weapon IDs, keep everything already correct, and start a guided session "
-                "containing only the required changes.\n"
-                f"Use `{helper_alias(helper_prefix, 'ht')} cancel` to stop."
-            ),
+            smart_replace_selection_text(session),
             allowed_mentions=discord.AllowedMentions(
                 users=True, roles=False, everyone=False, replied_user=False
             ),
@@ -2733,8 +2798,13 @@ class TeamTemplates(commands.Cog):
         found = self.find_smart_replace_scan_for_owo_message(message, text)
         if found is None:
             return False
-        key, scan, parsed = found
-        self.clear_smart_replace_scan(key)
+        key, scan, _ = found
+
+        scan.ready_for_user = False
+        scan.waiting_for_owo = False
+        scan.owo_response_message_id = message.id
+        scan.last_activity = time.monotonic()
+        self.reset_smart_replace_timeout(key, scan)
 
         if DELETE_CONFIRMED_USER_COMMANDS:
             await self.delete_message_safely(
@@ -2742,30 +2812,166 @@ class TeamTemplates(commands.Cog):
                 scan.command_message_id,
                 member_message=True,
             )
+        scan.command_message_id = None
 
+        prompt = await message.channel.send(
+            (
+                f"<@{scan.user_id}> **Is this the OwO team you want to replace with "
+                f"saved team #{scan.template_slot} `{scan.template_name}`?**\n"
+                "If needed, use OwO's own team-switch buttons on its message first. "
+                "When you press **Yes**, I will fetch and parse that message again so "
+                "the comparison uses the team currently displayed—not the first page I saw."
+            ),
+            view=SmartReplaceConfirmView(self, scan, message.id),
+            allowed_mentions=discord.AllowedMentions(
+                users=True, roles=False, everyone=False, replied_user=False
+            ),
+        )
+        scan.prompt_message_id = prompt.id
+        logger.info(
+            "Waiting for Smart replace confirmation from user %s for OwO message %s",
+            scan.user_id,
+            message.id,
+        )
+        return True
+
+    def rearm_smart_replace_selection(
+        self,
+        key: tuple[int, int, int],
+        scan: SmartReplaceScanSession,
+    ) -> None:
+        scan.ready_for_user = True
+        scan.waiting_for_owo = False
+        scan.command_message_id = None
+        scan.command_sent_at = 0.0
+        scan.display_command = ""
+        scan.owo_response_message_id = None
+        scan.last_activity = time.monotonic()
+        self.reset_smart_replace_timeout(key, scan)
+
+    async def retry_smart_replace_selection_from_interaction(
+        self,
+        interaction: discord.Interaction,
+        key: tuple[int, int, int],
+        scan: SmartReplaceScanSession,
+        response_message_id: int,
+    ) -> None:
+        current = self.smart_replace_scans.get(key)
+        if (
+            current is not scan
+            or scan.owo_response_message_id != response_message_id
+        ):
+            await interaction.response.send_message(
+                "That Smart replace confirmation is no longer active.", ephemeral=True
+            )
+            return
+        self.rearm_smart_replace_selection(key, scan)
+        await interaction.response.edit_message(
+            content=smart_replace_selection_text(scan),
+            view=None,
+            allowed_mentions=discord.AllowedMentions(
+                users=True, roles=False, everyone=False, replied_user=False
+            ),
+        )
+
+    async def confirm_smart_replace_from_interaction(
+        self,
+        interaction: discord.Interaction,
+        key: tuple[int, int, int],
+        scan: SmartReplaceScanSession,
+        response_message_id: int,
+    ) -> None:
+        current = self.smart_replace_scans.get(key)
+        if (
+            current is not scan
+            or scan.owo_response_message_id != response_message_id
+        ):
+            await interaction.response.send_message(
+                "That Smart replace confirmation is no longer active.", ephemeral=True
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        channel = interaction.channel
+        fetch_message = getattr(channel, "fetch_message", None)
+        if channel is None or fetch_message is None:
+            self.rearm_smart_replace_selection(key, scan)
+            await interaction.followup.send(
+                "I could not re-read that OwO message here. Choose the team again.",
+                ephemeral=True,
+            )
+            if interaction.message:
+                await interaction.message.edit(
+                    content=smart_replace_selection_text(scan), view=None
+                )
+            return
+
+        try:
+            latest_owo_message = await fetch_message(response_message_id)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            self.rearm_smart_replace_selection(key, scan)
+            await interaction.followup.send(
+                "That OwO team message is no longer available. Choose the team again.",
+                ephemeral=True,
+            )
+            if interaction.message:
+                await interaction.message.edit(
+                    content=smart_replace_selection_text(scan), view=None
+                )
+            return
+
+        parsed = parse_team_message_detailed(extract_message_text(latest_owo_message))
+        if parsed is None:
+            self.rearm_smart_replace_selection(key, scan)
+            await interaction.followup.send(
+                "The latest version of that message is not a readable OwO team page. "
+                "Choose the team again.",
+                ephemeral=True,
+            )
+            if interaction.message:
+                await interaction.message.edit(
+                    content=smart_replace_selection_text(scan), view=None
+                )
+            return
+
+        self.clear_smart_replace_scan(key)
+        await self.delete_message_safely(channel, scan.prompt_message_id)
+        await interaction.followup.send(
+            "✅ Confirmed. I re-read the latest OwO team message and am building the difference-only plan.",
+            ephemeral=True,
+        )
+        await self.start_confirmed_smart_replace_plan(channel, key, scan, parsed)
+
+    async def start_confirmed_smart_replace_plan(
+        self,
+        channel: discord.abc.Messageable,
+        key: tuple[int, int, int],
+        scan: SmartReplaceScanSession,
+        parsed: ParsedTeamMessage,
+    ) -> None:
         template = await self.store.get(scan.user_id, scan.template_id)
         if template is None:
-            await message.channel.send(
+            await channel.send(
                 f"<@{scan.user_id}> ⚠️ That saved team was changed or deleted. Open it again and restart Smart replace.",
                 allowed_mentions=discord.AllowedMentions(
                     users=True, roles=False, everyone=False, replied_user=False
                 ),
             )
-            return True
+            return
 
         try:
             plan = build_smart_replace_plan(template, parsed.members, scan.owo_prefix)
         except SmartReplacePlanningError as exc:
-            await message.channel.send(
+            await channel.send(
                 f"<@{scan.user_id}> ⚠️ **Smart replace could not build a safe plan:** {exc}",
                 allowed_mentions=discord.AllowedMentions(
                     users=True, roles=False, everyone=False, replied_user=False
                 ),
             )
-            return True
+            return
 
         if not plan.commands:
-            await message.channel.send(
+            await channel.send(
                 (
                     f"<@{scan.user_id}> ✅ **Team #{template.slot} `{template.name}` already matches.**\n"
                     "Every saved animal position and weapon ID is already correct. "
@@ -2775,7 +2981,7 @@ class TeamTemplates(commands.Cog):
                     users=True, roles=False, everyone=False, replied_user=False
                 ),
             )
-            return True
+            return
 
         guided = GuidedTeamSession(
             user_id=scan.user_id,
@@ -2800,15 +3006,17 @@ class TeamTemplates(commands.Cog):
             if plan.already_correct_positions
             else "none"
         )
-        initial_delay = smart_replace_transition_delay(
+        cooldown = smart_replace_transition_delay(
             scan.display_command, guided.commands[0]
         )
+        elapsed = max(0.0, time.monotonic() - scan.command_sent_at)
+        initial_delay = max(0.0, cooldown - elapsed)
         wait_text = (
-            f"\n⏳ Waiting **{int(initial_delay)} seconds** before the first team edit so OwO's team cooldown can clear."
+            f"\n⏳ Waiting **{int(initial_delay + 0.999)} seconds** before the first team edit so OwO's team cooldown can clear."
             if initial_delay
             else ""
         )
-        await message.channel.send(
+        await channel.send(
             (
                 f"<@{scan.user_id}> 🧠 **Smart scan complete for team #{template.slot} `{template.name}`.**\n"
                 f"Already-correct animal positions: **{correct_text}**\n"
@@ -2825,16 +3033,16 @@ class TeamTemplates(commands.Cog):
         if initial_delay:
             await asyncio.sleep(initial_delay)
             if self.guided_sessions.get(key) is not guided:
-                return True
+                return
 
-        await self.send_guided_step(message.channel, guided)
+        await self.send_guided_step(channel, guided)
         logger.info(
-            "Built Smart replace plan for user %s: %s team edits, %s weapon changes",
+            "Built confirmed Smart replace plan for user %s: %s team edits, %s weapon changes",
             scan.user_id,
             plan.team_change_count,
             plan.weapon_change_count,
         )
-        return True
+        return
 
     def find_guided_session_for_owo_message(
         self, message: discord.Message, text: str

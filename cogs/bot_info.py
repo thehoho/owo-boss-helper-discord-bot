@@ -38,7 +38,7 @@ TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.14.0-beta"
+BOT_VERSION = "0.14.1-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -646,8 +646,9 @@ class BotInfo(commands.Cog):
             value=(
                 "• Ordered Neon boss commands with detected HP\n"
                 "• Guild-boss timing and cooldown alerts\n"
-                "• Exact weapon-ID team templates with Smart replace\n"
-                "• Per-server boss-ticket boards in channels or threads"
+                "• Exact weapon-ID team templates with confirmed Smart replace\n"
+                "• Per-server boss-ticket boards in channels or threads\n"
+                "• Community RNG and the TapDeck Lite Android information card"
             ),
             inline=False,
         )
