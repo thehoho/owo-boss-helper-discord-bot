@@ -4,10 +4,12 @@ import asyncio
 import time
 import unittest
 from types import SimpleNamespace
+from unittest.mock import patch
 
 from cogs.bot_info import BOT_VERSION
 from cogs.team_templates import (
     SMART_REPLACE_TEAM_DELAY_SECONDS,
+    GuidedTeamSession,
     SmartReplacePlanningError,
     SmartReplaceScanSession,
     TeamMember,
@@ -19,6 +21,7 @@ from cogs.team_templates import (
     interleaved_member_commands,
     is_smart_team_display_command,
     parse_team_message_detailed,
+    smart_replace_selection_text,
     smart_replace_transition_delay,
 )
 
@@ -82,6 +85,33 @@ class SmartReplacePlannerTests(unittest.TestCase):
         self.assertEqual(plan.weapon_change_count, 0)
         self.assertEqual(plan.already_correct_positions, (3,))
 
+    def test_swap_with_weapon_changes_uses_available_weapon_between_team_edits(self) -> None:
+        target = saved_template(
+            team_member(1, "snake", "AAA111"),
+            team_member(2, "eagle", "BBB222"),
+            team_member(3, "owo", "CCC333"),
+        )
+        current = (
+            team_member(1, "eagle", "OLD111"),
+            team_member(2, "snake", "OLD222"),
+            team_member(3, "owo", "OLD333"),
+        )
+
+        plan = build_smart_replace_plan(target, current)
+
+        self.assertEqual(
+            plan.commands,
+            (
+                "ww AAA111 snake",
+                "wtm d 2",
+                "wuse BBB222 eagle",
+                "wtm a snake 1",
+                "ww CCC333 owo",
+                "wtm a eagle 2",
+            ),
+        )
+        for previous, following in zip(plan.commands, plan.commands[1:]):
+            self.assertEqual(smart_replace_transition_delay(previous, following), 0)
     def test_three_animal_cycle_needs_one_delete_and_three_adds(self) -> None:
         target = saved_template(
             team_member(1, "snake", "AAA111"),
@@ -118,10 +148,10 @@ class SmartReplacePlannerTests(unittest.TestCase):
         self.assertEqual(
             plan.commands,
             (
-                "wtm a eagle 2",
                 "ww BBB222 eagle",
-                "wtm a owo 3",
+                "wtm a eagle 2",
                 "wuse CCC333 owo",
+                "wtm a owo 3",
             ),
         )
         self.assertEqual(plan.team_change_count, 2)
@@ -146,15 +176,47 @@ class SmartReplacePlannerTests(unittest.TestCase):
 
 class SmartReplaceCommandTests(unittest.TestCase):
     def test_release_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.3-beta")
+        self.assertEqual(BOT_VERSION, "0.14.4-beta")
 
     def test_team_display_commands_respect_configured_prefix(self) -> None:
-        for command in ("otm", "oteam", "oteam display", "osetteam 1", "osetteam 2"):
+        for command in (
+            "otm",
+            "oteam",
+            "oteam display",
+            "osetteam 1",
+            "osetteam 2",
+            "oteams 1",
+            "oteams 2",
+        ):
             with self.subTest(command=command):
                 self.assertTrue(is_smart_team_display_command(command, "o"))
-        for command in ("wtm", "oteams", "otm a snake 1", "osetteam 3", "osetteam 9", "obattle"):
+        self.assertTrue(is_smart_team_display_command("owoteams 1", "owo"))
+        for command in (
+            "wtm",
+            "oteams",
+            "oteams 3",
+            "otm a snake 1",
+            "osetteam 3",
+            "osetteam 9",
+            "obattle",
+        ):
             with self.subTest(command=command):
                 self.assertFalse(is_smart_team_display_command(command, "o"))
+
+    def test_selection_text_lists_both_numbered_team_aliases(self) -> None:
+        session = SmartReplaceScanSession(
+            user_id=42,
+            guild_id=10,
+            channel_id=20,
+            template_id=7,
+            template_slot=1,
+            template_name="Boss team",
+            identity_tokens=("hassaan",),
+            owo_prefix="o",
+        )
+        text = smart_replace_selection_text(session)
+        self.assertIn("`osetteam 1` or `oteams 1`", text)
+        self.assertIn("`osetteam 2` or `oteams 2`", text)
 
     def test_shared_team_commands_wait_but_weapon_aliases_can_alternate(self) -> None:
         self.assertEqual(
@@ -186,11 +248,14 @@ class SmartReplaceCommandTests(unittest.TestCase):
         self.assertEqual(
             plan.commands,
             (
-                "wtm a snake 1",
                 "ww AAA111 snake",
-                "wtm a eagle 2",
+                "wtm a snake 1",
                 "wuse BBB222 eagle",
+                "wtm a eagle 2",
             ),
+        )
+        self.assertEqual(
+            smart_replace_transition_delay("wtm", plan.commands[0]), 0
         )
         self.assertEqual(
             smart_replace_transition_delay(plan.commands[0], plan.commands[1]), 0
@@ -248,6 +313,22 @@ class SmartReplaceCommandTests(unittest.TestCase):
             ),
             "success",
         )
+
+    def test_refreshed_two_animal_page_confirms_delete(self) -> None:
+        payload = """
+Hassaan's team
+owo team remove {animal}
+[1] <:hsnake:100> Snake
+AAA111 <:weapon:101> 99%
+[3] <:customowo:104> 4millionowo
+CCC333 <:weapon:105> 97%
+Current Streak: 0
+"""
+        self.assertEqual(
+            classify_team_confirmation(payload, "wtm d 2"),
+            "success",
+        )
+        self.assertIsNone(classify_team_confirmation(payload, "wtm d 1"))
 
     def test_team_page_parser_keeps_positions_and_weapon_ids(self) -> None:
         payload = """
@@ -428,5 +509,60 @@ Current Streak: 0
         self.assertNotIn(key, cog.smart_replace_scans)
         self.assertEqual(cog.guided_sessions[key].commands, ("ww AAA111 snake",))
         self.assertIn("`ww AAA111 snake`", str(channel.sent[-1]["content"]))
+        await cog.cog_unload()
+        await asyncio.sleep(0)
+    async def test_delete_refresh_advances_and_shows_cooldown_status(self) -> None:
+        channel = _FakeChannel(20)
+        cog = TeamTemplates(SimpleNamespace())
+        key = cog.guided_key(10, channel.id, 42)
+        session = GuidedTeamSession(
+            user_id=42,
+            guild_id=10,
+            channel_id=channel.id,
+            template_id=7,
+            template_slot=1,
+            template_name="Boss team",
+            identity_tokens=("hassaan",),
+            mode="Smart replace",
+            commands=("wtm d 2", "wtm a eagle 2"),
+            waiting_for_owo=True,
+            command_message_id=55,
+            command_sent_at=time.monotonic(),
+            last_activity=time.monotonic(),
+        )
+        cog.guided_sessions[key] = session
+        payload = """
+Hassaan's team
+owo team remove {animal}
+[1] <:hsnake:100> Snake
+AAA111 <:weapon:101> 99%
+[3] <:customowo:104> 4millionowo
+CCC333 <:weapon:105> 97%
+Current Streak: 0
+"""
+        message = SimpleNamespace(
+            id=88,
+            content=payload,
+            embeds=[],
+            components=[],
+            guild=SimpleNamespace(id=10),
+            channel=channel,
+            reference=SimpleNamespace(message_id=55),
+            mentions=[],
+        )
+
+        with patch(
+            "cogs.team_templates.SMART_REPLACE_TEAM_DELAY_SECONDS", 0.01
+        ):
+            handled = await cog.handle_guided_owo_confirmation(message)
+
+        self.assertTrue(handled)
+        self.assertEqual(session.next_index, 1)
+        self.assertEqual(session.expected_command, "wtm a eagle 2")
+        self.assertIn("OwO confirmed `wtm d 2`", str(channel.sent[-2]["content"]))
+        self.assertIn("team cooldown", str(channel.sent[-2]["content"]))
+        self.assertIn("`wtm a eagle 2`", str(channel.sent[-1]["content"]))
+        self.assertTrue(channel.partials[55].deleted)
+        self.assertTrue(channel.partials[1001].deleted)
         await cog.cog_unload()
         await asyncio.sleep(0)

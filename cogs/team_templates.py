@@ -728,37 +728,31 @@ def build_smart_replace_plan(
             continue
         weapon_targets[animal_key] = target
 
-    commands: list[str] = []
-    equipped_animals: set[str] = set()
-    weapon_index = 0
-
-    def append_weapon(target: TeamMember) -> None:
-        nonlocal weapon_index
-        commands.append(
-            owo_weapon_command(
-                owo_prefix,
-                target.weapon_id.upper(),
-                target.animal,
-                use_alias=bool(weapon_index % 2),
-            )
+    ordered_weapon_targets = [
+        target
+        for target in sorted(template.members, key=lambda member: member.position)
+        if _animal_identity(target.animal) in weapon_targets
+    ]
+    weapon_commands = [
+        owo_weapon_command(
+            owo_prefix,
+            target.weapon_id.upper(),
+            target.animal,
+            use_alias=bool(index % 2),
         )
-        weapon_index += 1
+        for index, target in enumerate(ordered_weapon_targets)
+    ]
 
-    for team_command, added_animal in team_commands:
-        commands.append(team_command)
-        target = weapon_targets.get(added_animal or "")
-        if target is not None:
-            append_weapon(target)
-            equipped_animals.add(added_animal or "")
-
-    # Correctly positioned animals can still need a different weapon. Append those
-    # remaining equips in position order while continuing the same alias alternation.
-    for target in sorted(template.members, key=lambda member: member.position):
-        animal_key = _animal_identity(target.animal)
-        if animal_key not in weapon_targets or animal_key in equipped_animals:
-            continue
-        append_weapon(target)
-        equipped_animals.add(animal_key)
+    # The team-display command has just consumed OwO's team cooldown. Interleave
+    # independent weapon corrections before team mutations so mixed plans always
+    # start with useful weapon work and avoid shared-cooldown waits wherever the
+    # available command families allow it.
+    commands: list[str] = []
+    for index in range(max(len(weapon_commands), len(team_commands))):
+        if index < len(weapon_commands):
+            commands.append(weapon_commands[index])
+        if index < len(team_commands):
+            commands.append(team_commands[index][0])
 
     return SmartReplacePlan(
         commands=tuple(commands),
@@ -769,12 +763,12 @@ def build_smart_replace_plan(
 
 
 def is_smart_team_display_command(value: str, owo_prefix: str) -> bool:
-    """Accept the three Smart replace choices, plus the full current-team alias."""
+    """Accept the current team plus OwO's Team 1 and Team 2 aliases."""
     normalized = normalize_owo_command(value)
     prefix = re.escape(owo_prefix or OWO_PREFIX_DEFAULT)
     return bool(
         re.fullmatch(rf"{prefix}(?:tm|team)(?:\s+display)?", normalized)
-        or re.fullmatch(rf"{prefix}setteam\s+[12]", normalized)
+        or re.fullmatch(rf"{prefix}(?:setteam|teams)\s+[12]", normalized)
     )
 
 
@@ -786,8 +780,8 @@ def smart_replace_selection_text(session: SmartReplaceScanSession) -> str:
         f"#{session.template_slot} `{session.template_name}`**\n"
         "Choose the OwO team you want to replace by sending one command:\n"
         f"`{owo_team_command(prefix)}` — current active team\n"
-        f"`{prefix}setteam 1` — Team 1\n"
-        f"`{prefix}setteam 2` — Team 2\n\n"
+        f"`{prefix}setteam 1` or `{prefix}teams 1` — Team 1\n"
+        f"`{prefix}setteam 2` or `{prefix}teams 2` — Team 2\n\n"
         "After OwO shows it, you can switch the displayed team with OwO's own "
         "buttons. I will ask for confirmation and re-read the latest version of "
         "that OwO message before comparing anything.\n"
@@ -834,7 +828,7 @@ def format_command_packet(
         (
             "",
             "⚠️ **Guided mode is active.** The helper posts one command at a time. "
-            "As soon as OwO confirms a command, the next command appears immediately.",
+            "After OwO confirms a command, the next command appears as soon as any shared cooldown is safe.",
             "Animal additions and weapon equips alternate to avoid unnecessary same-action cooldowns.",
             "Saved weapons are equipped to the animal name, not the team position, so position changes are safer.",
             note,
@@ -887,6 +881,17 @@ def parse_team_add_target(command: str) -> tuple[str, int] | None:
     return match.group(1), int(match.group(2))
 
 
+def parse_team_delete_target(command: str) -> int | str | None:
+    """Return the position or animal from a guided `wtm d` command."""
+    match = re.fullmatch(r"\S+tm\s+d\s+(.+)", normalize_owo_command(command))
+    if not match:
+        return None
+    target = match.group(1).strip()
+    if target in {"1", "2", "3"}:
+        return int(target)
+    return target or None
+
+
 def classify_team_confirmation(text: str, command: str) -> str | None:
     """Classify OwO success, cooldown, and team-conflict responses."""
     lowered = re.sub(r"\s+", " ", text or "").lower()
@@ -929,6 +934,20 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
             )
         ):
             return "success"
+
+        # OwO commonly confirms a deletion by returning the refreshed team page
+        # with only the remaining animals instead of a textual success sentence.
+        parsed = parse_team_message_detailed(text)
+        target = parse_team_delete_target(normalized)
+        if parsed is not None and target is not None:
+            if isinstance(target, int):
+                if target in parsed.missing_positions:
+                    return "success"
+            elif all(
+                _animal_identity(member.animal) != _animal_identity(target)
+                for member in parsed.members
+            ):
+                return "success"
         return None
 
     if re.match(r"^\S+tm\s+a\s+", normalized):
@@ -2553,8 +2572,8 @@ class TeamTemplates(commands.Cog):
             (
                 f"Step **{session.next_index + 1}/{len(session.commands)}**:",
                 f"`{expected}`",
-                "Send this exact command. The next step appears immediately after "
-                "OwO confirms it.",
+                "Send this exact command. The next step appears after OwO confirms it "
+                "and any shared cooldown is safe.",
                 f"Use `{helper_alias(session.helper_prefix, 'hs')}` / "
                 f"`{helper_command(session.helper_prefix, 'skip')}` or **Skip step** "
                 "when this step is already correct. "
@@ -3196,9 +3215,30 @@ class TeamTemplates(commands.Cog):
             following = session.expected_command or ""
             delay = smart_replace_transition_delay(completed_command, following)
             if delay:
+                seconds = max(1, int(delay + 0.999))
+                unit = "second" if seconds == 1 else "seconds"
+                family = _owo_cooldown_family(completed_command)
+                family_label = "team" if family == "team" else "weapon"
+                wait_message = await channel.send(
+                    (
+                        f"<@{session.user_id}> ✅ OwO confirmed `{completed_command}`.\n"
+                        f"⏳ Waiting **{seconds} {unit}** for OwO's {family_label} "
+                        "cooldown. The next command will appear automatically."
+                    ),
+                    allowed_mentions=discord.AllowedMentions(
+                        users=True, roles=False, everyone=False, replied_user=False
+                    ),
+                )
+                session.prompt_message_id = wait_message.id
+                session.ready_for_user = False
+                session.last_activity = time.monotonic()
+                self.reset_guided_timeout(key, session)
                 await asyncio.sleep(delay)
                 if self.guided_sessions.get(key) is not session:
                     return True
+                wait_prompt_id = session.prompt_message_id
+                session.prompt_message_id = None
+                await self.delete_message_safely(channel, wait_prompt_id)
 
         # Every guided mode pauses only when two required commands share one OwO
         # cooldown family. Interleaved team/equip steps continue immediately.

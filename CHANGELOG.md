@@ -1,3 +1,11 @@
+## v0.14.4-beta - Faster Smart Replace and Staff-Reviewed TapDeck Wording
+
+- Corrected TapDeck's rules wording: the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time; current rules remain authoritative.
+- Added `teams 1` and `teams 2` as Smart Replace team-selection aliases alongside `setteam 1` and `setteam 2`, using each server's configured OwO prefix.
+- Reordered mixed Smart Replace plans to begin with a required weapon command after the team scan, then interleave weapon and team actions where possible while preserving `ww` / `wuse` alternation.
+- Recognizes OwO's refreshed two-animal team page as confirmation of a requested position deletion when the requested slot is absent.
+- Shows an explicit confirmation-and-cooldown status before consecutive team or weapon commands instead of appearing frozen during the legitimate shared cooldown.
+- Updated the public version to `0.14.4-beta`; no database migration or additional Discord permission is required.
 ## v0.14.3-beta - TapDeck Naming Correction
 
 - Corrected the public command spelling to `H TapDeck` and `/tapdeck` in help, documentation, and release notes.

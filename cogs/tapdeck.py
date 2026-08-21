@@ -251,9 +251,10 @@ def build_tapdeck_embed(release: TapDeckRelease | None = None) -> discord.Embed:
     embed.add_field(
         name="Rules and installation",
         value=(
-            "The demonstrated **one tap = one command** workflow was reviewed by an "
-            "OwO administrator and described as following the rules. Rules can change, "
-            "so users remain responsible for following current OwO and Discord rules.\n\n"
+            "The demonstrated **one tap = one command** workflow was shared with "
+            "OwO's staff team for review and confirmed as allowed under the rules at "
+            "the time. Rules can change, so users remain responsible for following "
+            "current OwO and Discord rules.\n\n"
             "TapDeck Lite is distributed from GitHub rather than Google Play, so Android "
             "will show normal unknown-source and third-party-keyboard warnings. Review the "
             "public source and install only if you trust the developer."

@@ -1,4 +1,6 @@
+## v0.14.4-beta notes
 
+Smart Replace now starts mixed plans with a useful weapon command after the team scan, interleaves team and weapon work where possible, recognizes OwO's refreshed team page after a requested deletion, and visibly explains any required shared-cooldown wait. Team selection also accepts the configured equivalents of `teams 1` and `teams 2`. TapDeck's rules note now accurately records that the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time; members must still follow current rules.
 ## v0.14.3-beta notes
 
 Corrected the TapDeck name everywhere members can read or type it. The information card now opens with `H Grind`, `H TapDeck`, or `/tapdeck`; obsolete misspelled command forms were removed.
@@ -66,10 +68,10 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Reads animal identity from the OwO emoji alias rather than a renameable nickname.
 - Normalizes standard aliases such as `gfish → fish`, `gspider → spider`, and `hlizard → lizard`.
 - Preserves unknown custom-pet aliases exactly.
-- Supports confirmation-safe Smart replace for the active team, Team 1, or Team 2; the confirmation re-fetches button-edited OwO messages before planning.
+- Supports confirmation-safe Smart replace for the active team, Team 1, or Team 2; accepts both `setteam 1/2` and `teams 1/2`, and re-fetches button-edited OwO messages before planning.
 - Keeps full-packet All commands and Exact reset available.
 - Guides users one command at a time, waits for OwO's response, and pauses only when the next step shares the same team or weapon cooldown.
-- Places each required weapon equip immediately after its animal add so members can use the five-second team-cooldown window efficiently.
+- Starts mixed plans with a required weapon correction after the team scan, then interleaves team edits and weapon equips where possible to use cooldown windows efficiently.
 - Alternates weapon equips `ww` / `wuse` / `ww` in Smart replace, Exact reset, and the full **All commands** packet.
 - Equips every saved weapon by the saved animal identifier, such as `ww ALGOB8 snail`, instead of relying on a changeable team position.
 - Supports concurrent guided sessions by server, channel, and user.
@@ -87,7 +89,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Opens with `H Grind`, `H TapDeck`, or `/tapdeck`, respecting each server's custom helper prefix.
 - Resolves the newest APK from GitHub's public latest-release API, caches it for up to 24 hours, and falls back safely to GitHub's permanent latest-release page.
 - Describes the separate app's one-manual-tap/one-command boundary, offline design, zero-permission manifest, and local-only command storage.
-- Includes a careful rules note and normal Android sideload/third-party-keyboard warning.
+- Records that the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time, while keeping current-rules responsibility and normal Android sideload/third-party-keyboard warnings explicit.
 
 ### Public animal Dex catalog
 

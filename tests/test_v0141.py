@@ -155,6 +155,9 @@ class TapDeckTests(unittest.TestCase):
         self.assertIn("zero android permissions", text.casefold())
         self.assertIn("no internet capability", text.casefold())
         self.assertIn("only if you trust", text.casefold())
+        self.assertIn("shared with owo's staff team", text.casefold())
+        self.assertIn("confirmed as allowed under the rules at the time", text.casefold())
+        self.assertNotIn("reviewed by an owo administrator", text.casefold())
         self.assertNotIn("automated", text.casefold())
         self.assertNotIn("automation", text.casefold())
         self.assertNotIn("cached for", text.casefold())
@@ -187,7 +190,7 @@ class TapDeckTests(unittest.TestCase):
 
 class PublicSurfaceTests(unittest.TestCase):
     def test_version_and_help_include_the_whole_batch(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.3-beta")
+        self.assertEqual(BOT_VERSION, "0.14.4-beta")
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback
         embed = BossGenerator.build_help_embed(cog, "b", "o")
@@ -196,6 +199,9 @@ class PublicSurfaceTests(unittest.TestCase):
         self.assertIn("b grind", text)
         self.assertIn("b tapdeck", text)
         self.assertIn("/tapdeck", text)
+        self.assertIn("staff team reviewed", text.casefold())
+        self.assertIn("allowed under the rules at the time", text.casefold())
+        self.assertNotIn("an owo administrator", text.casefold())
         self.assertIn("Team 1", text)
         self.assertIn("Team 2", text)
         self.assertLessEqual(max(len(field.value) for field in embed.fields), 1024)

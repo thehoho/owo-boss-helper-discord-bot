@@ -30,7 +30,7 @@ This update makes Smart replace explicit and confirmation-safe, adds a small inc
 - Custom server helper prefixes are respected.
 - The card links to the public source and hosted privacy policy, and resolves the newest APK from GitHub's public latest-release API with a 24-hour in-memory cache.
 - Publicly verifiable repository claims include zero Android permissions, no Internet capability, app-private local command storage, disabled cloud backup, and no ads, analytics, accounts, or tracking.
-- The rules wording records that the demonstrated one-manual-tap/one-command workflow was reviewed and described as following the rules, while reminding members that current rules remain authoritative.
+- The rules wording records that the demonstrated one-manual-tap/one-command workflow was shared with OwO's staff team for review and confirmed as allowed under the rules at the time, while reminding members that current rules remain authoritative.
 - Android sideload and third-party-keyboard warnings are explained without asking users to bypass or ignore them.
 
 ## Compatibility and privacy

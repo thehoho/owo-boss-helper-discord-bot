@@ -2400,7 +2400,9 @@ class BossGenerator(commands.Cog):
             value=(
                 f"Use `{grind_command}`, `{helper_command(helper_prefix, 'tapdeck')}`, "
                 "or `/tapdeck` for the public source, privacy details, and latest GitHub APK "
-                "download. It is a separate one-tap/one-command shortcut keyboard."
+                "download. OwO's staff team reviewed the demonstrated one-tap/one-command "
+                "workflow and confirmed it was allowed under the rules at the time; "
+                "members remain responsible for current rules."
             ),
             inline=False,
         )
