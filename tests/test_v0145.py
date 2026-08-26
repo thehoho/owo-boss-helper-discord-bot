@@ -164,10 +164,13 @@ class BossHpRegressionTests(unittest.TestCase):
     def test_cow_hp_with_comma_touching_narrow_one(self) -> None:
         self.assert_hp("boss_hp_cow_125175.png", "125175")
 
+    def test_crocodile_hp_with_joined_comma_seven_four(self) -> None:
+        self.assert_hp("boss_hp_crocodile_139746.png", "139746")
+
 
 class ReleaseSurfaceTests(unittest.TestCase):
     def test_hotfix_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.7-beta")
+        self.assertEqual(BOT_VERSION, "0.14.8-beta")
 
 
 if __name__ == "__main__":

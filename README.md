@@ -1,3 +1,7 @@
+## v0.14.8-beta notes
+
+HP recognition now includes OwO's alternate `4` shape inside a joined `,746` run. The supplied crocodile image reads as `139746` at high confidence while the strict glyph thresholds and safe `80000` fallback remain unchanged.
+
 ## v0.14.7-beta notes
 
 HP recognition now handles the compact five-pixel shape produced when OwO's thousands comma touches a narrow `1`. The reported pig `103177` and cow `125175` images now scan at high confidence without weakening the safe `80000` fallback or the existing HP validation rules.

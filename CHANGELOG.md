@@ -1,3 +1,11 @@
+## v0.14.8-beta - Crocodile HP Glyph Hotfix
+
+- Added a trusted normalized `4` template for OwO's joined `,746` rendering.
+- Fixed the reported crocodile `139746` image falling back to the safe `80000` value.
+- Preserved the 80% minimum per-glyph threshold instead of weakening recognition globally.
+- Added the exact crocodile image as a permanent regression fixture and expanded the suite to 81 passing tests.
+- Updated the public version to `0.14.8-beta`; no database migration or additional Discord permission is required.
+
 ## v0.14.7-beta - Compact HP Punctuation Hotfix
 
 - Recognized OwO's compact five-pixel glyph created when a two-pixel thousands comma touches the narrow digit `1`.

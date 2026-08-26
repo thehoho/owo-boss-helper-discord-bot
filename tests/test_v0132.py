@@ -176,7 +176,7 @@ class SmartReplacePlannerTests(unittest.TestCase):
 
 class SmartReplaceCommandTests(unittest.TestCase):
     def test_release_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.7-beta")
+        self.assertEqual(BOT_VERSION, "0.14.8-beta")
 
     def test_team_display_commands_respect_configured_prefix(self) -> None:
         for command in (

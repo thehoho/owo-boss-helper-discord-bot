@@ -190,7 +190,7 @@ class TapDeckTests(unittest.TestCase):
 
 class PublicSurfaceTests(unittest.TestCase):
     def test_version_and_help_include_the_whole_batch(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.7-beta")
+        self.assertEqual(BOT_VERSION, "0.14.8-beta")
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback
         embed = BossGenerator.build_help_embed(cog, "b", "o")
