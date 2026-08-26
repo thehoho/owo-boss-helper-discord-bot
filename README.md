@@ -1,3 +1,6 @@
+## v0.14.5-beta notes
+
+The guild-boss tracker now understands OwO's updated active summary and no longer mistakes a numeric `defeated` reward counter for the active boss's outcome. A newer authoritative active card can safely repair state poisoned by the old parser. HP recognition now handles commas touching adjacent digits in the current boss-image rendering, including the reported cow and owl cases.
 ## v0.14.4-beta notes
 
 Smart Replace now starts mixed plans with a useful weapon command after the team scan, interleaves team and weapon work where possible, recognizes OwO's refreshed team page after a requested deletion, and visibly explains any required shared-cooldown wait. Team selection also accepts the configured equivalents of `teams 1` and `teams 2`. TapDeck's rules note now accurately records that the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time; members must still follow current rules.

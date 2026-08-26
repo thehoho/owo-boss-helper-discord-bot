@@ -1,3 +1,11 @@
+## v0.14.5-beta - Boss Status and HP Hotfix
+
+- Fixed the new active boss card's numeric `defeated` reward counter being misclassified as a completed boss.
+- Prevented the resulting false cooldown, false ready alert, stopped sticky, and repeated late-card rejection behavior.
+- Added guarded self-healing when a newer official active card proves the same boss is still running.
+- Extended HP OCR to split commas that touch adjacent digits in OwO's current boss-image rendering.
+- Added the exact failing cow `166463` and owl `207864` images as regression fixtures.
+- Updated the public version to `0.14.5-beta`; no database migration or additional Discord permission is required.
 ## v0.14.4-beta - Faster Smart Replace and Staff-Reviewed TapDeck Wording
 
 - Corrected TapDeck's rules wording: the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time; current rules remain authoritative.

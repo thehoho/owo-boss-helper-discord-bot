@@ -211,14 +211,38 @@ ESCAPED_PATTERNS = (
 )
 
 
+ACTIVE_REWARD_DEFEATED_PATTERN = re.compile(
+    r"(?<!\w)\d[\d,]*(?:\s|[*_~`]){0,12}defeated\b",
+    re.I,
+)
+
+
+def is_active_boss_summary_text(text: str) -> bool:
+    """Recognize OwO's new active boss summary, including reward counters."""
+    normalized = re.sub(r"\s+", " ", text or "").strip().lower()
+    return bool(
+        ("guild boss appeared" in normalized or "top 10 damage dealt" in normalized)
+        and re.search(r"\bruns\s+away\b", normalized)
+        and "fighters" in normalized
+        and ACTIVE_REWARD_DEFEATED_PATTERN.search(normalized)
+    )
+
+
 def detect_boss_outcome(text: str) -> str | None:
     """Return `defeated`, `escaped`, or None from an OwO message's full text."""
     normalized = re.sub(r"\s+", " ", text or "").strip()
     if not normalized:
         return None
-    if any(pattern.search(normalized) for pattern in DEFEATED_PATTERNS):
+
+    # OwO's August 2026 active card added a reward statistic such as
+    # ``3,020 defeated``. It describes the guild's historical reward count, not
+    # this boss's outcome, so remove only that numeric statistic before applying
+    # the past-tense result patterns. Explicit wording such as "boss was defeated"
+    # remains detectable in the same payload.
+    outcome_text = ACTIVE_REWARD_DEFEATED_PATTERN.sub("", normalized)
+    if any(pattern.search(outcome_text) for pattern in DEFEATED_PATTERNS):
         return "defeated"
-    if any(pattern.search(normalized) for pattern in ESCAPED_PATTERNS):
+    if any(pattern.search(outcome_text) for pattern in ESCAPED_PATTERNS):
         return "escaped"
     return None
 
@@ -720,6 +744,106 @@ def _best_glyph_match(
     return best_char, best_score
 
 
+def _recognize_hp_punctuation_run(
+    glyph_mask: list[list[bool]],
+    templates: dict[str, list[Image.Image]],
+) -> list[tuple[str, float]] | None:
+    """Split a wide run when OwO's comma touches one or more adjacent digits."""
+    width = len(glyph_mask[0]) if glyph_mask else 0
+    if width <= 8:
+        return None
+
+    allowed_chars = set("0123456789,")
+    min_segment_width = 2  # OwO's comma is only two pixels wide.
+    max_segment_width = 10
+    max_parts = min(6, width // min_segment_width)
+    segment_cache: dict[tuple[int, int], tuple[str, float] | None] = {}
+
+    def match_segment(left: int, right: int) -> tuple[str, float] | None:
+        key = (left, right)
+        if key in segment_cache:
+            return segment_cache[key]
+        segment = _normalize_glyph([row[left:right] for row in glyph_mask])
+        if segment is None:
+            segment_cache[key] = None
+            return None
+        char, score = _best_glyph_match(segment, templates, allowed_chars)
+        result = (char, score) if char is not None else None
+        segment_cache[key] = result
+        return result
+
+    best_parts: list[tuple[str, float]] | None = None
+    best_quality = -1.0
+    for part_count in range(2, max_parts + 1):
+        memo: dict[
+            tuple[int, int],
+            tuple[list[tuple[str, float]], float] | None,
+        ] = {}
+
+        def solve(
+            position: int,
+            remaining: int,
+        ) -> tuple[list[tuple[str, float]], float] | None:
+            key = (position, remaining)
+            if key in memo:
+                return memo[key]
+            columns_left = width - position
+            if (
+                columns_left < remaining * min_segment_width
+                or columns_left > remaining * max_segment_width
+            ):
+                memo[key] = None
+                return None
+            if remaining == 1:
+                matched = match_segment(position, width)
+                if matched is None:
+                    memo[key] = None
+                    return None
+                memo[key] = ([matched], matched[1])
+                return memo[key]
+
+            best: tuple[list[tuple[str, float]], float] | None = None
+            minimum_end = position + min_segment_width
+            maximum_end = min(
+                position + max_segment_width,
+                width - (remaining - 1) * min_segment_width,
+            )
+            for end_at in range(minimum_end, maximum_end + 1):
+                matched = match_segment(position, end_at)
+                if matched is None:
+                    continue
+                tail = solve(end_at, remaining - 1)
+                if tail is None:
+                    continue
+                tail_parts, tail_score = tail
+                option = ([matched, *tail_parts], matched[1] + tail_score)
+                if best is None or option[1] > best[1]:
+                    best = option
+            memo[key] = best
+            return best
+
+        candidate = solve(0, part_count)
+        if candidate is None:
+            continue
+        parts, total_score = candidate
+        chars = [char for char, _ in parts]
+        scores = [score for _, score in parts]
+        average_score = total_score / part_count
+        minimum_score = min(scores)
+        if (
+            chars.count(",") != 1
+            or not any(char.isdigit() for char in chars)
+            or minimum_score < 0.80
+            or average_score < 0.85
+        ):
+            continue
+        quality = average_score + minimum_score * 0.20
+        if quality > best_quality:
+            best_parts = parts
+            best_quality = quality
+
+    return best_parts
+
 def _recognize_hp_run(
     glyph_mask: list[list[bool]],
     templates: dict[str, list[Image.Image]],
@@ -734,6 +858,10 @@ def _recognize_hp_run(
     glyph = _normalize_glyph(glyph_mask)
     if glyph is None:
         return []
+
+    punctuation_parts = _recognize_hp_punctuation_run(glyph_mask, templates)
+    if punctuation_parts is not None:
+        return punctuation_parts
 
     single_char, single_score = _best_glyph_match(glyph, templates)
     width = len(glyph_mask[0]) if glyph_mask else 0
@@ -925,7 +1053,11 @@ def is_guild_boss_status(data: dict[str, Any]) -> bool:
     text = re.sub(r"\s+", " ", extract_all_text_from_raw(data)).lower()
     if "lvl " in text:
         return False
-    return ("fighters" in text and "defeated" in text) or ("guild boss" in text and "fight" in text) or detect_boss_outcome(text) is not None
+    return (
+        is_active_boss_summary_text(text)
+        or ("guild boss" in text and "fight" in text)
+        or detect_boss_outcome(text) is not None
+    )
 
 
 def extract_discord_timestamps(data: dict[str, Any]) -> list[int]:
@@ -941,6 +1073,70 @@ def extract_future_boss_expiry(data: dict[str, Any], now: int | None = None) -> 
     # The status card normally contains one future expiry. If it ever contains
     # more than one, the latest future timestamp is the safest expiry candidate.
     return max(future) if future else None
+
+
+def is_explicit_active_boss_status(
+    data: dict[str, Any],
+    now: int | None = None,
+) -> bool:
+    """Require both the active-card markers and an unexpired escape time."""
+    return bool(
+        is_active_boss_summary_text(extract_all_text_from_raw(data))
+        and extract_future_boss_expiry(data, now) is not None
+    )
+
+
+def should_reactivate_completed_boss(
+    config: dict[str, Any],
+    data: dict[str, Any],
+    message_id: int,
+    now: int | None = None,
+) -> bool:
+    """Allow only a newer authoritative active card to repair completed state."""
+    last_source_message_id = int(config.get("last_source_message_id") or 0)
+    return bool(
+        message_id > last_source_message_id
+        and is_explicit_active_boss_status(data, now)
+    )
+
+
+def repair_false_completed_boss_state(config: dict[str, Any]) -> None:
+    """Remove one proven-false outcome and its dedup/report side effects."""
+    previous_result = str(config.get("last_result") or "")
+    false_outcome = (
+        "escaped" if previous_result == "escaped"
+        else "defeated" if previous_result in {"defeated", "ready"}
+        else None
+    )
+    event_time = int(config.get("last_outcome_event_time") or 0)
+
+    if false_outcome and event_time:
+        event_cycle = current_boss_report_cycle(
+            datetime.fromtimestamp(event_time, tz=PACIFIC)
+        )
+        current_key = f"boss_report_{false_outcome}"
+        if str(config.get("boss_report_cycle") or "") == event_cycle:
+            config[current_key] = max(0, int(config.get(current_key) or 0) - 1)
+        else:
+            latest = config.get("boss_report_latest")
+            if (
+                isinstance(latest, dict)
+                and str(latest.get("cycle") or "") == event_cycle
+            ):
+                latest[false_outcome] = max(
+                    0,
+                    int(latest.get(false_outcome) or 0) - 1,
+                )
+
+    for key in (
+        "last_boss_key",
+        "last_source_message_id",
+        "last_outcome_event_time",
+        "last_detected_at",
+    ):
+        config.pop(key, None)
+    config["cooldown_end"] = 0
+    config["last_result"] = "active"
 
 
 def extract_relevant_timestamp(data: dict[str, Any], now: int | None = None) -> int | None:
@@ -2922,7 +3118,8 @@ class BossGenerator(commands.Cog):
         if old_id and message_id < old_id:
             return
 
-        outcome = detect_boss_outcome(extract_all_text_from_raw(data))
+        status_text = extract_all_text_from_raw(data)
+        outcome = detect_boss_outcome(status_text)
         if outcome is not None:
             # A completed status may be a newer replacement message. Let the
             # outcome handler apply the correct rule from OwO's timestamp: five
@@ -2944,13 +3141,27 @@ class BossGenerator(commands.Cog):
             and expiry == last_boss_key
             and last_result in {"defeated", "escaped", "ready"}
         ):
-            logger.info(
-                "Ignored late active card %s for completed guild %s boss %s",
+            if not should_reactivate_completed_boss(
+                config,
+                data,
                 message_id,
+                now,
+            ):
+                logger.info(
+                    "Ignored late active card %s for completed guild %s boss %s",
+                    message_id,
+                    guild_id,
+                    expiry,
+                )
+                return
+            logger.warning(
+                "Reactivating guild %s boss %s from newer authoritative active "
+                "card %s after a completed-state mismatch",
                 guild_id,
                 expiry,
+                message_id,
             )
-            return
+            repair_false_completed_boss_state(config)
 
         if expiry and expiry <= now:
             await self.finish_boss_escape(
