@@ -1,3 +1,7 @@
+## v0.14.6-beta notes
+
+Boss outcomes are now tied to official message identities observed while the current boss was active. Old or duplicate completed cards in other server channels can no longer end the active boss, increment the daily report, or start false cooldown/ready loops. Partial Discord edit payloads for known active cards are re-fetched before state changes.
+
 ## v0.14.5-beta notes
 
 The guild-boss tracker now understands OwO's updated active summary and no longer mistakes a numeric `defeated` reward counter for the active boss's outcome. A newer authoritative active card can safely repair state poisoned by the old parser. HP recognition now handles commas touching adjacent digits in the current boss-image rendering, including the reported cow and owl cases.

@@ -1100,6 +1100,37 @@ def should_reactivate_completed_boss(
     )
 
 
+def active_boss_message_ids(config: dict[str, Any]) -> list[int]:
+    """Return every official active-card ID recorded for the current boss."""
+    values: list[int] = []
+    raw_values = config.get("active_boss_message_ids")
+    if isinstance(raw_values, list):
+        for raw_value in raw_values:
+            try:
+                message_id = int(raw_value or 0)
+            except (TypeError, ValueError):
+                continue
+            if message_id and message_id not in values:
+                values.append(message_id)
+
+    # Backward compatibility for production state written before v0.14.6.
+    try:
+        current_id = int(config.get("active_boss_message_id") or 0)
+    except (TypeError, ValueError):
+        current_id = 0
+    if current_id and current_id not in values:
+        values.append(current_id)
+    return values
+
+
+def is_authoritative_boss_outcome_source(
+    config: dict[str, Any],
+    source_message_id: int,
+) -> bool:
+    """Only a card previously observed active may finish the current boss."""
+    return int(source_message_id or 0) in active_boss_message_ids(config)
+
+
 def repair_false_completed_boss_state(config: dict[str, Any]) -> None:
     """Remove one proven-false outcome and its dedup/report side effects."""
     previous_result = str(config.get("last_result") or "")
@@ -3008,6 +3039,11 @@ class BossGenerator(commands.Cog):
             and int(config.get("active_boss_message_id") or 0) == message_id
         )
 
+    def is_known_active_boss_message(self, guild_id: int, message_id: int) -> bool:
+        """Return whether this message was an official active card for this boss."""
+        config = self.cooldown_config.get(str(guild_id), {})
+        return int(message_id or 0) in active_boss_message_ids(config)
+
     def get_guild_boss_fetch_lock(self, guild_id: int) -> asyncio.Lock:
         return self.guild_boss_fetch_locks.setdefault(guild_id, asyncio.Lock())
 
@@ -3022,6 +3058,7 @@ class BossGenerator(commands.Cog):
         for key in (
             "active_boss_channel_id",
             "active_boss_message_id",
+            "active_boss_message_ids",
             "active_boss_expires_at",
             "active_boss_unverified",
         ):
@@ -3172,14 +3209,22 @@ class BossGenerator(commands.Cog):
             )
             return
         is_new_boss = bool(expiry and expiry != previous_expiry)
+        known_message_ids = [] if is_new_boss else active_boss_message_ids(config)
+        if message_id not in known_message_ids:
+            known_message_ids.append(message_id)
+        # A guild can expose the same boss card in several channels. Keep enough
+        # identities for legitimate edits while bounding persisted state.
+        known_message_ids = known_message_ids[-50:]
         tracking_changed = (
             old_id != message_id
             or old_channel_id != channel_id
             or bool(expiry and expiry != previous_expiry)
+            or known_message_ids != active_boss_message_ids(config)
         )
 
         config["active_boss_channel_id"] = channel_id
         config["active_boss_message_id"] = message_id
+        config["active_boss_message_ids"] = known_message_ids
         config.pop("active_boss_unverified", None)
         if expiry:
             config["active_boss_expires_at"] = expiry
@@ -3439,11 +3484,25 @@ class BossGenerator(commands.Cog):
             if not generator_needed and not cooldown_gateway_needed:
                 return
 
-            # For cooldown discovery/tracking, use the edit payload directly. If an
-            # update is partial, the single-message 15-second watcher will read the
-            # final state. We deliberately do not REST-fetch every OwO edit.
+            # Discord edit events may contain only the changed Components V2
+            # fragment. Never let a partial payload finish a known active boss:
+            # fetch that exact card first. Unrelated edits remain request-free.
             if cooldown_gateway_needed:
                 data = dict(payload.data)
+                known_active = self.is_known_active_boss_message(
+                    payload.guild_id,
+                    payload.message_id,
+                )
+                if known_active:
+                    async with self.get_guild_boss_fetch_lock(payload.guild_id):
+                        fetched = await fetch_raw_message(
+                            self.bot,
+                            payload.channel_id,
+                            payload.message_id,
+                        )
+                    if not fetched:
+                        return
+                    data = fetched
                 author_id = int((data.get("author") or {}).get("id", 0) or 0)
                 tracked = self.is_tracked_boss_message(
                     payload.guild_id, payload.channel_id, payload.message_id
@@ -3558,13 +3617,23 @@ class BossGenerator(commands.Cog):
         if outcome is None:
             return
 
+        config = self.cooldown_config.get(str(guild_id), {})
+        if not is_authoritative_boss_outcome_source(config, source_message_id):
+            logger.warning(
+                "Ignored untracked %s result message %s for guild %s; "
+                "it was never observed as an active card for the current boss",
+                outcome,
+                source_message_id,
+                guild_id,
+            )
+            return
+
         now = int(time.time())
         event_time = extract_relevant_timestamp(data, now) or now
 
         # The tracked escape timestamp is a stable identity for the current boss.
         # OwO can publish/edit more than one result message for the same boss, and
         # those messages do not always expose exactly the same result timestamp.
-        config = self.cooldown_config.get(str(guild_id), {})
         boss_key = int(config.get("active_boss_expires_at") or 0) or event_time
 
         if outcome == "escaped":
@@ -3651,6 +3720,7 @@ class BossGenerator(commands.Cog):
         config.pop("message_id", None)
         config.pop("active_boss_channel_id", None)
         config.pop("active_boss_message_id", None)
+        config.pop("active_boss_message_ids", None)
         config.pop("active_boss_expires_at", None)
         config.pop("active_boss_unverified", None)
 

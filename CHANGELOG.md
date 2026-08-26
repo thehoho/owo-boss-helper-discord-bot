@@ -1,3 +1,12 @@
+## v0.14.6-beta - Authoritative Boss Outcome Hotfix
+
+- Bound every defeat or escape to a message previously observed as an active card for the current boss.
+- Ignored newer completed boss copies from other channels instead of applying their old result to the active boss.
+- Re-fetched known active cards after Discord edit events so partial Components V2 payloads cannot create false outcomes.
+- Preserved multiple official active-card identities for the same boss while keeping one latest card for polling.
+- Added regressions for untracked result copies, legitimate tracked outcomes, migrated state, and partial edit payloads.
+- Updated the public version to `0.14.6-beta`; no database migration or additional Discord permission is required.
+
 ## v0.14.5-beta - Boss Status and HP Hotfix
 
 - Fixed the new active boss card's numeric `defeated` reward counter being misclassified as a completed boss.
