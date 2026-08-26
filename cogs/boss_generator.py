@@ -748,9 +748,14 @@ def _recognize_hp_punctuation_run(
     glyph_mask: list[list[bool]],
     templates: dict[str, list[Image.Image]],
 ) -> list[tuple[str, float]] | None:
-    """Split a wide run when OwO's comma touches one or more adjacent digits."""
+    """Split a run when OwO's comma touches one or more adjacent digits.
+
+    A comma followed by the narrow digit ``1`` is only five pixels wide. Keep the
+    strict comma-count and per-glyph confidence checks below, but do not discard
+    that compact compound before segmentation.
+    """
     width = len(glyph_mask[0]) if glyph_mask else 0
-    if width <= 8:
+    if width < 5:
         return None
 
     allowed_chars = set("0123456789,")

@@ -1,3 +1,7 @@
+## v0.14.7-beta notes
+
+HP recognition now handles the compact five-pixel shape produced when OwO's thousands comma touches a narrow `1`. The reported pig `103177` and cow `125175` images now scan at high confidence without weakening the safe `80000` fallback or the existing HP validation rules.
+
 ## v0.14.6-beta notes
 
 Boss outcomes are now tied to official message identities observed while the current boss was active. Old or duplicate completed cards in other server channels can no longer end the active boss, increment the daily report, or start false cooldown/ready loops. Partial Discord edit payloads for known active cards are re-fetched before state changes.

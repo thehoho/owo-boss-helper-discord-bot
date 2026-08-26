@@ -1,3 +1,12 @@
+## v0.14.7-beta - Compact HP Punctuation Hotfix
+
+- Recognized OwO's compact five-pixel glyph created when a two-pixel thousands comma touches the narrow digit `1`.
+- Fixed the reported pig `103177` and cow `125175` images falling back to the safe `80000` value.
+- Kept strict punctuation structure, per-glyph confidence, leading-zero, and current-versus-maximum validation in place.
+- Added both exact images as permanent regression fixtures while preserving the earlier cow and owl fixes.
+- Verified all four reported HP variants above 98.3% confidence and expanded the complete suite to 80 passing tests.
+- Updated the public version to `0.14.7-beta`; no database migration or additional Discord permission is required.
+
 ## v0.14.6-beta - Authoritative Boss Outcome Hotfix
 
 - Bound every defeat or escape to a message previously observed as an active card for the current boss.
