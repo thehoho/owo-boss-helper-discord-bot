@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 # CONSTANTS & CONFIG
 # ──────────────────────────────────────────────────────────────
 
-DEFAULT_HP = "80000"
+DEFAULT_HP = "100000"
 LVL_RE = re.compile(r"Lvl\s+\d+", re.I)
 PAGE_POSITION_RE = re.compile(r"^\s*([1-3])\s*/\s*3\s*$")
 PAGE_POSITION_SEARCH_RE = re.compile(r"(?<!\d)([1-3])\s*/\s*3(?!\d)")
@@ -86,6 +86,7 @@ SESSION_TIMEOUT_SECONDS = 180
 BOSS_COOLDOWN_SECONDS = 5 * 60
 OUTCOME_DEDUP_SECONDS = 20
 OUTCOME_SETTLE_SECONDS = 1.25
+BOSS_OUTCOME_WINDOW_SKEW_SECONDS = 90
 BOSS_WATCH_INTERVAL_SECONDS = 15
 PACIFIC = ZoneInfo("America/Los_Angeles")
 
@@ -1131,9 +1132,48 @@ def active_boss_message_ids(config: dict[str, Any]) -> list[int]:
 def is_authoritative_boss_outcome_source(
     config: dict[str, Any],
     source_message_id: int,
+    *,
+    outcome_timestamp: int | None = None,
+    now: int | None = None,
 ) -> bool:
-    """Only a card previously observed active may finish the current boss."""
-    return int(source_message_id or 0) in active_boss_message_ids(config)
+    """Bind an outcome to the active boss without trusting stale result copies.
+
+    OwO normally edits an active card in place, but it can also publish the real
+    result as a newer replacement message. Known active-card IDs remain
+    authoritative. A replacement is accepted only when it is newer than the
+    latest active card and carries an explicit Discord timestamp inside the
+    currently observed boss lifetime.
+    """
+    source_message_id = int(source_message_id or 0)
+    known_message_ids = active_boss_message_ids(config)
+    if source_message_id in known_message_ids:
+        return True
+
+    try:
+        latest_active_id = int(config.get("active_boss_message_id") or 0)
+        first_seen_at = int(config.get("active_boss_first_seen_at") or 0)
+        expires_at = int(config.get("active_boss_expires_at") or 0)
+        outcome_timestamp = int(outcome_timestamp or 0)
+    except (TypeError, ValueError):
+        return False
+
+    if (
+        not latest_active_id
+        or source_message_id <= latest_active_id
+        or not first_seen_at
+        or not expires_at
+        or not outcome_timestamp
+        or str(config.get("last_result") or "active") != "active"
+    ):
+        return False
+
+    now = int(now or time.time())
+    return bool(
+        first_seen_at - BOSS_OUTCOME_WINDOW_SKEW_SECONDS
+        <= outcome_timestamp
+        <= expires_at + BOSS_OUTCOME_WINDOW_SKEW_SECONDS
+        and now <= expires_at + BOSS_OUTCOME_WINDOW_SKEW_SECONDS
+    )
 
 
 def repair_false_completed_boss_state(config: dict[str, Any]) -> None:
@@ -3064,6 +3104,7 @@ class BossGenerator(commands.Cog):
             "active_boss_channel_id",
             "active_boss_message_id",
             "active_boss_message_ids",
+            "active_boss_first_seen_at",
             "active_boss_expires_at",
             "active_boss_unverified",
         ):
@@ -3231,6 +3272,8 @@ class BossGenerator(commands.Cog):
         config["active_boss_message_id"] = message_id
         config["active_boss_message_ids"] = known_message_ids
         config.pop("active_boss_unverified", None)
+        if is_new_boss or not int(config.get("active_boss_first_seen_at") or 0):
+            config["active_boss_first_seen_at"] = now
         if expiry:
             config["active_boss_expires_at"] = expiry
 
@@ -3623,17 +3666,33 @@ class BossGenerator(commands.Cog):
             return
 
         config = self.cooldown_config.get(str(guild_id), {})
-        if not is_authoritative_boss_outcome_source(config, source_message_id):
+        now = int(time.time())
+        explicit_timestamps = [
+            value
+            for value in extract_discord_timestamps(data)
+            if value <= now + BOSS_OUTCOME_WINDOW_SKEW_SECONDS
+        ]
+        explicit_event_time = max(explicit_timestamps) if explicit_timestamps else None
+        if not is_authoritative_boss_outcome_source(
+            config,
+            source_message_id,
+            outcome_timestamp=explicit_event_time,
+            now=now,
+        ):
             logger.warning(
                 "Ignored untracked %s result message %s for guild %s; "
-                "it was never observed as an active card for the current boss",
+                "it did not match the current boss lifetime "
+                "(first=%s expiry=%s event=%s active=%s)",
                 outcome,
                 source_message_id,
                 guild_id,
+                config.get("active_boss_first_seen_at"),
+                config.get("active_boss_expires_at"),
+                explicit_event_time,
+                config.get("active_boss_message_id"),
             )
             return
 
-        now = int(time.time())
         event_time = extract_relevant_timestamp(data, now) or now
 
         # The tracked escape timestamp is a stable identity for the current boss.
@@ -3726,6 +3785,7 @@ class BossGenerator(commands.Cog):
         config.pop("active_boss_channel_id", None)
         config.pop("active_boss_message_id", None)
         config.pop("active_boss_message_ids", None)
+        config.pop("active_boss_first_seen_at", None)
         config.pop("active_boss_expires_at", None)
         config.pop("active_boss_unverified", None)
 

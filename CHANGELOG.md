@@ -1,3 +1,13 @@
+## v0.14.9-beta - Boss Outcome Identity and Command Safety
+
+- Accepted legitimate OwO defeat cards published as newer replacement messages when their explicit result timestamp matches the active boss lifetime.
+- Preserved the stale-card protection by rejecting older timestamps, older message IDs, results after expiry, and results without a tracked active lifetime.
+- Persisted the first-seen time for each active boss and cleared it atomically with the rest of the active instance state.
+- Changed the unreadable boss-HP fallback from `80000` to `100000`.
+- Made compact `HAD <animal>` silently ignore unknown animals and normal sentence fragments while preserving explicit Dex not-found help.
+- Preserved `squid` and `hsquid` as distinct animal identities.
+- Updated the public version to `0.14.9-beta`; no database migration or additional Discord permission is required.
+
 ## v0.14.8-beta - Crocodile HP Glyph Hotfix
 
 - Added a trusted normalized `4` template for OwO's joined `,746` rendering.

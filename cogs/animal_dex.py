@@ -630,9 +630,12 @@ class AnimalDex(commands.Cog):
         query: str,
         *,
         reference: discord.Message | None = None,
+        silent_if_missing: bool = False,
     ) -> bool:
         record = await asyncio.to_thread(self.store.find, query)
         if record is None:
+            if silent_if_missing:
+                return False
             await destination.send(
                 f"I do not have a Dex record for `{query}` yet. Dex it with OwO in any shared server to teach the catalog.",
                 allowed_mentions=discord.AllowedMentions.none(),
@@ -662,7 +665,6 @@ class AnimalDex(commands.Cog):
                     "h adex",
                     "hadex",
                     "h ad",
-                    "had",
                 },
             )
             if direct is not None:
@@ -672,6 +674,21 @@ class AnimalDex(commands.Cog):
                     await message.reply(
                         f"Use `{helper_prefix} animal dex <animal>` to search the public animal catalog.",
                         mention_author=False,
+                    )
+                return
+
+            compact = parse_helper_command_argument(
+                message.content or "",
+                helper_prefix,
+                {"had"},
+            )
+            if compact is not None:
+                if compact:
+                    await self.send_lookup(
+                        message.channel,
+                        compact,
+                        reference=message,
+                        silent_if_missing=True,
                     )
                 return
 

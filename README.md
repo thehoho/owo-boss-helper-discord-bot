@@ -1,3 +1,9 @@
+## v0.14.9-beta notes
+
+Boss defeats published by OwO as a newer replacement message are now accepted only when their explicit result timestamp matches the currently tracked boss lifetime. Known active-card edits still work, while stale completed cards remain rejected and every boss outcome stays deduplicated. The safe unreadable-HP fallback is now `100000`.
+
+Compact `HAD <animal>` lookups now stay silent when the animal is not in the saved Dex, preventing ordinary sentences beginning with “had” from receiving bot replies. Explicit Animal Dex commands keep their helpful not-found response. Normal `squid` and hidden `hsquid` are also preserved as separate team identities.
+
 ## v0.14.8-beta notes
 
 HP recognition now includes OwO's alternate `4` shape inside a joined `,746` run. The supplied crocodile image reads as `139746` at high confidence while the strict glyph thresholds and safe `80000` fallback remain unchanged.

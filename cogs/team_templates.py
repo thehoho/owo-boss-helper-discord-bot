@@ -451,6 +451,11 @@ def normalize_animal_emoji_alias(alias: str) -> str:
     if not lowered:
         return original
 
+    # Hidden squid is a distinct animal identity, not the hidden-rank emoji for
+    # the normal squid. Preserve it before generic rank-prefix stripping.
+    if lowered == "hsquid":
+        return lowered
+
     # Some animals already include a leading tier-like letter in their official
     # name (for example pbird), so exact matches must win before prefix stripping.
     if lowered in STANDARD_ANIMAL_NAMES:
