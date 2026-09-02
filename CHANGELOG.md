@@ -1,3 +1,12 @@
+## v0.14.10-beta - OwO Mail Isolation Hotfix
+
+- Identified OwO's mailbox reward layout as the global source of false boss defeats.
+- Required the real `Top 10 Damage Dealt` leaderboard structure before any OwO message can enter boss state tracking.
+- Prevented mail rewards from starting cooldowns, incrementing daily boss reports, or emitting ready alerts.
+- Tightened ticket snapshot classification so mail rewards are not stored as empty boss-card baselines.
+- Added the exact production mail payload as a regression alongside real active and defeated cards.
+- Updated the public version to `0.14.10-beta`; no database migration or additional Discord permission is required.
+
 ## v0.14.9-beta - Boss Outcome Identity and Command Safety
 
 - Accepted legitimate OwO defeat cards published as newer replacement messages when their explicit result timestamp matches the active boss lifetime.

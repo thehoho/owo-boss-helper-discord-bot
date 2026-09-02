@@ -323,11 +323,9 @@ def split_ticket_lookup_terms(query: str) -> list[str]:
 
 def looks_like_guild_boss_card(text: str) -> bool:
     lowered = (text or "").lower()
-    if "top 10 damage dealt" in lowered or "owobot.com/battle-log?uuid=" in lowered:
-        return True
-    return "guild boss" in lowered and any(
-        marker in lowered
-        for marker in ("fight!", "fighters", "defeated", "escaped", "damage dealt")
+    return (
+        "top 10 damage dealt" in lowered
+        or "owobot.com/battle-log?uuid=" in lowered
     )
 
 

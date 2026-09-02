@@ -1,3 +1,9 @@
+## v0.14.10-beta notes
+
+Boss state tracking now requires OwO's real `Top 10 Damage Dealt` leaderboard layout. OwO mailbox rewards such as `You defeated a guild boss!` are ignored globally, even though they come from the official OwO account and contain recent defeat timestamps. Mail can no longer start cooldowns, increment boss reports, or trigger ready alerts.
+
+The ticket snapshot listener uses the same boundary, while genuine active, defeated, and escaped leaderboard cards continue through the existing boss-instance and deduplication checks.
+
 ## v0.14.9-beta notes
 
 Boss defeats published by OwO as a newer replacement message are now accepted only when their explicit result timestamp matches the currently tracked boss lifetime. Known active-card edits still work, while stale completed cards remain rejected and every boss outcome stays deduplicated. The safe unreadable-HP fallback is now `100000`.

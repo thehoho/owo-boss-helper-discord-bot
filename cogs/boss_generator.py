@@ -1055,9 +1055,9 @@ def read_hp_from_image_bytes(image_bytes: bytes, templates: dict[str, list[Image
 
 
 def is_guild_boss_status(data: dict[str, Any]) -> bool:
-    """Recognize OwO's server-wide guild-boss status card, not inventory pages."""
+    """Recognize OwO's leaderboard status card, not mail or inventory pages."""
     text = re.sub(r"\s+", " ", extract_all_text_from_raw(data)).lower()
-    if "lvl " in text:
+    if "lvl " in text or "top 10 damage dealt" not in text:
         return False
     return (
         is_active_boss_summary_text(text)
