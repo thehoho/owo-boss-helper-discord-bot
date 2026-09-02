@@ -38,6 +38,7 @@ EMOJI_FILES: dict[str, str] = {
     "boss_escaped": "boss_escaped.png",
     "boss_defeated": "boss_defeated.png",
     "neon_calculate": "neon_calculate.png",
+    "clown": "clown.png",
 }
 
 GAME_EMOJI_CATEGORIES: dict[str, str] = {

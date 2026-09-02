@@ -503,6 +503,9 @@ def guide_animal_variable_emoji_key(value: str) -> str | None:
 def guide_variable_emoji_key(value: str) -> str | None:
     compact = normalize_catalog_token(value).replace(" ", "")
 
+    if compact == "clown":
+        return "clown"
+
     # Exact direct aliases win before optional prefixes. Animals take priority
     # for the two familiar collisions; the specific passive forms remain
     # available as lwolf and snail_passive.

@@ -62,6 +62,7 @@ def emoji_bot() -> SimpleNamespace:
         "weapon_vstaff",
         "passive_mtap",
         "passive_snail",
+        "clown",
     )
     manager.emojis = {
         key: discord.PartialEmoji(name=key, id=100 + index)
@@ -88,6 +89,7 @@ class GuideVariableTests(unittest.TestCase):
         self.assertIn("<:pet_2026may_beeday:105>", rendered)
         self.assertIn("<:stat_wp:106>", rendered)
         self.assertIn("<:rank_legendary:107>", rendered)
+        self.assertIn("<:clown:111>", render_guide_markdown(emoji_bot(), "{clown}"))
         self.assertIn("{unknown}", rendered)
         self.assertEqual(unresolved_guide_variables(rendered), ("unknown",))
 
@@ -206,6 +208,7 @@ class GuideVariableTests(unittest.TestCase):
             guide_variable_emoji_key("legendary"),
             "rank_legendary",
         )
+        self.assertEqual(guide_variable_emoji_key("clown"), "clown")
 
     def test_prefixed_variables_remain_backward_compatible(self) -> None:
         expected = {
