@@ -1,3 +1,9 @@
+## v0.14.11-beta notes
+
+`HT C <name>` now has two deliberate paths. Replying to an official OwO team message imports that team exactly as before. Running it without a reply asks for confirmation; **Yes, create empty team** creates a blank editable template, while **Cancel** directs the member back to the reply-based import. Empty creation never overwrites an existing same-name template.
+
+Public team-guide compositions now keep each slot's level, animal emoji/name, rank, weapons, passives, and weapon rank on one compact row. Ranked animal aliases such as `gfish` resolve to the existing base-animal emoji, and emoji variables in optional slot notes continue to render below their slot.
+
 ## v0.14.10-beta notes
 
 Boss state tracking now requires OwO's real `Top 10 Damage Dealt` leaderboard layout. OwO mailbox rewards such as `You defeated a guild boss!` are ignored globally, even though they come from the official OwO account and contain recent defeat timestamps. Mail can no longer start cooldowns, increment boss reports, or trigger ready alerts.
@@ -135,7 +141,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - The private editor uses Discord modals and buttons for guide basics, unique aliases, user-created categories, displayed authors, viability, ease of creation, an optional detailed full guide, and all three composition slots.
 - Summaries, full guides, and slot notes support Discord Markdown plus direct emoji variables such as `{fish}`, `{pdagger}`, `{lifesteal}`, `{wp_stat}`, and `{legendary}`. The original `{w...}`, `{fp...}`, `{a...}`, `{s...}`, and `{r...}` prefixes remain optional for disambiguation.
 - The editor includes a private **Emoji variables** reference, resolves known variables during **Preview**, and warns about unknown variables without deleting their text.
-- Composition slots continue to support optional animal/weapon ranks, levels, up to three weapon specifications, passives, and notes using the checked-in animal, weapon, passive, and tier emoji catalogs.
+- Composition slots keep the level, animal emoji/name, animal rank, up to three weapon specifications, passives, and weapon ranks on one compact row; optional notes render below it using the same checked-in emoji catalogs and guide variables.
 - Search aliases are globally unique, edits increment the guide version, and the last editor is recorded.
 - Everyone can browse with `H guide`, search by name, alias, category, or displayed author with `H guide <query>` or `/team-guide`, open related teams, and privately page through an expert's optional **Full guide**.
 
@@ -382,7 +388,7 @@ H help
 
 ### Save a team
 
-Run `wtm` or `owo team`, open the correct team page, and reply directly to the OwO message:
+To import a team, run `wtm` or `owo team`, open the correct team page, and reply directly to the OwO message:
 
 ```text
 HT C <name>
@@ -391,7 +397,9 @@ HTM C <name>
 H team create <name>
 ```
 
-Saving the same name updates that template without changing its stable slot.
+To start from nothing, run the same create command without replying. The helper asks for confirmation before creating an empty template and immediately provides position-edit buttons. **Cancel** leaves everything unchanged so you can reply to the correct OwO team message instead.
+
+Reply-based imports with the same name update that template without changing its stable slot. Empty creation refuses to overwrite an existing same-name team.
 
 ### Update a team by slot or name
 

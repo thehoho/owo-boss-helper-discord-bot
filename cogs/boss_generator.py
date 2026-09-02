@@ -2612,8 +2612,9 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="💾 Team templates",
             value=(
-                f"Use `{team_short} C <name>` to save, `{team_short}` or "
-                f"`{team_short}<number>` to open, `{team_short} U <slot/name>` to "
+                f"Use `{team_short} C <name>` to import a replied OwO team or confirm "
+                f"an empty team, `{team_short}` or `{team_short}<number>` to open, "
+                f"`{team_short} U <slot/name>` to "
                 f"update, `{team_short} D <slot/name>` to delete, and "
                 f"`{team_short} help` for the full guide. A saved team's **Smart "
                 "replace** button lets the member choose the active team, Team 1, or "

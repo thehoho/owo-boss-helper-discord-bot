@@ -470,6 +470,9 @@ def animal_emoji_key(animal: str) -> str:
     special = resolve_special_animal(animal)
     if special:
         return f"pet_{special.get('emoji_stem', '')}"
+    standard = normalize_animal_emoji_alias(animal)
+    if standard in STANDARD_ANIMAL_NAMES:
+        return f"pet_{standard}"
     return f"pet_{normalize_catalog_token(animal).replace(' ', '')}"
 
 
@@ -714,14 +717,20 @@ def build_guide_embed(bot: commands.Bot, guide: TeamGuide) -> discord.Embed:
         rank = resolve_rank(slot.animal_rank)
         rank_icon = ui_emoji_text(bot, rank.emoji_key, "") if rank else ""
         level = f"L.{slot.level}" if slot.level is not None else "Any level"
-        line = f"**[{slot.position}]** {level} {pet} **{slot.animal}** {rank_icon}\n{render_weapon_specs(bot, slot.weapons)}"
+        roster = " ".join(
+            part for part in (level, pet, f"**{slot.animal}**", rank_icon) if part
+        )
+        line = (
+            f"**[{slot.position}]** {roster} │ "
+            f"{render_weapon_specs(bot, slot.weapons)}"
+        )
         if slot.notes:
             rendered_notes = render_guide_markdown(bot, slot.notes)
             line += f"\n-# {truncate_rendered_text(rendered_notes, 250)}"
         composition.append(line.strip())
     embed.add_field(
         name="Composition",
-        value=truncate_rendered_text("\n\n".join(composition), 1024),
+        value=truncate_rendered_text("\n".join(composition), 1024),
         inline=False,
     )
     embed.set_footer(text=f"Guide v{guide.version} • Created by Discord user {guide.creator_id} • Last editor {guide.updated_by}")

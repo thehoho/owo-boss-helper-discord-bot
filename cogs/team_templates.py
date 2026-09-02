@@ -998,13 +998,26 @@ async def fetch_raw_message(
         return None
 
 
+class ClosingConnection(sqlite3.Connection):
+    def __enter__(self) -> "ClosingConnection":
+        return self
+
+    def __exit__(self, exc_type: object, exc: object, traceback: object) -> bool:
+        try:
+            return bool(super().__exit__(exc_type, exc, traceback))
+        finally:
+            self.close()
+
+
 class TeamTemplateStore:
     def __init__(self, path: Path) -> None:
         self.path = path
         self.lock = asyncio.Lock()
 
     def _connect(self) -> sqlite3.Connection:
-        connection = sqlite3.connect(self.path)
+        connection = sqlite3.connect(
+            self.path, factory=ClosingConnection
+        )
         connection.row_factory = sqlite3.Row
         connection.execute("PRAGMA journal_mode=WAL")
         connection.execute("PRAGMA foreign_keys=ON")
@@ -1150,10 +1163,17 @@ class TeamTemplateStore:
         name: str,
         source_title: str,
         members: tuple[TeamMember, ...],
+        *,
+        replace_existing: bool = True,
     ) -> tuple[TeamTemplate | None, str | None]:
         async with self.lock:
             return await asyncio.to_thread(
-                self._save_sync, user_id, name, source_title, members
+                self._save_sync,
+                user_id,
+                name,
+                source_title,
+                members,
+                replace_existing,
             )
 
     def _save_sync(
@@ -1162,6 +1182,7 @@ class TeamTemplateStore:
         name: str,
         source_title: str,
         members: tuple[TeamMember, ...],
+        replace_existing: bool = True,
     ) -> tuple[TeamTemplate | None, str | None]:
         now = int(time.time())
         members_json = json.dumps(
@@ -1183,6 +1204,11 @@ class TeamTemplateStore:
                 """,
                 (user_id, name),
             ).fetchone()
+            if existing is not None and not replace_existing:
+                return None, (
+                    "You already have a saved team with that name. "
+                    "Open or rename the existing team instead."
+                )
             if existing is None:
                 used_slots = {
                     int(row["slot"])
@@ -1753,6 +1779,77 @@ class SmartReplaceConfirmView(discord.ui.View):
             self.session,
             self.response_message_id,
         )
+
+
+class EmptyTeamCreateConfirmView(OwnedView):
+    """Confirm an intentional empty template instead of a missed OwO reply."""
+
+    def __init__(
+        self,
+        cog: "TeamTemplates",
+        owner_id: int,
+        name: str,
+        helper_prefix: str,
+    ) -> None:
+        super().__init__(owner_id, timeout=180)
+        self.cog = cog
+        self.name = name
+        self.helper_prefix = helper_prefix
+
+    @discord.ui.button(
+        label="Yes, create empty team",
+        emoji="✅",
+        style=discord.ButtonStyle.success,
+    )
+    async def create_empty(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        template, error = await self.cog.store.save(
+            interaction.user.id,
+            self.name,
+            "Created as an empty team",
+            (),
+            replace_existing=False,
+        )
+        if error or template is None:
+            await interaction.response.edit_message(
+                content=f"⚠️ {error or 'The empty team could not be created.'}",
+                embed=None,
+                view=None,
+            )
+            self.stop()
+            return
+        await interaction.response.edit_message(
+            content=None,
+            embed=self.cog.build_saved_embed(template, self.helper_prefix),
+            view=TemplateEditView(self.cog, interaction.user.id, template),
+        )
+        logger.info(
+            "Created empty team template %s for user %s",
+            template.template_id,
+            interaction.user.id,
+        )
+        self.stop()
+
+    @discord.ui.button(
+        label="Cancel",
+        emoji="✖️",
+        style=discord.ButtonStyle.secondary,
+    )
+    async def cancel(
+        self, interaction: discord.Interaction, _: discord.ui.Button
+    ) -> None:
+        team_short = helper_alias(self.helper_prefix, "ht")
+        await interaction.response.edit_message(
+            content=(
+                "Cancelled. Reply directly to the official OwO team message, then run "
+                f"`{team_short} C {self.name}` again."
+            ),
+            embed=None,
+            view=None,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        self.stop()
 
 
 class MissingWeaponConfirmView(OwnedView):
@@ -3396,10 +3493,13 @@ class TeamTemplates(commands.Cog):
         embed.add_field(
             name="Save a team",
             value=(
-                "Run `wtm` or `owo team`, open the correct page, and reply to it with "
+                "To import a team, run `wtm` or `owo team`, open the correct page, "
+                "and reply to it with "
                 f"`{team_short} C <name>`. Full form: "
                 f"`{helper_command(helper_prefix, 'team create <name>')}`. The helper reads "
-                "the animal emoji alias, so custom pet nicknames do not break restores."
+                "the animal emoji alias, so custom pet nicknames do not break restores. "
+                "Without an official OwO team reply, the same command asks whether to "
+                "create an empty team with that name instead."
             ),
             inline=False,
         )
@@ -3506,10 +3606,21 @@ class TeamTemplates(commands.Cog):
         helper_prefix: str = HELPER_PREFIX_DEFAULT,
     ) -> discord.Embed:
         team_short = helper_alias(helper_prefix, "ht")
+        is_empty = not template.members
+        if is_empty:
+            title = f"✅ Empty team #{template.slot} created: {template.name}"
+            member_summary = (
+                "**This team is empty.** "
+                "Use the position buttons below to add any animals and weapons, or run "
+                f"`{team_short} edit {template.slot}` later."
+            )
+        else:
+            title = f"✅ Team #{template.slot} saved: {template.name}"
+            member_summary = format_team_members(template.members)
         return discord.Embed(
-            title=f"✅ Team #{template.slot} saved: {template.name}",
+            title=title,
             description=(
-                f"{format_team_members(template.members)}\n\n"
+                f"{member_summary}\n\n"
                 f"Use `{team_short}{template.slot}` or `{team_short} {template.name}` "
                 f"to open it directly, or `{team_short}` to open the full list."
             ),
@@ -3588,6 +3699,26 @@ class TeamTemplates(commands.Cog):
             await message.reply(
                 f"Template names can contain at most {MAX_TEMPLATE_NAME_LENGTH} characters.",
                 mention_author=False,
+            )
+            return
+        helper_prefix = await get_guild_helper_prefix(
+            message.guild.id if message.guild else None
+        )
+        if message.reference is None or message.reference.message_id is None:
+            escaped_name = discord.utils.escape_markdown(name)
+            await message.reply(
+                (
+                    "You did not reply to an official OwO team message. "
+                    f"Do you want to create an empty team named **{escaped_name}**?"
+                ),
+                view=EmptyTeamCreateConfirmView(
+                    self,
+                    message.author.id,
+                    name,
+                    helper_prefix,
+                ),
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
             )
             return
         parsed = await self.parse_team_reply(message)
@@ -3982,8 +4113,9 @@ class TeamTemplates(commands.Cog):
                 message.guild.id if message.guild else None
             )
             await message.reply(
-                "You do not have any saved teams yet. Reply to an OwO `wtm` / "
-                f"`owo team` message with `{helper_alias(helper_prefix, 'ht')} C <name>`.",
+                "You do not have any saved teams yet. Reply to an OwO `wtm` / `owo team` "
+                f"message with `{helper_alias(helper_prefix, 'ht')} C <name>` to import it, "
+                "or run the command without a reply and confirm the empty-team prompt.",
                 mention_author=False,
             )
             return

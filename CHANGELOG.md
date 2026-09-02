@@ -1,3 +1,14 @@
+## v0.14.11-beta - Empty Teams and Compact Guide Composition
+
+- Added a user-owned **Yes, create empty team** / **Cancel** confirmation when `HT C <name>` is not a reply to an official OwO team message.
+- Created confirmed empty templates with immediate position-edit controls so members can add any animals and weapons they want.
+- Prevented empty creation from silently replacing an existing same-name template while preserving normal reply-based updates.
+- Kept each guide slot's level, pet, animal name, rank, weapons, passives, and weapon rank on one compact composition row.
+- Fixed ranked standard animal aliases such as `gfish` resolving to nonexistent emoji keys instead of the existing base-animal emoji.
+- Preserved editable displayed authors and emoji-variable rendering in summaries, full guides, and optional slot notes.
+- Closed team-template SQLite connections deterministically after every operation.
+- Updated the public version to `0.14.11-beta`; no database migration or additional Discord permission is required.
+
 ## v0.14.10-beta - OwO Mail Isolation Hotfix
 
 - Identified OwO's mailbox reward layout as the global source of false boss defeats.
