@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import io
+import json
 import logging
 import os
 from dataclasses import dataclass
@@ -15,11 +16,11 @@ from discord import app_commands
 from discord.ext import commands
 from PIL import Image
 
-from .emoji_assets import MAX_UPLOAD_BYTES, custom_emoji_url, normalize_upload
+from .emoji_assets import MAX_UPLOAD_BYTES, custom_emoji_url, emoji_label, normalize_upload
 from .game_catalog import PASSIVES, RANKS, WEAPONS, special_animals
 from .team_guides import guide_variable_emoji_key
 from .ui_emojis import (
-    discover_emoji_assets, emoji_asset_keys, get_ui_emoji_manager, prepare_emoji_image,
+    DEX_ARTWORK, default_emoji_image, discover_emoji_assets, emoji_asset_keys, get_ui_emoji_manager, prepare_emoji_image,
 )
 
 logger = logging.getLogger(__name__)
@@ -42,13 +43,14 @@ def reference_entries() -> tuple[EmojiReference, ...]:
     catalog = {entry.emoji_key: (entry.name, entry.aliases) for entry in (*WEAPONS, *PASSIVES, *RANKS)}
     for animal in special_animals():
         catalog[f"pet_{animal['emoji_stem']}"] = (str(animal["name"]), tuple(animal["aliases"]))
+    for key, (_, name, aliases_json, _) in DEX_ARTWORK.items():
+        catalog[key] = (name, tuple(json.loads(aliases_json)))
     result = []
     for key in sorted(emoji_asset_keys()):
         prefix, _, stem = key.partition("_")
         category = prefix if prefix in CATEGORIES and prefix != "all" else "ui"
         name, aliases = catalog.get(key, (stem.replace("_", " ").title() if category != "ui" else key.replace("_", " ").title(), (stem if category != "ui" else key,)))
-        usable = tuple(alias for alias in aliases if guide_variable_emoji_key(alias) == key)
-        result.append(EmojiReference(key, category, name, aliases, "{" + (usable[0] if usable else key) + "}"))
+        result.append(EmojiReference(key, category, name, aliases, "{" + emoji_label(key) + "}"))
     return tuple(result)
 
 
@@ -56,7 +58,7 @@ def search_entries(query: str = "", category: str = "all") -> tuple[EmojiReferen
     terms = query.strip().casefold().replace("{", "").replace("}", "").split()
     return tuple(entry for entry in reference_entries()
                  if (category == "all" or entry.category == category)
-                 and all(term in " ".join((entry.key, entry.name, *entry.aliases)).casefold() for term in terms))
+                 and all(term in " ".join((entry.key, entry.name, emoji_label(entry.key), *entry.aliases)).casefold() for term in terms))
 
 
 def resolve_target(value: str) -> str:
@@ -71,7 +73,7 @@ class ReferenceSelect(discord.ui.Select):
     def __init__(self, browser: EmojiBrowser) -> None:
         manager = get_ui_emoji_manager(browser.bot)
         entries = browser.visible_entries()
-        options = [discord.SelectOption(label=entry.name[:100], value=entry.key,
+        options = [discord.SelectOption(label=emoji_label(entry.key)[:100], value=entry.key,
                    description=f"{entry.variable} | {entry.key}"[:100],
                    emoji=manager.emojis.get(entry.key) if manager else None,
                    default=entry.key == browser.selected) for entry in entries]
@@ -254,6 +256,60 @@ class EmojiConfirm(discord.ui.View):
             self.stop()
 
 
+class ReplacementSource(discord.ui.Modal, title="Choose replacement artwork"):
+    source = discord.ui.TextInput(label="Paste one custom Discord emoji", max_length=150)
+
+    def __init__(self, browser):
+        super().__init__()
+        self.browser = browser
+        self.key = browser.selected
+
+    async def on_submit(self, interaction):
+        if not await self.browser.interaction_check(interaction):
+            return
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        try:
+            await self.browser.cog.preview(interaction, self.key, await download_custom_emoji(str(self.source)))
+        except (ValueError, aiohttp.ClientError, asyncio.TimeoutError) as exc:
+            await interaction.followup.send(str(exc) if isinstance(exc, ValueError) else "Could not download this emoji. Use the image option of /emoji-replace instead.", ephemeral=True)
+
+
+class OwnerEmojiBrowser(EmojiBrowser):
+    def __init__(self, cog, user_id, overrides, category="all", query="", raw=None):
+        self.cog, self.overrides, self.raw = cog, overrides, raw
+        super().__init__(cog.bot, user_id, query, category)
+
+    async def interaction_check(self, interaction):
+        return await super().interaction_check(interaction) and await self.cog.require_owner(interaction)
+
+    async def refresh(self, interaction):
+        self.overrides = await asyncio.to_thread(get_ui_emoji_manager(self.bot).store.all)
+        await super().refresh(interaction)
+
+    def embed(self):
+        embed = super().embed()
+        entries = search_entries(category=self.category)
+        done = sum(entry.key in self.overrides for entry in entries)
+        status = ("Manually replaced" if self.selected in self.overrides else
+                  "Original Animal Dex artwork" if self.selected in DEX_ARTWORK else "Packaged artwork")
+        embed.title = "Owner emoji replacement — all categories"
+        embed.add_field(name="Replacement status", value=f"{done}/{len(entries)} manually replaced in this category.\nSelected: {status}\nUse categories and Next for the complete list.\nReplace selected: paste a Discord emoji. For an image upload, use /emoji-replace with the image option.", inline=False)
+        return embed
+
+    @discord.ui.button(label="Replace selected", style=discord.ButtonStyle.success, row=3)
+    async def replace_selected(self, interaction, button):
+        if not await self.interaction_check(interaction):
+            return
+        key = self.selected
+        if not key:
+            await interaction.response.send_message("Choose an icon first.", ephemeral=True)
+        elif self.raw is None:
+            await interaction.response.send_modal(ReplacementSource(self))
+        else:
+            await interaction.response.defer(ephemeral=True, thinking=True)
+            await self.cog.preview(interaction, key, self.raw)
+
+
 class EmojiTools(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -261,6 +317,41 @@ class EmojiTools(commands.Cog):
             self.owner_id = int(os.getenv("BOT_OWNER_ID", "0") or 0)
         except ValueError:
             self.owner_id = 0
+        self._dex_task = None
+        self.last_dex_report = None
+
+    @commands.Cog.listener()
+    async def on_ready(self):
+        if self._dex_task is None:
+            self._dex_task = asyncio.create_task(self.run_dex_sync())
+
+    async def cog_unload(self):
+        if self._dex_task:
+            self._dex_task.cancel()
+            await asyncio.gather(self._dex_task, return_exceptions=True)
+
+    async def run_dex_sync(self):
+        from .emoji_dex import sync_dex_artwork
+        try:
+            self.last_dex_report = await sync_dex_artwork(self.bot, get_ui_emoji_manager(self.bot))
+        except Exception:
+            logger.exception("Animal Dex artwork sync could not finish")
+            self.last_dex_report = {"error": "Sync failed; existing artwork was preserved. Try refresh again."}
+
+    @app_commands.command(name="emoji-dex-sync", description="Owner only: see the animal artwork sync report or refresh saved Dex images.")
+    async def emoji_dex_sync(self, interaction: discord.Interaction, refresh: bool = False):
+        if not await self.require_owner(interaction):
+            return
+        if self._dex_task and not self._dex_task.done():
+            await interaction.response.send_message("Animal artwork is syncing in the background. Run this command again for its report.", ephemeral=True)
+        elif refresh or self.last_dex_report is None:
+            self._dex_task = asyncio.create_task(self.run_dex_sync())
+            await interaction.response.send_message("Animal artwork sync started. Existing manual replacements are protected. Run this command again for the report.", ephemeral=True)
+        else:
+            report = self.last_dex_report
+            text = json.dumps(report, ensure_ascii=False, indent=2)
+            await interaction.response.send_message("Animal artwork report: missing entries need an official OwO Dex source; existing fallback artwork is retained.",
+                file=discord.File(io.BytesIO(text.encode()), filename="animal-emoji-report.json"), ephemeral=True)
 
     async def is_owner(self, user: discord.abc.User) -> bool:
         if self.owner_id:
@@ -280,8 +371,10 @@ class EmojiTools(commands.Cog):
         await interaction.response.send_message(embed=browser.embed(), view=browser, ephemeral=True)
 
     async def target_choices(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
-        return [app_commands.Choice(name=f"{entry.name} — {entry.key}"[:100], value=entry.key)
-                for entry in search_entries(current)[:25]]
+        category = getattr(getattr(interaction, "namespace", None), "category", "all")
+        category = category if category in CATEGORIES else "all"
+        return [app_commands.Choice(name=f"{emoji_label(entry.key)} — {entry.name}"[:100], value=emoji_label(entry.key))
+                for entry in search_entries(current, category)[:25]]
 
     async def preview(self, interaction: discord.Interaction, key: str, raw: bytes | None) -> None:
         manager = get_ui_emoji_manager(self.bot)
@@ -289,13 +382,13 @@ class EmojiTools(commands.Cog):
             raise ValueError("The emoji manager is unavailable. Please try again later.")
         expected = await manager.current_revision(key)
         if raw is None:
-            payload = await asyncio.to_thread(prepare_emoji_image, discover_emoji_assets()[key])
+            payload = await asyncio.to_thread(default_emoji_image, key)
         else:
             payload = await asyncio.to_thread(normalize_upload, raw)
         with Image.open(io.BytesIO(payload)) as image:
             extension = {"GIF": "gif", "WEBP": "webp"}.get(image.format, "png")
         filename = f"emoji-preview.{extension}"
-        embed = discord.Embed(title=f"{'Reset' if raw is None else 'Replace'} {key}?",
+        embed = discord.Embed(title=f"{'Reset' if raw is None else 'Replace'} {emoji_label(key)}?",
                               description="Large image: proposed artwork. Thumbnail: current emoji.\nConfirm to use this icon globally in future bot messages. Old emoji IDs are retained so existing messages keep working.\nNo change is made until you confirm.",
                               color=0xFEE75C)
         embed.set_image(url=f"attachment://{filename}")
@@ -310,21 +403,29 @@ class EmojiTools(commands.Cog):
     @app_commands.describe(target="Choose the exact icon to replace", source="Paste one custom Discord emoji (or attach an image instead)",
                            image="Original artwork, at most 2 MiB; use either image or source")
     @app_commands.autocomplete(target=target_choices)
-    async def emoji_replace(self, interaction: discord.Interaction, target: str,
-                            source: str | None = None, image: discord.Attachment | None = None) -> None:
+    @app_commands.choices(category=[app_commands.Choice(name=label, value=key) for key, label in CATEGORIES.items()])
+    async def emoji_replace(self, interaction: discord.Interaction, target: str = "",
+                            source: str | None = None, image: discord.Attachment | None = None, category: str = "all") -> None:
         if not await self.require_owner(interaction):
             return
         await interaction.response.defer(ephemeral=True)
         try:
-            key = resolve_target(target)
-            if (source is None) == (image is None):
-                raise ValueError("Provide exactly one source: a custom Discord emoji OR an attached image.")
+            key = resolve_target(target) if target else None
+            if source is not None and image is not None:
+                raise ValueError("Provide one source: a custom Discord emoji OR an attached image.")
+            raw = None
             if image is not None:
                 if image.size > MAX_UPLOAD_BYTES:
                     raise ValueError("The source image must be at most 2 MiB.")
                 raw = await image.read()
-            else:
+            elif source is not None:
                 raw = await download_custom_emoji(source)
+            if key is None or raw is None:
+                manager = get_ui_emoji_manager(self.bot)
+                overrides = await asyncio.to_thread(manager.store.all)
+                browser = OwnerEmojiBrowser(self, interaction.user.id, overrides, category, key or "", raw)
+                await interaction.followup.send(embed=browser.embed(), view=browser, ephemeral=True)
+                return
             await self.preview(interaction, key, raw)
         except (ValueError, aiohttp.ClientError, asyncio.TimeoutError, discord.HTTPException) as exc:
             message = str(exc) if isinstance(exc, ValueError) else "The image could not be downloaded. Attach the original image and try again."

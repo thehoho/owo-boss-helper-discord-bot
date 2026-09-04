@@ -513,6 +513,10 @@ class AnimalDexStore:
             updated_at=int(row["updated_at"]),
         )
 
+    def all_records(self) -> tuple[AnimalDexRecord, ...]:
+        with self._connect() as connection:
+            return tuple(self._from_row(row) for row in connection.execute("SELECT * FROM animals ORDER BY animal_key"))
+
     def find(self, query: str) -> AnimalDexRecord | None:
         normalized = normalize_catalog_token(query)
         if not normalized:

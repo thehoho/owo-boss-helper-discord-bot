@@ -17,7 +17,7 @@ from PIL import Image
 from cogs.emoji_assets import EmojiOverrideStore, MAX_UPLOAD_BYTES, custom_emoji_url, normalize_upload, override_name
 from cogs.emoji_tools import EmojiBrowser, EmojiConfirm, EmojiTools, reference_entries, resolve_target, search_entries
 from cogs.team_guides import guide_variable_emoji_key, render_guide_markdown
-from cogs.ui_emojis import UIEmojiManager, deployed_emoji_name, discover_emoji_assets, emoji_asset_keys, prepare_emoji_image
+from cogs.ui_emojis import UIEmojiManager, deployed_emoji_name, legacy_emoji_name, discover_emoji_assets, emoji_asset_keys, prepare_emoji_image
 
 
 def png(color="red", size=(32, 16)) -> bytes:
@@ -81,7 +81,7 @@ class UploadTests(unittest.TestCase):
         key = max(emoji_asset_keys(), key=len)
         name = override_name(key, png())
         self.assertLessEqual(len(name), 32)
-        self.assertRegex(name, r"^[a-z0-9_]+$")
+        self.assertRegex(name, r"^[A-Za-z0-9_]+$")
         self.assertEqual(name, override_name(key, png()))
         self.assertNotEqual(name, override_name(key, png("blue")))
         self.assertNotEqual(name, override_name("clown", png()))
@@ -91,8 +91,8 @@ class UploadTests(unittest.TestCase):
             with Image.open(io.BytesIO(prepare_emoji_image(path))) as image:
                 left, top, right, bottom = image.convert("RGBA").getchannel("A").getbbox()
                 self.assertEqual(max(right - left, bottom - top), 128)
-        self.assertTrue(deployed_emoji_name("weapon_sword").startswith("v3_"))
-        self.assertEqual(deployed_emoji_name("clown"), "clown")
+        self.assertEqual(deployed_emoji_name("weapon_sword"), "W_sword_v3")
+        self.assertEqual(deployed_emoji_name("clown"), "UI_clown_v3")
 
 
 class StoreTests(unittest.TestCase):
@@ -196,7 +196,7 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
                              self.manager.store.all()[self.key].image)
 
     async def test_startup_upload_failure_keeps_old_catalog_usable(self):
-        old_name = deployed_emoji_name(self.key, revision=2)
+        old_name = legacy_emoji_name(self.key, revision=2)
         self.bot.fetch_application_emojis.return_value = [remote(old_name, 77)]
         self.bot.create_application_emoji.side_effect = discord.HTTPException(SimpleNamespace(status=500, reason="error"), "error")
         with patch("cogs.ui_emojis.discover_emoji_assets", return_value={self.key: discover_emoji_assets()[self.key]}):
@@ -248,7 +248,7 @@ class InterfaceTests(unittest.IsolatedAsyncioTestCase):
         async with bot:
             await bot.add_cog(EmojiTools(bot))
             names = {command.name for command in bot.tree.get_commands()}
-            self.assertEqual(names, {"guide-emojis", "emoji-replace", "emoji-reset"})
+            self.assertEqual(names, {"guide-emojis", "emoji-replace", "emoji-reset", "emoji-dex-sync"})
             for command in bot.tree.get_commands():
                 self.assertEqual(command.to_dict(bot.tree)["name"], command.name)
 

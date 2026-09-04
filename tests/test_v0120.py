@@ -160,7 +160,7 @@ class HelpAndEmojiTests(unittest.TestCase):
         self.assertEqual(len(deployed_names), len(assets))
         for name, path in assets.items():
             self.assertRegex(name, re.compile(r"^[a-z0-9_]{2,32}$"))
-            self.assertRegex(deployed_emoji_name(name), re.compile(r"^[a-z0-9_]{2,32}$"))
+            self.assertRegex(deployed_emoji_name(name), re.compile(r"^[A-Za-z0-9_]{2,32}$"))
             self.assertTrue(path.is_file(), path)
             self.assertLessEqual(len(prepare_emoji_image(path)), MAX_EMOJI_BYTES, path)
 

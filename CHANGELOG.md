@@ -1,3 +1,13 @@
+## v0.14.13-beta - Complete Emoji Picker and Animal Dex Artwork
+
+- Fixed incomplete-looking replacement discovery by adding a categorized, paginated owner picker directly to `/emoji-replace`; blank arguments now open the picker.
+- Added category-filtered autocomplete, normalized BS/W/ST/AN/R/UI labels and compatible guide variables, plus replacement status.
+- Renamed active application emojis in place while preserving their IDs and manually uploaded artwork.
+- Added background import of official saved Animal Dex emoji sources, including custom animals, with stable dynamic guide keys.
+- Persisted original Dex artwork in the existing backed-up `emoji_overrides.db`; manual overrides remain authoritative.
+- Added owner-only `/emoji-dex-sync` status, refresh, and a downloadable missing/failed-source report.
+- Retained packaged art when no valid Dex source exists; no boss tracking or HP-reading behavior changed.
+
 ## v0.14.12-beta - Emoji Reference and Owner Artwork Tools
 
 - Added a public, private-response `/guide-emojis` browser with category filters, search, pagination, aliases, exact guide syntax, and enlarged previews.

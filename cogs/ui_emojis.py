@@ -21,7 +21,7 @@ import discord
 from discord.ext import commands
 from PIL import Image
 
-from .emoji_assets import EmojiOverrideStore, normalize_upload, override_name
+from .emoji_assets import EmojiOverrideStore, emoji_label, normalize_upload, override_name, versioned_name
 
 logger = logging.getLogger(__name__)
 
@@ -33,6 +33,7 @@ MAX_APPLICATION_EMOJIS = 2000
 MAX_EMOJI_NAME_LENGTH = 32
 GAME_EMOJI_ASSET_REVISION = 3
 SUPPORTED_ASSET_SUFFIXES = frozenset({".gif", ".jpeg", ".jpg", ".png", ".webp"})
+DEX_ARTWORK: dict[str, tuple] = {}
 
 EMOJI_FILES: dict[str, str] = {
     "ticket_available": "ticket_available.png",
@@ -70,6 +71,8 @@ def discover_emoji_assets() -> dict[str, Path]:
                     logger.warning("Skipped duplicate application emoji name: %s", name)
                     continue
                 assets[name] = path
+    for key in DEX_ARTWORK:
+        assets.setdefault(key, PROJECT_ROOT / "emoji_dex_assets" / key)
     return assets
 
 
@@ -78,7 +81,28 @@ def emoji_asset_keys() -> frozenset[str]:
     return frozenset(discover_emoji_assets())
 
 
+@lru_cache(maxsize=1)
+def emoji_alias_keys() -> dict[str, str]:
+    return {emoji_label(key).casefold(): key for key in emoji_asset_keys()}
+
+
+def clear_emoji_catalog_cache() -> None:
+    emoji_asset_keys.cache_clear()
+    emoji_alias_keys.cache_clear()
+
+
+def default_emoji_image(key: str) -> bytes:
+    return DEX_ARTWORK[key][0] if key in DEX_ARTWORK else prepare_emoji_image(discover_emoji_assets()[key])
+
+
 def deployed_emoji_name(logical_name: str, revision: int = GAME_EMOJI_ASSET_REVISION) -> str:
+    if logical_name in DEX_ARTWORK:
+        digest = hashlib.sha256(DEX_ARTWORK[logical_name][0]).hexdigest()[:12]
+        return versioned_name(logical_name, "d" + digest)
+    return versioned_name(logical_name, f"v{revision}")
+
+
+def legacy_emoji_name(logical_name: str, revision: int = GAME_EMOJI_ASSET_REVISION) -> str:
     """Return the Discord-side name while keeping stable logical lookups."""
     if logical_name in EMOJI_FILES:
         return logical_name
@@ -146,6 +170,9 @@ class UIEmojiManager(commands.Cog):
 
     async def cog_load(self) -> None:
         await asyncio.to_thread(self.store.initialize)
+        DEX_ARTWORK.clear()
+        DEX_ARTWORK.update(await asyncio.to_thread(self.store.dex_all))
+        clear_emoji_catalog_cache()
 
     async def cog_unload(self) -> None:
         if getattr(self.bot, "ui_emoji_manager", None) is self:
@@ -189,22 +216,36 @@ class UIEmojiManager(commands.Cog):
             emoji_assets = discover_emoji_assets()
             # Keep current guides usable while the enlarged catalog uploads.
             for name in emoji_assets:
-                previous = by_name.get(deployed_emoji_name(name, revision=2))
+                previous = by_name.get(legacy_emoji_name(name, revision=2))
                 if previous is not None:
                     self.emojis[name] = self._to_partial(previous)
             for name, path in emoji_assets.items():
                 override = overrides.get(name)
-                remote_name = override.name if override else deployed_emoji_name(name)
+                remote_name = override_name(name, override.image) if override else deployed_emoji_name(name)
                 fallback = by_name.get(deployed_emoji_name(name))
                 if fallback is not None:
                     self.emojis[name] = self._to_partial(fallback)
                 current = by_name.get(remote_name)
+                if current is None:
+                    old_name = override.name if override else legacy_emoji_name(name)
+                    current = by_name.get(old_name)
+                    if current is not None:
+                        # Rename in place: no new IDs, no artwork loss, no quota cost.
+                        try:
+                            renamed = await current.edit(name=remote_name)
+                            if override:
+                                await asyncio.to_thread(self.store.rename, name, override.name, remote_name)
+                            current = renamed
+                            logger.info("Normalized application emoji %s without changing ID %s", name, current.id)
+                        except Exception:
+                            logger.exception("Could not normalize emoji name for %s; keeping its existing ID", name)
+                            failed.append(name)
                 if current is not None:
                     self.emojis[name] = self._to_partial(current)
                     reused += 1
                     continue
 
-                if not override and not path.is_file():
+                if not override and name not in DEX_ARTWORK and not path.is_file():
                     missing_assets.append(str(path.relative_to(PROJECT_ROOT)))
                     continue
 
@@ -217,7 +258,7 @@ class UIEmojiManager(commands.Cog):
                     failed.append(name)
                     continue
 
-                image = override.image if override else await asyncio.to_thread(prepare_emoji_image, path)
+                image = override.image if override else await asyncio.to_thread(default_emoji_image, name)
                 if len(image) > MAX_EMOJI_BYTES:
                     logger.warning(
                         "Application emoji asset %s is too large (%s bytes; max %s)",
@@ -260,6 +301,28 @@ class UIEmojiManager(commands.Cog):
     async def current_revision(self, key: str) -> str:
         return await asyncio.to_thread(self.store.revision, key, deployed_emoji_name(key))
 
+    async def install_dex_asset(self, key: str, raw: bytes, display_name: str, aliases_json: str, source_url: str, inventory: list | None = None) -> None:
+        if not re.fullmatch(r"pet_[a-z0-9_]{1,59}", key):
+            raise ValueError("Animal name cannot be represented safely as a guide emoji key.")
+        image = await asyncio.to_thread(normalize_upload, raw)
+        async with self._sync_lock:
+            override = (await asyncio.to_thread(self.store.all)).get(key)
+            emoji = None
+            if override is None:
+                name = versioned_name(key, "d" + hashlib.sha256(image).hexdigest()[:12])
+                existing = inventory if inventory is not None else await self.bot.fetch_application_emojis()
+                emoji = next((item for item in existing if item.name == name), None)
+                if emoji is None:
+                    if len(existing) >= MAX_APPLICATION_EMOJIS:
+                        raise ValueError("Application emoji capacity is full; current artwork was preserved.")
+                    emoji = await self.bot.create_application_emoji(name=name, image=image)
+                    existing.append(emoji)
+            await asyncio.to_thread(self.store.save_dex, key, image, display_name, aliases_json, source_url)
+            DEX_ARTWORK[key] = (image, display_name, aliases_json, source_url)
+            clear_emoji_catalog_cache()
+            if emoji:
+                self.emojis[key] = self._to_partial(emoji)
+
     async def replace_asset(
         self, key: str, image: bytes | None, actor_id: int, expected: str,
     ) -> discord.PartialEmoji:
@@ -282,7 +345,7 @@ class UIEmojiManager(commands.Cog):
                 if len(existing) >= MAX_APPLICATION_EMOJIS:
                     raise ValueError("Application emoji capacity is full. Nothing was replaced; old emojis were retained.")
                 payload = image if image is not None else await asyncio.to_thread(
-                    prepare_emoji_image, discover_emoji_assets()[key],
+                    default_emoji_image, key,
                 )
                 if len(payload) > MAX_EMOJI_BYTES:
                     raise ValueError("The prepared image exceeds Discord's 256 KiB limit.")

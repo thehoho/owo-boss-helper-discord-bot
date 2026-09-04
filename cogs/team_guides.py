@@ -29,7 +29,7 @@ from .game_catalog import (
 )
 from .helper_prefix import get_guild_helper_prefix, parse_helper_command_argument
 from .team_templates import STANDARD_ANIMAL_NAMES, normalize_animal_emoji_alias
-from .ui_emojis import emoji_asset_keys, ui_emoji_text
+from .ui_emojis import emoji_alias_keys, emoji_asset_keys, ui_emoji_text
 
 
 logger = logging.getLogger(__name__)
@@ -501,6 +501,9 @@ def guide_animal_variable_emoji_key(value: str) -> str | None:
 
 
 def guide_variable_emoji_key(value: str) -> str | None:
+    normalized_key = emoji_alias_keys().get(value.strip().casefold())
+    if normalized_key:
+        return normalized_key
     # Exact registry keys make every icon available without ambiguous aliases.
     if value.strip().casefold() in emoji_asset_keys():
         return value.strip().casefold()

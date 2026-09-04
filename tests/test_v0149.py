@@ -227,7 +227,7 @@ class CorrectnessSurfaceTests(unittest.TestCase):
         self.assertEqual(normalize_animal_emoji_alias("hfish"), "fish")
 
     def test_release_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.12-beta")
+        self.assertEqual(BOT_VERSION, "0.14.13-beta")
 
 
 if __name__ == "__main__":

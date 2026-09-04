@@ -17,6 +17,20 @@ from PIL import Image, ImageOps
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 MAX_IMAGE_PIXELS = 2048 * 2048
 MAX_EMOJI_BYTES = 256 * 1024
+EMOJI_PREFIXES = {"passive": "BS", "weapon": "W", "stat": "ST", "pet": "AN", "rank": "R"}
+
+
+def emoji_label(key: str) -> str:
+    category, _, stem = key.partition("_")
+    return f"{EMOJI_PREFIXES[category]}_{stem}" if category in EMOJI_PREFIXES else f"UI_{key}"
+
+
+def versioned_name(key: str, suffix: str) -> str:
+    label = emoji_label(key)
+    if len(label) + len(suffix) + 1 > 32:
+        digest = hashlib.sha256(key.encode()).hexdigest()[:6]
+        label = label[:32 - len(suffix) - len(digest) - 2] + "_" + digest
+    return f"{label}_{suffix}"
 CUSTOM_EMOJI_RE = re.compile(r"<(?P<animated>a?):[A-Za-z0-9_]{2,32}:(?P<id>[0-9]{17,20})>")
 
 
@@ -73,8 +87,8 @@ def normalize_upload(raw: bytes) -> bytes:
 
 
 def override_name(key: str, image: bytes) -> str:
-    digest = hashlib.sha256(key.encode() + b"\0" + image).hexdigest()[:16]
-    return f"ov_{key[:12]}_{digest}"
+    digest = hashlib.sha256(key.encode() + b"\0" + image).hexdigest()[:12]
+    return versioned_name(key, "u" + digest)
 
 
 @dataclass(frozen=True)
@@ -103,6 +117,25 @@ class EmojiOverrideStore:
                 id INTEGER PRIMARY KEY, key TEXT NOT NULL, action TEXT NOT NULL,
                 emoji_id INTEGER, actor_id INTEGER NOT NULL, created_at INTEGER NOT NULL
             )""")
+            db.execute("""CREATE TABLE IF NOT EXISTS emoji_dex_assets (
+                key TEXT PRIMARY KEY, image BLOB NOT NULL, display_name TEXT NOT NULL,
+                aliases_json TEXT NOT NULL, source_url TEXT NOT NULL
+            )""")
+
+    def dex_all(self) -> dict[str, tuple]:
+        with closing(sqlite3.connect(self.path)) as db:
+            return {row[0]: row[1:] for row in db.execute("SELECT key, image, display_name, aliases_json, source_url FROM emoji_dex_assets")}
+
+    def save_dex(self, key: str, image: bytes, display_name: str, aliases_json: str, source_url: str) -> None:
+        with closing(sqlite3.connect(self.path)) as db, db:
+            db.execute("INSERT OR REPLACE INTO emoji_dex_assets VALUES (?, ?, ?, ?, ?)",
+                       (key, image, display_name, aliases_json, source_url))
+
+    def rename(self, key: str, old: str, new: str) -> None:
+        with closing(sqlite3.connect(self.path)) as db, db:
+            changed = db.execute("UPDATE emoji_overrides SET name = ? WHERE key = ? AND name = ?", (new, key, old)).rowcount
+            if changed:
+                db.execute("INSERT INTO emoji_override_audit (key, action, actor_id, created_at) VALUES (?, 'rename', 0, ?)", (key, int(time.time())))
 
     def all(self) -> dict[str, EmojiOverride]:
         with closing(sqlite3.connect(self.path)) as db:
