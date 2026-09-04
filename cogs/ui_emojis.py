@@ -22,7 +22,7 @@ from discord.ext import commands
 from PIL import Image
 
 from .emoji_assets import EmojiOverrideStore, emoji_label, normalize_upload, override_name, versioned_name
-from .emoji_catalog import is_catalog_emoji
+from .emoji_catalog import canonical_emoji_key, effective_override, emoji_key_group, is_catalog_emoji
 
 logger = logging.getLogger(__name__)
 
@@ -96,11 +96,17 @@ def clear_emoji_catalog_cache() -> None:
     emoji_alias_keys.cache_clear()
 
 
+def default_artwork_key(key: str) -> str:
+    return next((candidate for candidate in emoji_key_group(key) if candidate in DEX_ARTWORK), canonical_emoji_key(key))
+
+
 def default_emoji_image(key: str) -> bytes:
+    key = default_artwork_key(key)
     return DEX_ARTWORK[key][0] if key in DEX_ARTWORK else prepare_emoji_image(discover_emoji_assets()[key])
 
 
 def deployed_emoji_name(logical_name: str, revision: int = GAME_EMOJI_ASSET_REVISION) -> str:
+    logical_name = default_artwork_key(logical_name)
     if logical_name in DEX_ARTWORK:
         digest = hashlib.sha256(DEX_ARTWORK[logical_name][0]).hexdigest()[:12]
         return versioned_name(logical_name, "d" + digest)
@@ -195,6 +201,10 @@ class UIEmojiManager(commands.Cog):
             animated=bool(getattr(emoji, "animated", False)),
         )
 
+    def _set_emoji(self, key: str, emoji: discord.PartialEmoji) -> None:
+        for alias in emoji_key_group(key):
+            self.emojis[alias] = emoji
+
     async def ensure_synced(self) -> None:
         if self._synced:
             return
@@ -225,21 +235,23 @@ class UIEmojiManager(commands.Cog):
                 if previous is not None:
                     self.emojis[name] = self._to_partial(previous)
             for name, path in emoji_assets.items():
-                override = overrides.get(name)
-                remote_name = override_name(name, override.image) if override else deployed_emoji_name(name)
+                if canonical_emoji_key(name) != name:
+                    continue
+                override = effective_override(overrides, name)
+                remote_name = override_name(override.key, override.image) if override else deployed_emoji_name(name)
                 fallback = by_name.get(deployed_emoji_name(name))
                 if fallback is not None:
-                    self.emojis[name] = self._to_partial(fallback)
+                    self._set_emoji(name, self._to_partial(fallback))
                 current = by_name.get(remote_name)
                 if not is_catalog_emoji(name):
                     # Historical imports can still render, but are never
                     # uploaded or renamed again outside the focused catalog.
                     if current is not None:
-                        self.emojis[name] = self._to_partial(current)
+                        self._set_emoji(name, self._to_partial(current))
                         reused += 1
                     continue
                 if current is None:
-                    old_name = override.name if override else legacy_emoji_name(name)
+                    old_name = override.name if override else legacy_emoji_name(default_artwork_key(name))
                     # The previous release used BS_ for passives. Prefer its
                     # active artwork over older packaged versions; retain IDs.
                     previous_prefix_name = "BS_" + remote_name[3:] if name.startswith("passive_") else old_name
@@ -251,18 +263,18 @@ class UIEmojiManager(commands.Cog):
                         try:
                             renamed = await current.edit(name=remote_name)
                             if override:
-                                await asyncio.to_thread(self.store.rename, name, override.name, remote_name)
+                                await asyncio.to_thread(self.store.rename, override.key, override.name, remote_name)
                             current = renamed
                             logger.info("Normalized application emoji %s without changing ID %s", name, current.id)
                         except Exception:
                             logger.exception("Could not normalize emoji name for %s; keeping its existing ID", name)
                             failed.append(name)
                 if current is not None:
-                    self.emojis[name] = self._to_partial(current)
+                    self._set_emoji(name, self._to_partial(current))
                     reused += 1
                     continue
 
-                if not override and name not in DEX_ARTWORK and not path.is_file():
+                if not override and default_artwork_key(name) not in DEX_ARTWORK and not path.is_file():
                     missing_assets.append(str(path.relative_to(PROJECT_ROOT)))
                     continue
 
@@ -296,7 +308,7 @@ class UIEmojiManager(commands.Cog):
                     failed.append(name)
                     continue
 
-                self.emojis[name] = self._to_partial(emoji)
+                self._set_emoji(name, self._to_partial(emoji))
                 created += 1
 
             self._synced = not failed and not missing_assets
@@ -316,14 +328,15 @@ class UIEmojiManager(commands.Cog):
                 )
 
     async def current_revision(self, key: str) -> str:
-        return await asyncio.to_thread(self.store.revision, key, deployed_emoji_name(key))
+        return "|".join([await asyncio.to_thread(self.store.revision, alias, deployed_emoji_name(alias))
+                         for alias in emoji_key_group(key)])
 
     async def install_dex_asset(self, key: str, raw: bytes, display_name: str, aliases_json: str, source_url: str, inventory: list | None = None) -> None:
         if not re.fullmatch(r"pet_[a-z0-9_]{1,59}", key):
             raise ValueError("Animal name cannot be represented safely as a guide emoji key.")
         image = await asyncio.to_thread(normalize_upload, raw)
         async with self._sync_lock:
-            override = (await asyncio.to_thread(self.store.all)).get(key)
+            override = effective_override(await asyncio.to_thread(self.store.all), key)
             emoji = None
             if override is None:
                 name = versioned_name(key, "d" + hashlib.sha256(image).hexdigest()[:12])
@@ -338,7 +351,8 @@ class UIEmojiManager(commands.Cog):
             DEX_ARTWORK[key] = (image, display_name, aliases_json, source_url)
             clear_emoji_catalog_cache()
             if emoji:
-                self.emojis[key] = self._to_partial(emoji)
+                if default_artwork_key(key) == key:
+                    self._set_emoji(key, self._to_partial(emoji))
 
     async def replace_asset(
         self, key: str, image: bytes | None, actor_id: int, expected: str,
@@ -348,6 +362,7 @@ class UIEmojiManager(commands.Cog):
         Old application emojis are deliberately retained for existing messages.
         A failed upload or database transaction cannot erase the current mapping.
         """
+        key = canonical_emoji_key(key)
         if key not in emoji_asset_keys():
             raise ValueError("Unknown emoji target. Choose one from /guide-emojis.")
         if image is not None:
@@ -368,20 +383,20 @@ class UIEmojiManager(commands.Cog):
                     raise ValueError("The prepared image exceeds Discord's 256 KiB limit.")
                 emoji = await self.bot.create_application_emoji(name=remote_name, image=payload)
             if image is None:
-                await asyncio.to_thread(self.store.reset, key, actor_id)
+                await asyncio.to_thread(self.store.reset, key, actor_id, emoji_key_group(key)[1:])
             else:
                 await asyncio.to_thread(self.store.save, key, remote_name, image, emoji.id, actor_id)
-            self.emojis[key] = self._to_partial(emoji)
+            self._set_emoji(key, self._to_partial(emoji))
             logger.info("Application emoji %s %s by owner %s; active ID %s",
                         key, "reset" if image is None else "replaced", actor_id, emoji.id)
             return self.emojis[key]
 
     def text(self, name: str, fallback: str) -> str:
-        emoji = self.emojis.get(name)
+        emoji = self.emojis.get(canonical_emoji_key(name))
         return str(emoji) if emoji is not None else fallback
 
     def button(self, name: str, fallback: str) -> discord.PartialEmoji | str:
-        return self.emojis.get(name, fallback)
+        return self.emojis.get(canonical_emoji_key(name), fallback)
 
 
 def get_ui_emoji_manager(bot: commands.Bot) -> UIEmojiManager | None:

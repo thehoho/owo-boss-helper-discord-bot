@@ -1,5 +1,7 @@
 ## v0.14.13-beta notes
 
+Verified animal aliases such as `fish`/`gfish` share one replacement target and prefer the existing high-quality Dex icon. Hidden squid remains separate. Manual replacements always win. Superseded animal `_v3` icons may be removed with the backup-first maintenance script; sole remaining artwork is retained, and old deleted IDs cannot be restored in historical messages.
+
 Run **/emoji-replace** without arguments, or choose **Browse all pages** in the target suggestions, to open the full owner picker. Use **Next**, **Previous**, **Page** (jump to a number), categories, or search; **Replace selected** previews your change. Weapons (29), passives (28), stats (6), gameplay ranks, other icons, and selected Animal Dex artwork are reachable. The target autocomplete is limited to 25 suggestions by Discord; it is not the whole catalog.
 
 Names use `PS_<passive>`, `W_<weapon>`, `ST_<stat>`, `AN_<animal>`, `R_<rank>`, and `UI_<icon>`. These names work in guide braces too, while previous aliases (including `BS_`) remain compatible. Existing application emojis are renamed in place with IDs and uploaded artwork preserved; remote version/hash suffixes keep historical versions distinct.

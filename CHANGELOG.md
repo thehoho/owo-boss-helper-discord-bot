@@ -1,5 +1,6 @@
 ## v0.14.13-beta - Complete Emoji Picker and Animal Dex Artwork
 
+- Animal cleanup: unified verified ranked aliases onto one owner target and existing Dex artwork, preserving manual replacements and keeping hidden squid distinct. Added backup-first deletion of only superseded animal `_v3` IDs; sole icons and non-animal assets are protected.
 - Hotfix: corrected passive labels to `PS_`, renamed active passive emojis in place, and retained `BS_` guide aliases for compatibility.
 - Follow-up: added an explicit Browse all pages autocomplete choice, visible icon ranges, and page-number navigation. Restricted replacement/reference browsing and future Dex imports to gameplay animals plus selected guide specials; retained previous extras only for historical rendering.
 - Fixed incomplete-looking replacement discovery by adding a categorized, paginated owner picker directly to `/emoji-replace`; blank arguments now open the picker.

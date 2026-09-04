@@ -31,4 +31,8 @@ An animal record is not necessarily an image source: seeded records may have no 
 
 ## Deployment
 
+Verified standard/ranked animal aliases are consolidated in the picker and runtime mappings. For example, `fish` and `gfish` use the same high-quality Dex ID, but squid and hidden squid remain distinct. Existing owner replacements take precedence across aliases; resetting a consolidated target clears its alias overrides together.
+
+`scripts/prune_duplicate_animal_emojis.py` is a separate operator-only cleanup, never a startup action. Run it first without `--apply` and with a fresh `--backup-dir` to save original artwork and the exact proposed IDs. Review its manifest, then use `--apply` with that directory. It deletes only animal `_v3` IDs with a verified non-V3 replacement, protecting active and manual IDs and sole icons. It does not touch weapons, passives, stats, or unrelated versions. Artwork can be reuploaded from the backup, but Discord cannot restore deleted IDs or repair older messages automatically.
+
 The existing protected database backup includes the new Dex image table; no extra secret or permission is required. First-time name normalization and artwork import take longer than an ordinary restart. Old IDs remain usable, and Dex imports run separately from normal boss tracking after initial registry synchronization. No boss parsing, rewards, or HP-reading behavior changes.

@@ -15,7 +15,7 @@ from discord.ext import commands
 from PIL import Image
 
 from cogs.emoji_assets import EmojiOverrideStore, MAX_UPLOAD_BYTES, custom_emoji_url, normalize_upload, override_name
-from cogs.emoji_catalog import is_catalog_emoji
+from cogs.emoji_catalog import canonical_emoji_key, is_catalog_emoji
 from cogs.emoji_tools import EmojiBrowser, EmojiConfirm, EmojiTools, reference_entries, resolve_target, search_entries
 from cogs.team_guides import guide_variable_emoji_key, render_guide_markdown
 from cogs.ui_emojis import UIEmojiManager, deployed_emoji_name, legacy_emoji_name, discover_emoji_assets, emoji_asset_keys, prepare_emoji_image
@@ -209,7 +209,7 @@ class ManagerTests(unittest.IsolatedAsyncioTestCase):
 class InterfaceTests(unittest.IsolatedAsyncioTestCase):
     async def test_every_reference_variable_resolves_without_collisions(self):
         entries = reference_entries()
-        self.assertEqual({entry.key for entry in entries}, {key for key in emoji_asset_keys() if is_catalog_emoji(key)})
+        self.assertEqual({entry.key for entry in entries}, {key for key in emoji_asset_keys() if is_catalog_emoji(key) and canonical_emoji_key(key) == key})
         for entry in entries:
             self.assertEqual(guide_variable_emoji_key(entry.variable[1:-1]), entry.key, entry)
             self.assertEqual(guide_variable_emoji_key(entry.key), entry.key, entry)

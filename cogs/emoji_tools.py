@@ -17,11 +17,11 @@ from discord.ext import commands
 from PIL import Image
 
 from .emoji_assets import MAX_UPLOAD_BYTES, custom_emoji_url, emoji_label, normalize_upload
-from .emoji_catalog import is_catalog_emoji
+from .emoji_catalog import canonical_emoji_key, effective_override, emoji_key_group, is_catalog_emoji
 from .game_catalog import PASSIVES, RANKS, WEAPONS, special_animals
 from .team_guides import guide_variable_emoji_key
 from .ui_emojis import (
-    DEX_ARTWORK, default_emoji_image, discover_emoji_assets, emoji_asset_keys, get_ui_emoji_manager, prepare_emoji_image,
+    DEX_ARTWORK, default_artwork_key, default_emoji_image, discover_emoji_assets, emoji_asset_keys, get_ui_emoji_manager, prepare_emoji_image,
 )
 
 logger = logging.getLogger(__name__)
@@ -49,11 +49,13 @@ def reference_entries() -> tuple[EmojiReference, ...]:
         catalog[key] = (name, tuple(json.loads(aliases_json)))
     result = []
     for key in sorted(emoji_asset_keys()):
-        if not is_catalog_emoji(key):
+        if not is_catalog_emoji(key) or canonical_emoji_key(key) != key:
             continue
         prefix, _, stem = key.partition("_")
         category = prefix if prefix in CATEGORIES and prefix != "all" else "ui"
-        name, aliases = catalog.get(key, (stem.replace("_", " ").title() if category != "ui" else key.replace("_", " ").title(), (stem if category != "ui" else key,)))
+        name, aliases = catalog.get(default_artwork_key(key), (stem.replace("_", " ").title() if category != "ui" else key.replace("_", " ").title(), (stem if category != "ui" else key,)))
+        aliases = tuple(dict.fromkeys((*aliases, *(alias[4:] for alias in emoji_key_group(key)[1:]),
+                                     *(emoji_label(alias) for alias in emoji_key_group(key)[1:]))))
         result.append(EmojiReference(key, category, name, aliases, "{" + emoji_label(key) + "}"))
     return tuple(result)
 
@@ -70,7 +72,7 @@ def resolve_target(value: str) -> str:
     key = token if token in emoji_asset_keys() else guide_variable_emoji_key(token)
     if key not in emoji_asset_keys() or not is_catalog_emoji(key):
         raise ValueError("Unknown target. Use /guide-emojis to choose an exact target key.")
-    return key
+    return canonical_emoji_key(key)
 
 
 class ReferenceSelect(discord.ui.Select):
@@ -321,9 +323,9 @@ class OwnerEmojiBrowser(EmojiBrowser):
     def embed(self):
         embed = super().embed()
         entries = search_entries(category=self.category)
-        done = sum(entry.key in self.overrides for entry in entries)
-        status = ("Manually replaced" if self.selected in self.overrides else
-                  "Original Animal Dex artwork" if self.selected in DEX_ARTWORK else "Packaged artwork")
+        done = sum(effective_override(self.overrides, entry.key) is not None for entry in entries)
+        status = ("Manually replaced" if self.selected and effective_override(self.overrides, self.selected) else
+                  "Original Animal Dex artwork" if self.selected and default_artwork_key(self.selected) in DEX_ARTWORK else "Packaged artwork")
         embed.title = "Owner emoji replacement — all categories"
         embed.add_field(name="Replacement status", value=f"{done}/{len(entries)} manually replaced in this category.\nSelected: {status}\nUse categories and Next for the complete list.\nReplace selected: paste a Discord emoji. For an image upload, use /emoji-replace with the image option.", inline=False)
         return embed

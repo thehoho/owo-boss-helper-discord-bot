@@ -158,8 +158,9 @@ class EmojiOverrideStore:
             name = row[0] if row else default
             return f"{name}@{sequence}" if sequence else name
 
-    def reset(self, key: str, actor_id: int) -> None:
+    def reset(self, key: str, actor_id: int, aliases: tuple[str, ...] = ()) -> None:
         with closing(sqlite3.connect(self.path)) as db, db:
-            db.execute("DELETE FROM emoji_overrides WHERE key = ?", (key,))
-            db.execute("INSERT INTO emoji_override_audit (key, action, actor_id, created_at) VALUES (?, 'reset', ?, ?)",
-                       (key, actor_id, int(time.time())))
+            for target in dict.fromkeys((key, *aliases)):
+                db.execute("DELETE FROM emoji_overrides WHERE key = ?", (target,))
+                db.execute("INSERT INTO emoji_override_audit (key, action, actor_id, created_at) VALUES (?, 'reset', ?, ?)",
+                           (target, actor_id, int(time.time())))
