@@ -105,6 +105,8 @@ async def main() -> None:
         logger.info("Public animal dex catalog loaded")
         await bot.load_extension("cogs.team_guides")
         logger.info("Trusted team guide manager loaded")
+        await bot.load_extension("cogs.emoji_tools")
+        logger.info("Guide emoji reference and owner replacement tools loaded")
         await bot.load_extension("cogs.boss_generator")
         logger.info("Boss generator and cooldown tracker loaded")
         await bot.load_extension("cogs.team_templates")

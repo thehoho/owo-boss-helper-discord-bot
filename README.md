@@ -1,3 +1,11 @@
+## v0.14.12-beta notes
+
+Phase three adds **/guide-emojis**, a searchable reference for all 312 application icons with names, aliases, exact guide variables, and enlarged previews. The guide editor's **Emoji variables** button also opens the browser.
+
+The configured bot owner can use **/emoji-replace** with a target and either a custom Discord emoji in `source` or an original artwork attachment in `image`. Nothing changes until the owner confirms the preview. **/emoji-reset** previews restoring the packaged artwork. Replacements work across servers, survive restarts in `emoji_overrides.db`, and retain old emoji IDs so previously sent messages continue to render.
+
+Static game icons now fill the 128×128 canvas with less padding. Small pixel art uses nearest-neighbor enlargement; larger originals are downsampled. Small supported animations stay animated. Source resolution still limits detail, and Discord controls the inline display size. See [phase-three usage and safety notes](RELEASE_NOTES_v0.14.12-beta.md).
+
 ## v0.14.11-beta notes
 
 `HT C <name>` now has two deliberate paths. Replying to an official OwO team message imports that team exactly as before. Running it without a reply asks for confirmation; **Yes, create empty team** creates a blank editable template, while **Cancel** directs the member back to the reply-based import. Empty creation never overwrites an existing same-name template.

@@ -1,3 +1,14 @@
+## v0.14.12-beta - Emoji Reference and Owner Artwork Tools
+
+- Added a public, private-response `/guide-emojis` browser with category filters, search, pagination, aliases, exact guide syntax, and enlarged previews.
+- Added owner-only `/emoji-replace` and `/emoji-reset` with preview, confirmation, cancellation, and stale-preview protection.
+- Persisted replacement artwork and mappings in `emoji_overrides.db`, included in the standard SQLite backup.
+- Kept old application emojis for historical messages; failed uploads and failed database writes preserve the current mapping.
+- Added strict source/decoded-image limits, Discord-CDN-only custom emoji downloads, and explicit rejection instead of silently flattening oversized animations.
+- Published revision-three game artwork using the full 128px canvas; retained existing IDs and temporary revision-two fallbacks during startup.
+- Added unambiguous `{logical_key}` guide variables for every registered icon, while preserving existing aliases.
+- No boss tracking, reward alerts, or HP-reading behavior changed.
+
 ## v0.14.11-beta - Empty Teams and Compact Guide Composition
 
 - Added a user-owned **Yes, create empty team** / **Cancel** confirmation when `HT C <name>` is not a reply to an official OwO team message.

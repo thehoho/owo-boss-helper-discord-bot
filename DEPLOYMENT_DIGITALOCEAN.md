@@ -154,6 +154,8 @@ Keep DigitalOcean backups enabled as the off-server recovery layer.
 
 The bundled backup includes `.env`, `boss_cooldown_config.json`, and all six runtime databases. Archives and their working directories are owner-only. After updating the repository, reinstall the latest `deploy/backup.sh` copy in `/usr/local/bin` so newly introduced databases are included.
 
+Emoji artwork overrides introduced in v0.14.12-beta are stored in `emoji_overrides.db`. Include it with the other runtime databases during migrations. The current bundled backup script includes both the normalized artwork and owner audit trail in that database; reinstall the backup helper when deploying this version.
+
 ## 9. Normal update workflow
 
 ```bash

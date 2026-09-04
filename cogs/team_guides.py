@@ -29,7 +29,7 @@ from .game_catalog import (
 )
 from .helper_prefix import get_guild_helper_prefix, parse_helper_command_argument
 from .team_templates import STANDARD_ANIMAL_NAMES, normalize_animal_emoji_alias
-from .ui_emojis import ui_emoji_text
+from .ui_emojis import emoji_asset_keys, ui_emoji_text
 
 
 logger = logging.getLogger(__name__)
@@ -501,6 +501,9 @@ def guide_animal_variable_emoji_key(value: str) -> str | None:
 
 
 def guide_variable_emoji_key(value: str) -> str | None:
+    # Exact registry keys make every icon available without ambiguous aliases.
+    if value.strip().casefold() in emoji_asset_keys():
+        return value.strip().casefold()
     compact = normalize_catalog_token(value).replace(" ", "")
 
     if compact == "clown":
@@ -665,7 +668,8 @@ def build_emoji_variable_help_embed(bot: commands.Bot) -> discord.Embed:
     description = (
         "Put a familiar animal, weapon, passive, stat, or rank name inside braces "
         "anywhere in the summary, full guide, or slot notes. Preview turns known "
-        "names into the bot's portable application emojis. Existing Discord "
+        "names into the bot's portable application emojis. Browse every icon, name, "
+        "and alias with **/guide-emojis**. Exact keys such as {weapon_sword} also work. Existing Discord "
         "Markdown, Unicode emojis, and custom emoji markup stay unchanged.\n\n"
         f"**Weapons**\n{example('{sword}')}  {example('{pdagger}')}  {example('{arcane}')}\n"
         f"**Passives**\n{example('{strength}')}  {example('{lifesteal}')}  {example('{mana_mtap}')}\n"
@@ -1013,8 +1017,12 @@ class GuideEditorView(discord.ui.View):
         interaction: discord.Interaction,
         button: discord.ui.Button,
     ) -> None:
+        from .emoji_tools import EmojiBrowser
+
+        browser = EmojiBrowser(self.cog.bot, interaction.user.id)
         await interaction.response.send_message(
             embed=build_emoji_variable_help_embed(self.cog.bot),
+            view=browser,
             ephemeral=True,
         )
 
