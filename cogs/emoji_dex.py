@@ -11,7 +11,7 @@ from urllib.parse import urlsplit
 import aiohttp
 
 from .emoji_assets import MAX_UPLOAD_BYTES
-from .emoji_catalog import eligible_dex_record, is_catalog_emoji
+from .emoji_catalog import canonical_emoji_key, eligible_dex_record, is_catalog_emoji
 from .ui_emojis import DEX_ARTWORK, discover_emoji_assets
 
 logger = logging.getLogger(__name__)
@@ -50,8 +50,11 @@ async def sync_dex_artwork(bot, manager) -> dict:
             report["failed"].append(f"{key}: unsupported key")
             continue
         candidates[key] = record
-    report["missing"] = sorted(key for key in set(candidates) | {k for k in discover_emoji_assets() if k.startswith("pet_") and is_catalog_emoji(k)}
-                               if key not in candidates or not dex_source_url(candidates[key]))
+    needed = {canonical_emoji_key(key) for key in set(candidates) | {
+        k for k in discover_emoji_assets() if k.startswith("pet_") and is_catalog_emoji(k)}}
+    available = {canonical_emoji_key(key) for key, record in candidates.items() if dex_source_url(record)}
+    available.update(canonical_emoji_key(key) for key in DEX_ARTWORK)
+    report["missing"] = sorted(needed - available)
     inventory = await bot.fetch_application_emojis()
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:
         for index, (key, record) in enumerate(candidates.items()):

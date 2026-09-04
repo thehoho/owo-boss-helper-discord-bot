@@ -10,6 +10,7 @@ from PIL import Image
 
 from cogs.emoji_assets import EmojiOverrideStore, override_name
 from cogs.emoji_catalog import canonical_emoji_key, is_catalog_emoji
+from cogs.emoji_dex import sync_dex_artwork
 from cogs.emoji_tools import reference_entries, resolve_target
 from cogs.ui_emojis import (DEX_ARTWORK, UIEmojiManager, clear_emoji_catalog_cache,
                             default_emoji_image, deployed_emoji_name)
@@ -97,3 +98,10 @@ class DedupeTests(unittest.IsolatedAsyncioTestCase):
         self.manager.store.save("pet_fish", "AN_fish_v3", artwork(), 1, 42)
         plan, _ = plan_duplicates([low, high, sole, weapon], self.manager.store.all())
         self.assertEqual(plan, [])
+
+    async def test_missing_source_report_recognizes_saved_ranked_artwork(self):
+        self.bot.animal_dex_store = SimpleNamespace(all_records=lambda: [])
+        self.manager.ensure_synced = AsyncMock()
+        report = await sync_dex_artwork(self.bot, self.manager)
+        self.assertNotIn("pet_fish", report["missing"])
+        self.assertNotIn("pet_gfish", report["missing"])

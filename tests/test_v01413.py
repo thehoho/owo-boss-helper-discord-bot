@@ -223,7 +223,7 @@ class DexAndMigrationTests(unittest.IsolatedAsyncioTestCase):
         with patch("cogs.emoji_dex.aiohttp.ClientSession", return_value=Session()):
             report = await sync_dex_artwork(self.bot, self.manager)
         self.assertEqual((report["imported"], report["reused"]), (1, 1))
-        self.assertIn("pet_gfish", report["missing"])
+        self.assertIn("pet_fish", report["missing"])
         self.manager.install_dex_asset.assert_awaited_once()
         self.assertEqual(self.manager.install_dex_asset.call_args.args[0], "pet_hsquid")
         Response.status = 404
