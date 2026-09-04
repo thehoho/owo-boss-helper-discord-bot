@@ -77,7 +77,7 @@ class PickerTests(unittest.IsolatedAsyncioTestCase):
         await EmojiTools.emoji_replace.callback(cog, event)
         view = event.followup.send.call_args.kwargs["view"]
         self.assertIsInstance(view, OwnerEmojiBrowser)
-        self.assertIn("1/312", view.embed().fields[-1].value)
+        self.assertIn(f"1/{len(reference_entries())}", view.embed().fields[-1].value)
         outsider = request(user=99)
         self.assertFalse(await view.interaction_check(outsider))
 
@@ -117,7 +117,8 @@ class DexAndMigrationTests(unittest.IsolatedAsyncioTestCase):
     async def test_saved_custom_animal_is_registered_and_survives_restart(self):
         await self.manager.install_dex_asset("pet_custom_test", artwork(), "Custom Test", '["custom_test"]', "source")
         self.assertIn("pet_custom_test", emoji_asset_keys())
-        self.assertEqual(resolve_target("AN_custom_test"), "pet_custom_test")
+        with self.assertRaises(ValueError):
+            resolve_target("AN_custom_test")
         self.assertEqual(animal_emoji_key("Custom Test"), "pet_custom_test")
         self.assertEqual(animal_emoji_key("custom_test"), "pet_custom_test")
         self.assertEqual(guide_variable_emoji_key("custom_test"), "pet_custom_test")
@@ -126,7 +127,7 @@ class DexAndMigrationTests(unittest.IsolatedAsyncioTestCase):
         await self.manager.cog_load()
         self.assertEqual(default_emoji_image("pet_custom_test"), saved)
         self.assertTrue(deployed_emoji_name("pet_custom_test").startswith("AN_custom_test_"))
-        self.assertIn("pet_custom_test", {entry.key for entry in reference_entries()})
+        self.assertNotIn("pet_custom_test", {entry.key for entry in reference_entries()})
 
     async def test_manual_animal_replacement_wins_over_dex_artwork(self):
         self.manager.store.save("pet_fish", "manual", artwork("blue"), 10, 42)
@@ -192,13 +193,13 @@ class DexAndMigrationTests(unittest.IsolatedAsyncioTestCase):
                     self.assertEqual((saved.name, saved.emoji_id, saved.image), (expected, 123, raw))
 
     async def test_sync_skips_cached_sources_and_reports_missing_and_failed_sources(self):
-        cached = SimpleNamespace(animal_key="cached", display_name="Cached", aliases=(), source="owo",
+        cached = SimpleNamespace(animal_key="hsnake", rank="hidden", display_name="Cached", aliases=(), source="owo",
             emoji_id=123456789012345678, image_url="", emoji_animated=False)
-        fresh = SimpleNamespace(animal_key="fresh", display_name="Fresh", aliases=(), source="owo",
+        fresh = SimpleNamespace(animal_key="hsquid", rank="hidden", display_name="Fresh", aliases=(), source="owo",
             emoji_id=123456789012345679, image_url="", emoji_animated=False)
-        missing = SimpleNamespace(animal_key="missing", display_name="Missing", aliases=(), source="owo_wiki_seed",
+        missing = SimpleNamespace(animal_key="gfish", rank="gem", display_name="Missing", aliases=(), source="owo_wiki_seed",
             emoji_id=None, image_url="", emoji_animated=False)
-        DEX_ARTWORK["pet_cached"] = (artwork(), "Cached", "[]", dex_source_url(cached))
+        DEX_ARTWORK["pet_hsnake"] = (artwork(), "Cached", "[]", dex_source_url(cached))
         self.bot.animal_dex_store = SimpleNamespace(all_records=lambda: (cached, fresh, missing))
         self.manager.ensure_synced = AsyncMock()
         self.manager.install_dex_asset = AsyncMock()
@@ -222,9 +223,9 @@ class DexAndMigrationTests(unittest.IsolatedAsyncioTestCase):
         with patch("cogs.emoji_dex.aiohttp.ClientSession", return_value=Session()):
             report = await sync_dex_artwork(self.bot, self.manager)
         self.assertEqual((report["imported"], report["reused"]), (1, 1))
-        self.assertIn("pet_missing", report["missing"])
+        self.assertIn("pet_gfish", report["missing"])
         self.manager.install_dex_asset.assert_awaited_once()
-        self.assertEqual(self.manager.install_dex_asset.call_args.args[0], "pet_fresh")
+        self.assertEqual(self.manager.install_dex_asset.call_args.args[0], "pet_hsquid")
         Response.status = 404
         self.manager.install_dex_asset.reset_mock()
         with patch("cogs.emoji_dex.aiohttp.ClientSession", return_value=Session()):

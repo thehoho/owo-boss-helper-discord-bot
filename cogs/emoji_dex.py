@@ -11,6 +11,7 @@ from urllib.parse import urlsplit
 import aiohttp
 
 from .emoji_assets import MAX_UPLOAD_BYTES
+from .emoji_catalog import eligible_dex_record, is_catalog_emoji
 from .ui_emojis import DEX_ARTWORK, discover_emoji_assets
 
 logger = logging.getLogger(__name__)
@@ -38,15 +39,18 @@ async def sync_dex_artwork(bot, manager) -> dict:
     if dex is None:
         raise ValueError("Animal Dex storage is not ready.")
     records = await asyncio.to_thread(dex.all_records)
-    report = {"imported": 0, "reused": 0, "missing": [], "failed": []}
+    report = {"imported": 0, "reused": 0, "skipped_outside_catalog": 0, "missing": [], "failed": []}
     candidates = {}
     for record in records:
+        if not eligible_dex_record(record):
+            report["skipped_outside_catalog"] += 1
+            continue
         key = "pet_" + record.animal_key
         if not re.fullmatch(r"pet_[a-z0-9_]{1,59}", key):
             report["failed"].append(f"{key}: unsupported key")
             continue
         candidates[key] = record
-    report["missing"] = sorted(key for key in set(candidates) | {k for k in discover_emoji_assets() if k.startswith("pet_")}
+    report["missing"] = sorted(key for key in set(candidates) | {k for k in discover_emoji_assets() if k.startswith("pet_") and is_catalog_emoji(k)}
                                if key not in candidates or not dex_source_url(candidates[key]))
     inventory = await bot.fetch_application_emojis()
     async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=20)) as session:

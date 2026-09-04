@@ -17,6 +17,7 @@ from discord.ext import commands
 from PIL import Image
 
 from .emoji_assets import MAX_UPLOAD_BYTES, custom_emoji_url, emoji_label, normalize_upload
+from .emoji_catalog import is_catalog_emoji
 from .game_catalog import PASSIVES, RANKS, WEAPONS, special_animals
 from .team_guides import guide_variable_emoji_key
 from .ui_emojis import (
@@ -25,6 +26,7 @@ from .ui_emojis import (
 
 logger = logging.getLogger(__name__)
 PAGE_SIZE = 20
+BROWSE_TARGET = "__browse_all__"
 CATEGORIES = {"all": "All icons", "pet": "Animals", "weapon": "Weapons",
               "passive": "Passives", "rank": "Ranks", "stat": "Stats", "ui": "Other / guide icons"}
 
@@ -47,6 +49,8 @@ def reference_entries() -> tuple[EmojiReference, ...]:
         catalog[key] = (name, tuple(json.loads(aliases_json)))
     result = []
     for key in sorted(emoji_asset_keys()):
+        if not is_catalog_emoji(key):
+            continue
         prefix, _, stem = key.partition("_")
         category = prefix if prefix in CATEGORIES and prefix != "all" else "ui"
         name, aliases = catalog.get(key, (stem.replace("_", " ").title() if category != "ui" else key.replace("_", " ").title(), (stem if category != "ui" else key,)))
@@ -64,7 +68,7 @@ def search_entries(query: str = "", category: str = "all") -> tuple[EmojiReferen
 def resolve_target(value: str) -> str:
     token = value.strip().strip("{}").casefold()
     key = token if token in emoji_asset_keys() else guide_variable_emoji_key(token)
-    if key not in emoji_asset_keys():
+    if key not in emoji_asset_keys() or not is_catalog_emoji(key):
         raise ValueError("Unknown target. Use /guide-emojis to choose an exact target key.")
     return key
 
@@ -77,7 +81,7 @@ class ReferenceSelect(discord.ui.Select):
                    description=f"{entry.variable} | {entry.key}"[:100],
                    emoji=manager.emojis.get(entry.key) if manager else None,
                    default=entry.key == browser.selected) for entry in entries]
-        super().__init__(placeholder="Choose an icon for its names and enlarged preview",
+        super().__init__(placeholder=f"Page {browser.page + 1}: choose one of these {len(entries)} icons; use Next for more",
                          options=options or [discord.SelectOption(label="No matching icons", value="none")],
                          disabled=not entries, row=1)
 
@@ -117,6 +121,27 @@ class ReferenceSearch(discord.ui.Modal, title="Find a guide icon"):
         await self.browser.refresh(interaction)
 
 
+class ReferencePage(discord.ui.Modal, title="Jump to emoji page"):
+    number = discord.ui.TextInput(label="Page number", max_length=5)
+
+    def __init__(self, browser):
+        super().__init__()
+        self.browser = browser
+        self.number.default = str(browser.page + 1)
+
+    async def on_submit(self, interaction):
+        if not await self.browser.interaction_check(interaction):
+            return
+        pages = max(1, (len(search_entries(self.browser.query, self.browser.category)) + PAGE_SIZE - 1) // PAGE_SIZE)
+        value = str(self.number).strip()
+        if not value.isascii() or not value.isdigit() or not 1 <= int(value) <= pages:
+            await interaction.response.send_message(f"Enter a page number from 1 to {pages}.", ephemeral=True)
+            return
+        self.browser.page = int(value) - 1
+        self.browser.selected = None
+        await self.browser.refresh(interaction)
+
+
 class EmojiBrowser(discord.ui.View):
     def __init__(self, bot: commands.Bot, user_id: int, query: str = "", category: str = "all") -> None:
         super().__init__(timeout=600)
@@ -142,6 +167,7 @@ class EmojiBrowser(discord.ui.View):
         count = len(search_entries(self.query, self.category))
         self.previous.disabled = self.page == 0
         self.next_page.disabled = (self.page + 1) * PAGE_SIZE >= count
+        self.jump_page.label = f"Page {self.page + 1}/{max(1, (count + PAGE_SIZE - 1) // PAGE_SIZE)}"
 
     def embed(self) -> discord.Embed:
         manager = get_ui_emoji_manager(self.bot)
@@ -150,8 +176,10 @@ class EmojiBrowser(discord.ui.View):
         for entry in entries:
             icon = manager.text(entry.key, "•") if manager else "•"
             lines.append(f"{icon} **{entry.name}** — `{entry.variable}`")
+        count = len(search_entries(self.query, self.category))
+        heading = f"Showing {self.page * PAGE_SIZE + 1}–{self.page * PAGE_SIZE + len(entries)} of {count} icons. Use **Next** or **Page** to see more.\n\n" if entries else ""
         embed = discord.Embed(title="Guide emoji reference", color=0x57F287,
-                              description="\n".join(lines) or "No icons match. Try another search or category.")
+                              description=heading + ("\n".join(lines) or "No icons match. Try another search or category."))
         selected = next((entry for entry in entries if entry.key == self.selected), None)
         if selected:
             aliases = ", ".join(selected.aliases)
@@ -189,6 +217,10 @@ class EmojiBrowser(discord.ui.View):
     @discord.ui.button(label="Search", style=discord.ButtonStyle.primary, row=2)
     async def search(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
         await interaction.response.send_modal(ReferenceSearch(self))
+
+    @discord.ui.button(label="Page", style=discord.ButtonStyle.secondary, row=2)
+    async def jump_page(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await interaction.response.send_modal(ReferencePage(self))
 
 
 async def download_custom_emoji(value: str) -> bytes:
@@ -376,6 +408,12 @@ class EmojiTools(commands.Cog):
         return [app_commands.Choice(name=f"{emoji_label(entry.key)} — {entry.name}"[:100], value=emoji_label(entry.key))
                 for entry in search_entries(current, category)[:25]]
 
+    async def replacement_target_choices(self, interaction: discord.Interaction, current: str) -> list[app_commands.Choice[str]]:
+        choices = await self.target_choices(interaction, current)
+        if not current.strip() or len(choices) == 25:
+            return [app_commands.Choice(name="Browse all pages — full icon picker", value=BROWSE_TARGET), *choices[:24]]
+        return choices
+
     async def preview(self, interaction: discord.Interaction, key: str, raw: bytes | None) -> None:
         manager = get_ui_emoji_manager(self.bot)
         if manager is None:
@@ -400,9 +438,9 @@ class EmojiTools(commands.Cog):
                                         ephemeral=True)
 
     @app_commands.command(name="emoji-replace", description="Owner only: preview replacing a bot icon with an image or Discord emoji.")
-    @app_commands.describe(target="Choose the exact icon to replace", source="Paste one custom Discord emoji (or attach an image instead)",
+    @app_commands.describe(target="Browse all pages, type an icon name, or leave empty to open the full picker", source="Paste one custom Discord emoji (or attach an image instead)",
                            image="Original artwork, at most 2 MiB; use either image or source")
-    @app_commands.autocomplete(target=target_choices)
+    @app_commands.autocomplete(target=replacement_target_choices)
     @app_commands.choices(category=[app_commands.Choice(name=label, value=key) for key, label in CATEGORIES.items()])
     async def emoji_replace(self, interaction: discord.Interaction, target: str = "",
                             source: str | None = None, image: discord.Attachment | None = None, category: str = "all") -> None:
@@ -410,7 +448,7 @@ class EmojiTools(commands.Cog):
             return
         await interaction.response.defer(ephemeral=True)
         try:
-            key = resolve_target(target) if target else None
+            key = resolve_target(target) if target and target != BROWSE_TARGET else None
             if source is not None and image is not None:
                 raise ValueError("Provide one source: a custom Discord emoji OR an attached image.")
             raw = None

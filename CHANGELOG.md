@@ -1,6 +1,7 @@
 ## v0.14.13-beta - Complete Emoji Picker and Animal Dex Artwork
 
 - Hotfix: corrected passive labels to `PS_`, renamed active passive emojis in place, and retained `BS_` guide aliases for compatibility.
+- Follow-up: added an explicit Browse all pages autocomplete choice, visible icon ranges, and page-number navigation. Restricted replacement/reference browsing and future Dex imports to gameplay animals plus selected guide specials; retained previous extras only for historical rendering.
 - Fixed incomplete-looking replacement discovery by adding a categorized, paginated owner picker directly to `/emoji-replace`; blank arguments now open the picker.
 - Added category-filtered autocomplete, normalized PS/W/ST/AN/R/UI labels and compatible guide variables, plus replacement status.
 - Renamed active application emojis in place while preserving their IDs and manually uploaded artwork.

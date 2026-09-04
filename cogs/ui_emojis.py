@@ -22,6 +22,7 @@ from discord.ext import commands
 from PIL import Image
 
 from .emoji_assets import EmojiOverrideStore, emoji_label, normalize_upload, override_name, versioned_name
+from .emoji_catalog import is_catalog_emoji
 
 logger = logging.getLogger(__name__)
 
@@ -230,6 +231,13 @@ class UIEmojiManager(commands.Cog):
                 if fallback is not None:
                     self.emojis[name] = self._to_partial(fallback)
                 current = by_name.get(remote_name)
+                if not is_catalog_emoji(name):
+                    # Historical imports can still render, but are never
+                    # uploaded or renamed again outside the focused catalog.
+                    if current is not None:
+                        self.emojis[name] = self._to_partial(current)
+                        reused += 1
+                    continue
                 if current is None:
                     old_name = override.name if override else legacy_emoji_name(name)
                     # The previous release used BS_ for passives. Prefer its

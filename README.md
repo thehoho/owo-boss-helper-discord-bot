@@ -1,10 +1,10 @@
 ## v0.14.13-beta notes
 
-Run **/emoji-replace** without arguments to open the full owner picker: categories, pages, search, replacement status, and a **Replace selected** button. Weapons (29), passives (28), stats (6), ranks, other icons, and saved Animal Dex artwork are all reachable. Autocomplete also supports a category filter; its first 25 suggestions are not the whole catalog.
+Run **/emoji-replace** without arguments, or choose **Browse all pages** in the target suggestions, to open the full owner picker. Use **Next**, **Previous**, **Page** (jump to a number), categories, or search; **Replace selected** previews your change. Weapons (29), passives (28), stats (6), gameplay ranks, other icons, and selected Animal Dex artwork are reachable. The target autocomplete is limited to 25 suggestions by Discord; it is not the whole catalog.
 
 Names use `PS_<passive>`, `W_<weapon>`, `ST_<stat>`, `AN_<animal>`, `R_<rank>`, and `UI_<icon>`. These names work in guide braces too, while previous aliases (including `BS_`) remain compatible. Existing application emojis are renamed in place with IDs and uploaded artwork preserved; remote version/hash suffixes keep historical versions distinct.
 
-Original Discord emoji sources saved by official OwO Dex messages are imported in the background, including saved custom animals. Manual artwork wins over Dex artwork. Missing sources keep existing packaged fallbacks. **/emoji-dex-sync** gives the owner a missing/failed-source report; `refresh:true` picks up newly saved Dex sources. See [usage and migration notes](RELEASE_NOTES_v0.14.13-beta.md).
+Original Discord emoji sources saved by official OwO Dex messages are imported only for regular gameplay animals (including gem, bot, hidden, fabled, and distorted) and selected specials in `data/guide_special_emojis.json`. Juan and Bee Day are the starting special selection, based on saved-guide usage. Patreon/CP animals and other specials are excluded from browsing and future uploads. Already uploaded extras are retained for historical rendering, not deleted. Manual artwork wins over Dex artwork. Missing sources keep existing packaged fallbacks. **/emoji-dex-sync** gives the owner a missing/failed-source report; `refresh:true` picks up eligible new Dex sources. See [usage and migration notes](RELEASE_NOTES_v0.14.13-beta.md).
 
 ## v0.14.12-beta notes
 
