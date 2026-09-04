@@ -467,6 +467,9 @@ def star_rating(value: int) -> str:
 
 
 def animal_emoji_key(animal: str) -> str:
+    dex_key = "pet_" + normalize_catalog_token(animal).replace(" ", "_")
+    if dex_key in emoji_asset_keys():
+        return dex_key
     special = resolve_special_animal(animal)
     if special:
         return f"pet_{special.get('emoji_stem', '')}"
@@ -491,6 +494,9 @@ def resolve_compact_catalog_entry(
 
 
 def guide_animal_variable_emoji_key(value: str) -> str | None:
+    dex_key = "pet_" + normalize_catalog_token(value).replace(" ", "_")
+    if dex_key in emoji_asset_keys():
+        return dex_key
     special = resolve_special_animal(value)
     if special:
         return f"pet_{special.get('emoji_stem', '')}"
@@ -580,7 +586,7 @@ def guide_variable_emoji_key(value: str) -> str | None:
 
     # Ranked standard animal aliases such as gfish resolve after exact weapon
     # and passive aliases so ffish and lwolf keep their documented meanings.
-    animal_key = guide_animal_variable_emoji_key(compact)
+    animal_key = guide_animal_variable_emoji_key(value)
     if animal_key:
         return animal_key
 

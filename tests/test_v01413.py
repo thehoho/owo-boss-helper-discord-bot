@@ -14,7 +14,7 @@ from PIL import Image
 from cogs.emoji_assets import EmojiOverrideStore, emoji_label, normalize_upload, override_name
 from cogs.emoji_dex import dex_source_url, sync_dex_artwork
 from cogs.emoji_tools import EmojiTools, OwnerEmojiBrowser, reference_entries, resolve_target, search_entries
-from cogs.team_guides import guide_variable_emoji_key, render_guide_markdown
+from cogs.team_guides import animal_emoji_key, guide_variable_emoji_key, render_guide_markdown
 from cogs.ui_emojis import (DEX_ARTWORK, UIEmojiManager, clear_emoji_catalog_cache,
                            default_emoji_image, deployed_emoji_name, discover_emoji_assets, emoji_asset_keys)
 
@@ -107,6 +107,9 @@ class DexAndMigrationTests(unittest.IsolatedAsyncioTestCase):
         await self.manager.install_dex_asset("pet_custom_test", artwork(), "Custom Test", '["custom_test"]', "source")
         self.assertIn("pet_custom_test", emoji_asset_keys())
         self.assertEqual(resolve_target("AN_custom_test"), "pet_custom_test")
+        self.assertEqual(animal_emoji_key("Custom Test"), "pet_custom_test")
+        self.assertEqual(animal_emoji_key("custom_test"), "pet_custom_test")
+        self.assertEqual(guide_variable_emoji_key("custom_test"), "pet_custom_test")
         self.assertIn("555", render_guide_markdown(self.bot, "{AN_custom_test}"))
         saved = default_emoji_image("pet_custom_test")
         await self.manager.cog_load()
