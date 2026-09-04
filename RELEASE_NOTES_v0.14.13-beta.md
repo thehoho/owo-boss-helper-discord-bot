@@ -10,14 +10,14 @@ The picker shows the number of manually replaced icons in the selected category 
 
 ## Consistent names
 
-- Passives: `BS_crit`
+- Passives: `PS_crit`
 - Weapons: `W_sword`
 - Stats: `ST_hp`
 - Animals: `AN_fish`
 - Ranks: `R_legendary`
 - Other icons: `UI_clown`
 
-Use these in braces in guides, for example `{BS_crit}`, `{W_sword}`, and `{AN_fish}`. Existing guide aliases and exact logical keys still work. Actual Discord application names include a compact version/hash suffix to distinguish retained artwork versions. Active legacy emojis are renamed, not deleted or reuploaded: IDs, artwork, and historical messages are preserved.
+Use these in braces in guides, for example `{PS_crit}`, `{W_sword}`, and `{AN_fish}`. Existing guide aliases (including the previous `BS_` prefix) and exact logical keys still work. Actual Discord application names include a compact version/hash suffix to distinguish retained artwork versions. Active legacy emojis are renamed, not deleted or reuploaded: IDs, artwork, and historical messages are preserved.
 
 ## Animal Dex artwork
 

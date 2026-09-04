@@ -83,7 +83,11 @@ def emoji_asset_keys() -> frozenset[str]:
 
 @lru_cache(maxsize=1)
 def emoji_alias_keys() -> dict[str, str]:
-    return {emoji_label(key).casefold(): key for key in emoji_asset_keys()}
+    aliases = {emoji_label(key).casefold(): key for key in emoji_asset_keys()}
+    # Keep guides written before the passive-prefix correction usable.
+    aliases.update({"bs_" + key.removeprefix("passive_"): key
+                    for key in emoji_asset_keys() if key.startswith("passive_")})
+    return aliases
 
 
 def clear_emoji_catalog_cache() -> None:
@@ -228,7 +232,12 @@ class UIEmojiManager(commands.Cog):
                 current = by_name.get(remote_name)
                 if current is None:
                     old_name = override.name if override else legacy_emoji_name(name)
-                    current = by_name.get(old_name)
+                    # The previous release used BS_ for passives. Prefer its
+                    # active artwork over older packaged versions; retain IDs.
+                    previous_prefix_name = "BS_" + remote_name[3:] if name.startswith("passive_") else old_name
+                    current = by_name.get(old_name) if override else by_name.get(previous_prefix_name)
+                    if current is None:
+                        current = by_name.get(old_name)
                     if current is not None:
                         # Rename in place: no new IDs, no artwork loss, no quota cost.
                         try:

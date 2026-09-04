@@ -17,7 +17,7 @@ from PIL import Image, ImageOps
 MAX_UPLOAD_BYTES = 2 * 1024 * 1024
 MAX_IMAGE_PIXELS = 2048 * 2048
 MAX_EMOJI_BYTES = 256 * 1024
-EMOJI_PREFIXES = {"passive": "BS", "weapon": "W", "stat": "ST", "pet": "AN", "rank": "R"}
+EMOJI_PREFIXES = {"passive": "PS", "weapon": "W", "stat": "ST", "pet": "AN", "rank": "R"}
 
 
 def emoji_label(key: str) -> str:

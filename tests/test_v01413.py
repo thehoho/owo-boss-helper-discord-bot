@@ -33,12 +33,23 @@ def request(user=42, category="all"):
 
 class PickerTests(unittest.IsolatedAsyncioTestCase):
     def test_normalized_aliases_preserve_old_syntax(self):
-        for new, old, key in (("BS_crit", "crit", "passive_crit"), ("W_sword", "sword", "weapon_sword"),
+        for new, old, key in (("PS_crit", "crit", "passive_crit"), ("W_sword", "sword", "weapon_sword"),
                               ("ST_hp", "hp_stat", "stat_hp"), ("AN_fish", "fish", "pet_fish")):
             self.assertEqual(guide_variable_emoji_key(new), key)
             self.assertEqual(guide_variable_emoji_key(old), key)
             self.assertEqual(resolve_target(new), key)
             self.assertEqual(emoji_label(key), new)
+
+    async def test_all_passives_use_ps_and_accept_previous_bs_aliases(self):
+        cog = EmojiTools(SimpleNamespace())
+        for entry in search_entries(category="passive"):
+            label = emoji_label(entry.key)
+            self.assertTrue(label.startswith("PS_"))
+            self.assertEqual(entry.variable, "{" + label + "}")
+            self.assertEqual(resolve_target("BS_" + label[3:]), entry.key)
+            self.assertEqual(guide_variable_emoji_key("BS_" + label[3:]), entry.key)
+            choices = await cog.target_choices(request(category="passive"), label)
+            self.assertIn(label, [choice.value for choice in choices])
 
     async def test_all_weapons_are_reachable_in_owner_pages_and_autocomplete(self):
         cog = EmojiTools(SimpleNamespace())
@@ -157,6 +168,28 @@ class DexAndMigrationTests(unittest.IsolatedAsyncioTestCase):
             await self.manager.ensure_synced()
         self.assertEqual(self.manager.emojis["weapon_sword"].id, 88)
         self.bot.create_application_emoji.assert_not_awaited()
+
+    async def test_bs_passives_rename_in_place_preserving_manual_artwork(self):
+        for manual in (False, True):
+            with self.subTest(manual=manual):
+                key = "passive_crit"
+                raw = artwork()
+                expected = override_name(key, raw) if manual else deployed_emoji_name(key)
+                previous = "BS_" + expected[3:]
+                if manual:
+                    self.manager.store.save(key, previous, raw, 123, 42)
+                remote = SimpleNamespace(name=previous, id=123, animated=False,
+                    edit=AsyncMock(return_value=SimpleNamespace(name=expected, id=123, animated=False)))
+                self.bot.fetch_application_emojis.return_value = [remote]
+                self.manager._synced = False
+                with patch("cogs.ui_emojis.discover_emoji_assets", return_value={key: Path("unused")}):
+                    await self.manager.ensure_synced()
+                remote.edit.assert_awaited_once_with(name=expected)
+                self.bot.create_application_emoji.assert_not_awaited()
+                self.assertEqual(self.manager.emojis[key].id, 123)
+                if manual:
+                    saved = self.manager.store.all()[key]
+                    self.assertEqual((saved.name, saved.emoji_id, saved.image), (expected, 123, raw))
 
     async def test_sync_skips_cached_sources_and_reports_missing_and_failed_sources(self):
         cached = SimpleNamespace(animal_key="cached", display_name="Cached", aliases=(), source="owo",
