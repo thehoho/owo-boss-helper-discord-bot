@@ -1,3 +1,15 @@
+## v0.15.0-beta - Opt-in Boss Reward and End DMs
+
+- Added private, member-controlled reward rules for minimum weapon shards, weapon crates, boss weapon crates, and XP.
+- Added any-x2 alerts plus defeated-or-escaped end alerts.
+- Added recurring rules and one-boss rules scoped to the current boss, or the next boss when none is active.
+- Required explicit consent and a successful test DM before the first rule is stored.
+- Combined multiple matching rules into one reward DM per member per boss and deduplicated end DMs.
+- Added a strict local reader for OwO's fixed 620×60 reward card, trusted Discord-CDN media only, bounded downloads, three-observation consistency telemetry, and fail-closed behavior.
+- Reused the authoritative active-boss and outcome lifecycle so mailbox messages and stale cards cannot trigger notifications.
+- Added `boss_notifications.db` to backups; snapshots and delivery state are pruned after seven days.
+- Updated the public version to 0.15.0-beta; the SQLite schema is created automatically and no new Discord permission is required.
+
 ## v0.14.15-beta - Live Exact-HP Refresh
 
 - Read public battle-log UUIDs from every nested Components V2 URL field instead of rendered text only.

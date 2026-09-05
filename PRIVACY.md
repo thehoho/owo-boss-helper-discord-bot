@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 10 August 2026_
+_Last updated: 5 September 2026_
 
 OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 
@@ -21,6 +21,8 @@ The bot stores only the information needed to provide its features and operate s
 - Configured Discord channel or thread IDs and message IDs used for cooldown alerts, daily boss reports, and ticket boards.
 - Per-server helper and OwO command-prefix settings.
 - Per-server daily totals of confirmed defeated and escaped guild bosses.
+- Opt-in boss-notification consent timestamps and member-selected rules, including Discord user/server IDs, reward type, minimum, recurring or one-boss mode, and the boss lifetime associated with a one-boss rule.
+- Public guild-boss reward snapshots (weapon shards, both crate amounts, XP, x2 markers, source message IDs, and consistency counters) plus short-lived DM delivery status used to prevent duplicate alerts.
 - Operational logs containing events, warnings, and errors.
 
 The bot does not intentionally store ordinary conversation content. It temporarily reads relevant messages to recognize supported OwO commands and responses.
@@ -29,7 +31,7 @@ The bot does not request Discord presence data or a complete server-member list.
 
 ## Why the data is used
 
-Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, authorize configured boss-decision helpers, send optional fighter-role HIT alerts, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, provide cached public animal information, publish trusted expert team guides, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, and notify the developer when the bot joins or leaves a server.
+Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, authorize configured boss-decision helpers, send optional fighter-role HIT alerts, deliver member-requested boss reward and end DMs, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, provide cached public animal information, publish trusted expert team guides, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, and notify the developer when the bot joins or leaves a server.
 
 ## Storage and sharing
 
@@ -39,6 +41,8 @@ Runtime data is stored on the bot's private hosting server in local SQLite datab
 
 - Current ticket-board entries expire after 48 hours without a successful manual ticket check or a confirmed public Top 10 hit. Personal tracking, block, and nickname preferences are preserved so the user's chosen controls continue to work.
 - Public battle-log UUID deduplication records and boss-message observations are automatically removed after approximately seven days.
+- Boss reward snapshots and notification delivery records are automatically removed after approximately seven days. Recurring rules remain until disabled; one-boss rules are removed when that boss ends or a newer boss supersedes it.
+- Members can disable one notification rule or all rules in a server with `/boss-notify` or `H boss notify`. When a member has no notification rules in any server, the stored DM-consent record is removed too.
 - Users can clear their scanned Neon weapon entries with `H weapon clear`.
 - The bot owner can revoke trusted guide-expert access. Published guide correction or deletion requests can be sent to the developer through the contact method below.
 - Cached animal records contain global public game facts rather than a member's personal activity. Corrections can be requested when an official OwO response or source catalog has changed.

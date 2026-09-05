@@ -11,7 +11,7 @@ ARCHIVE="${BACKUP_DIR}/owo-boss-helper-${TIMESTAMP}.tar.gz"
 mkdir -p "${WORK_DIR}"
 chmod 700 "${BACKUP_DIR}" "${WORK_DIR}"
 
-for database in team_templates.db animal_dex.db team_guides.db boss_tickets.db bot_stats.db neon_weapons.db emoji_overrides.db; do
+for database in team_templates.db animal_dex.db team_guides.db boss_tickets.db bot_stats.db neon_weapons.db emoji_overrides.db boss_notifications.db; do
     if [[ -f "${APP_DIR}/${database}" ]]; then
         sqlite3 "${APP_DIR}/${database}" ".backup '${WORK_DIR}/${database}'"
     fi

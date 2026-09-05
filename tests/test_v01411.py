@@ -251,7 +251,7 @@ class CompactGuideCompositionTests(unittest.TestCase):
 
 class ReleaseSurfaceTests(unittest.TestCase):
     def test_phase_two_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.14.15-beta")
+        self.assertEqual(BOT_VERSION, "0.15.0-beta")
 
 
 if __name__ == "__main__":

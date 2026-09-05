@@ -109,6 +109,8 @@ async def main() -> None:
         logger.info("Guide emoji reference and owner replacement tools loaded")
         await bot.load_extension("cogs.boss_generator")
         logger.info("Boss generator and cooldown tracker loaded")
+        await bot.load_extension("cogs.boss_notifications")
+        logger.info("Opt-in boss reward and outcome notifications loaded")
         await bot.load_extension("cogs.team_templates")
         logger.info("Team template manager loaded")
         await bot.load_extension("cogs.ticket_tracker")

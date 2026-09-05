@@ -1,3 +1,9 @@
+## v0.15.0-beta notes
+
+Members can now opt into private guild-boss reward and end alerts with `/boss-notify` or the server's helper prefix. Rules support minimum weapon shards, weapon crates, boss weapon crates, or XP; any x2 reward; and defeated/escaped outcomes. Each rule can repeat for every boss or apply only to the current/next boss.
+
+The bot asks for explicit DM consent and verifies delivery before saving the first rule. Reward cards are read locally from OwO's fixed reward image, fail closed on uncertain layouts, and are sampled up to three times per boss for consistency telemetry. Matching rules are ORed into one reward DM per member per boss. Snapshots and delivery deduplication state expire after seven days. See [notification behavior and deployment notes](RELEASE_NOTES_v0.15.0-beta.md).
+
 ## v0.14.15-beta notes
 
 Exact boss HP now follows newly added battle-log links on the latest active OwO boss card. Components V2 link destinations are scanned directly, gateway edits update the current reply immediately, and a one-minute reconciliation pass catches missed Discord edit events. Older command replies remain in place and are never rewritten after a newer active card appears. See [refresh behavior and deployment notes](RELEASE_NOTES_v0.14.15-beta.md).
@@ -119,6 +125,16 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 - Persists up to seven failed daily reports for retry instead of discarding counts during a temporary Discord/channel failure.
 - Keeps the latest completed daily totals per server and reposts them with `H boss report`.
 - Adds one stable random usable custom emoji from the current server when a helper marks an active boss HIT or SKIP; servers without a usable custom emoji keep a plain sticky.
+
+### Personal boss notifications
+
+- Use `/boss-notify` or `H boss notify` to view and manage private alerts in a server.
+- Set recurring minimums with `H boss notify shards 175`, `H boss notify crate 4`, `H boss notify bcrate 3`, or `H boss notify xp 20k`.
+- Use `H boss notify x2` for any doubled reward and `H boss notify end` for defeated-or-escaped alerts.
+- Add `current` for a one-boss rule, such as `H boss notify end current`; if no boss is active, it applies to the next boss.
+- Disable one rule with `H boss notify xp off`, or every alert in that server with `H boss notify off`.
+- Rules use minimum thresholds and are ORed: one matching rule is enough, and one combined reward DM is sent per boss.
+- The first alert requires an explicit confirmation button and a successful test DM. No rule is saved if DMs are blocked.
 
 ### Team templates
 

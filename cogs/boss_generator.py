@@ -3451,7 +3451,7 @@ class BossGenerator(commands.Cog):
 
     def is_spawn_window_open(self, guild_id: int) -> bool:
         """True only when the guild can legitimately receive a new boss."""
-        if not self.is_cooldown_configured(guild_id):
+        if not self.is_boss_tracking_enabled(guild_id):
             return False
         config = self.cooldown_config.get(str(guild_id), {})
         if config.get("active_boss_message_id"):
@@ -3465,7 +3465,7 @@ class BossGenerator(commands.Cog):
         ignored completely. While a boss is active, gateway payloads are still
         inspected cheaply so a newer status card can replace the tracked one.
         """
-        if not self.is_cooldown_configured(guild_id):
+        if not self.is_boss_tracking_enabled(guild_id):
             return False
         config = self.cooldown_config.get(str(guild_id), {})
         if config.get("active_boss_message_id"):
@@ -3584,7 +3584,7 @@ class BossGenerator(commands.Cog):
             )
 
     async def track_latest_guild_boss_message(self, guild_id: int, channel_id: int, message_id: int, data: dict[str, Any]) -> None:
-        if not self.is_cooldown_configured(guild_id) or not is_guild_boss_status(data):
+        if not self.is_boss_tracking_enabled(guild_id) or not is_guild_boss_status(data):
             return
 
         ticket_tracker = self.bot.get_cog("TicketTracker")
@@ -3701,6 +3701,24 @@ class BossGenerator(commands.Cog):
                 channel_id,
                 f"; escapes at {expiry}" if expiry else "",
             )
+
+        notification_cog = self.bot.get_cog("BossNotifications")
+        handle_active_boss = getattr(notification_cog, "handle_active_boss", None)
+        if expiry and callable(handle_active_boss):
+            try:
+                await handle_active_boss(
+                    guild_id,
+                    channel_id,
+                    message_id,
+                    expiry,
+                    data,
+                )
+            except Exception:
+                logger.exception(
+                    "Could not process reward notifications for guild %s boss %s",
+                    guild_id,
+                    expiry,
+                )
 
         if is_new_boss and int(config.get("announced_boss_expires_at") or 0) != expiry:
             config["announced_boss_expires_at"] = expiry
@@ -4111,6 +4129,14 @@ class BossGenerator(commands.Cog):
         config = self.cooldown_config.get(str(guild_id), {})
         return bool(config.get("channel_id"))
 
+    def is_boss_tracking_enabled(self, guild_id: int) -> bool:
+        if self.is_cooldown_configured(guild_id):
+            return True
+        get_cog = getattr(self.bot, "get_cog", None)
+        notification_cog = get_cog("BossNotifications") if callable(get_cog) else None
+        has_subscribers = getattr(notification_cog, "has_guild_subscribers", None)
+        return bool(callable(has_subscribers) and has_subscribers(guild_id))
+
     async def maybe_handle_outcome(
         self,
         guild_id: int,
@@ -4297,6 +4323,24 @@ class BossGenerator(commands.Cog):
                 guild_id,
                 cooldown_end,
             )
+            notification_cog = self.bot.get_cog("BossNotifications")
+            handle_boss_outcome = getattr(
+                notification_cog, "handle_boss_outcome", None
+            )
+            if callable(handle_boss_outcome):
+                try:
+                    await handle_boss_outcome(
+                        guild_id,
+                        effective_boss_key,
+                        "defeated",
+                        event_time,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Could not process defeat notifications for guild %s boss %s",
+                        guild_id,
+                        effective_boss_key,
+                    )
             await self.record_boss_report_outcome(guild_id, "defeated")
             await self.clear_boss_decision_message(guild_id)
             await self.send_boss_outcome_marker(guild_id, "defeated")
@@ -4347,6 +4391,24 @@ class BossGenerator(commands.Cog):
                 guild_id,
                 event_time,
             )
+            notification_cog = self.bot.get_cog("BossNotifications")
+            handle_boss_outcome = getattr(
+                notification_cog, "handle_boss_outcome", None
+            )
+            if callable(handle_boss_outcome):
+                try:
+                    await handle_boss_outcome(
+                        guild_id,
+                        effective_boss_key,
+                        "escaped",
+                        event_time,
+                    )
+                except Exception:
+                    logger.exception(
+                        "Could not process escape notifications for guild %s boss %s",
+                        guild_id,
+                        effective_boss_key,
+                    )
             await self.record_boss_report_outcome(guild_id, "escaped")
             await self.clear_boss_decision_message(guild_id)
             await self.send_boss_outcome_marker(guild_id, "escaped")
