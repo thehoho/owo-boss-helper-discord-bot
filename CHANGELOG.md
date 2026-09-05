@@ -1,3 +1,13 @@
+## v0.14.14-beta - Exact Boss HP from Battle Logs
+
+- Persisted the latest generated Neon boss command and bound it to one active boss lifetime.
+- Replied once beneath each official active OwO boss status card and edited that reply when fresher fight data appeared.
+- Decoded OwO's compressed v2 public battle logs locally and read final HP by authoritative enemy-team ID/order.
+- Selected freshness by OwO's battle timestamp, preventing older status copies from rolling HP backward.
+- Kept OCR and the 100,000 fallback when no valid log exists; malformed, oversized, stale, and non-three-enemy logs fail closed.
+- Added bounded concurrency, timeouts, immutable-log caching, persisted reply deduplication, and restart-safe state.
+- Updated the public version to 0.14.14-beta; no database migration or additional Discord permission is required.
+
 ## v0.14.13-beta - Complete Emoji Picker and Animal Dex Artwork
 
 - Animal cleanup: unified verified ranked aliases onto one owner target and existing Dex artwork, preserving manual replacements and keeping hidden squid distinct. Added backup-first deletion of only superseded animal `_v3` IDs; sole icons and non-animal assets are protected.

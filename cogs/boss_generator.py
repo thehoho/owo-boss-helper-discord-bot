@@ -35,6 +35,12 @@ from PIL import Image
 from discord import app_commands
 from discord.ext import commands
 
+from .battle_log_hp import (
+    BattleLogHP,
+    extract_battle_log_hp,
+    extract_battle_log_uuids,
+    replace_command_hp,
+)
 from .helper_prefix import (
     HELPER_PREFIX_DEFAULT,
     MAX_HELPER_PREFIX_LENGTH,
@@ -88,6 +94,16 @@ OUTCOME_DEDUP_SECONDS = 20
 OUTCOME_SETTLE_SECONDS = 1.25
 BOSS_OUTCOME_WINDOW_SKEW_SECONDS = 90
 BOSS_WATCH_INTERVAL_SECONDS = 15
+BOSS_COMMAND_UNBOUND_MAX_AGE_SECONDS = 20 * 60
+BOSS_COMMAND_BOUND_MAX_AGE_SECONDS = 4 * 60 * 60
+BATTLE_LOG_SUCCESS_CACHE_SECONDS = 6 * 60 * 60
+BATTLE_LOG_FAILURE_CACHE_SECONDS = 5
+BATTLE_LOG_MAX_LINKS = 40
+BATTLE_LOG_MAX_RESPONSE_BYTES = 6 * 1024 * 1024
+BATTLE_LOG_API_URLS = (
+    "https://owobot.com/api/battle-log/{uuid}",
+    "https://logs.owobot.com/logs/{uuid}",
+)
 PACIFIC = ZoneInfo("America/Los_Angeles")
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
@@ -1566,6 +1582,8 @@ class BossGenerator(commands.Cog):
         self.guild_boss_watch_tasks: dict[int, asyncio.Task] = {}
         self.guild_boss_fetch_locks: dict[int, asyncio.Lock] = {}
         self.guild_boss_outcome_locks: dict[int, asyncio.Lock] = {}
+        self.boss_hp_refresh_locks: dict[int, asyncio.Lock] = {}
+        self.battle_log_hp_cache: dict[str, tuple[float, BattleLogHP | None]] = {}
         self.http_session: aiohttp.ClientSession | None = None
         self.hp_templates = load_hp_templates()
         self.boss_sticky_refresh_tasks: dict[int, asyncio.Task[None]] = {}
@@ -2116,6 +2134,8 @@ class BossGenerator(commands.Cog):
         for task in self.boss_sticky_refresh_tasks.values():
             task.cancel()
         self.boss_sticky_refresh_tasks.clear()
+        self.boss_hp_refresh_locks.clear()
+        self.battle_log_hp_cache.clear()
         if self.boss_report_task:
             self.boss_report_task.cancel()
             self.boss_report_task = None
@@ -3053,6 +3073,296 @@ class BossGenerator(commands.Cog):
                 continue
         return None, 0.0
 
+    def has_recent_generated_boss_command(
+        self,
+        guild_id: int,
+        *,
+        now: int | None = None,
+    ) -> bool:
+        """Return whether a saved command can still belong to the current boss."""
+        config = self.cooldown_config.get(str(guild_id), {})
+        command = str(config.get("generated_boss_command") or "")
+        try:
+            created_at = int(config.get("generated_boss_created_at") or 0)
+            bound_expiry = int(config.get("generated_boss_bound_expiry") or 0)
+        except (TypeError, ValueError):
+            return False
+        if not command or " -hp " not in command or not created_at:
+            return False
+        age = int(now or time.time()) - created_at
+        max_age = (
+            BOSS_COMMAND_BOUND_MAX_AGE_SECONDS
+            if bound_expiry
+            else BOSS_COMMAND_UNBOUND_MAX_AGE_SECONDS
+        )
+        return -60 <= age <= max_age
+
+    def should_refresh_generated_boss_command(
+        self,
+        guild_id: int,
+        message_id: int,
+        data: dict[str, Any],
+    ) -> bool:
+        """Use cheap payload text unless this status message is already known."""
+        if not self.has_recent_generated_boss_command(guild_id):
+            return False
+        config = self.cooldown_config.get(str(guild_id), {})
+        replies = config.get("generated_boss_replies")
+        if isinstance(replies, dict) and str(message_id) in replies:
+            return True
+        return is_guild_boss_status(data)
+
+    def get_boss_hp_refresh_lock(self, guild_id: int) -> asyncio.Lock:
+        return self.boss_hp_refresh_locks.setdefault(guild_id, asyncio.Lock())
+
+    async def fetch_battle_log_hp(self, uuid: str) -> BattleLogHP | None:
+        """Fetch and decode one immutable public OwO battle log."""
+        now = time.monotonic()
+        cached = self.battle_log_hp_cache.get(uuid)
+        if cached:
+            cached_at, result = cached
+            ttl = (
+                BATTLE_LOG_SUCCESS_CACHE_SECONDS
+                if result is not None
+                else BATTLE_LOG_FAILURE_CACHE_SECONDS
+            )
+            if now - cached_at <= ttl:
+                return result
+
+        if self.http_session is None or self.http_session.closed:
+            self.http_session = aiohttp.ClientSession()
+
+        result: BattleLogHP | None = None
+        for template in BATTLE_LOG_API_URLS:
+            url = template.format(uuid=uuid)
+            try:
+                async with self.http_session.get(
+                    url,
+                    timeout=aiohttp.ClientTimeout(total=15),
+                    headers={"User-Agent": "OwOBossHelper/0.14"},
+                ) as response:
+                    if response.status != 200:
+                        continue
+                    if (
+                        response.content_length is not None
+                        and response.content_length > BATTLE_LOG_MAX_RESPONSE_BYTES
+                    ):
+                        logger.warning("Rejected oversized battle log %s", uuid)
+                        break
+                    body = await response.content.read(BATTLE_LOG_MAX_RESPONSE_BYTES + 1)
+                if len(body) > BATTLE_LOG_MAX_RESPONSE_BYTES:
+                    logger.warning("Rejected oversized battle log %s", uuid)
+                    break
+                payload = json.loads(body)
+                result = await asyncio.to_thread(extract_battle_log_hp, payload, uuid)
+                break
+            except (
+                aiohttp.ClientError,
+                asyncio.TimeoutError,
+                json.JSONDecodeError,
+                UnicodeDecodeError,
+                ValueError,
+                TypeError,
+                KeyError,
+                IndexError,
+                OverflowError,
+                RecursionError,
+            ) as exc:
+                logger.debug("Could not read battle log %s from %s: %s", uuid, url, exc)
+
+        self.battle_log_hp_cache[uuid] = (now, result)
+        if len(self.battle_log_hp_cache) > 1_000:
+            oldest = min(
+                self.battle_log_hp_cache,
+                key=lambda key: self.battle_log_hp_cache[key][0],
+            )
+            self.battle_log_hp_cache.pop(oldest, None)
+        return result
+
+    async def freshest_battle_log_hp(self, uuids: list[str]) -> BattleLogHP | None:
+        """Fetch a bounded set and select by OwO's own battle timestamp."""
+        semaphore = asyncio.Semaphore(4)
+
+        async def fetch_one(uuid: str) -> BattleLogHP | None:
+            async with semaphore:
+                return await self.fetch_battle_log_hp(uuid)
+
+        if len(uuids) > BATTLE_LOG_MAX_LINKS:
+            half = BATTLE_LOG_MAX_LINKS // 2
+            uuids = uuids[:half] + uuids[-half:]
+        tasks = [asyncio.create_task(fetch_one(uuid)) for uuid in uuids]
+        done, pending = await asyncio.wait(tasks, timeout=20)
+        for task in pending:
+            task.cancel()
+        if pending:
+            await asyncio.gather(*pending, return_exceptions=True)
+        valid: list[BattleLogHP] = []
+        for task in done:
+            try:
+                result = task.result()
+            except Exception:
+                continue
+            if isinstance(result, BattleLogHP):
+                valid.append(result)
+        return max(valid, key=lambda result: result.timestamp_ms) if valid else None
+
+    @staticmethod
+    def battle_log_matches_boss_lifetime(
+        result: BattleLogHP,
+        expiry: int | None,
+    ) -> bool:
+        if not expiry:
+            return True
+        earliest = (int(expiry) - BOSS_COMMAND_BOUND_MAX_AGE_SECONDS) * 1_000
+        latest = (int(expiry) + 60) * 1_000
+        return earliest <= result.timestamp_ms <= latest
+
+    async def upsert_generated_boss_reply(
+        self,
+        guild_id: int,
+        channel_id: int,
+        source_message_id: int,
+        command: str,
+    ) -> None:
+        """Create one reply per OwO status card, editing it as fresher logs appear."""
+        config = self.cooldown_config.setdefault(str(guild_id), {})
+        raw_replies = config.get("generated_boss_replies")
+        replies = dict(raw_replies) if isinstance(raw_replies, dict) else {}
+        key = str(source_message_id)
+        entry = replies.get(key)
+        entry = entry if isinstance(entry, dict) else {}
+        if str(entry.get("command") or "") == command and int(entry.get("reply_id") or 0):
+            return
+
+        channel = self.bot.get_channel(channel_id)
+        if channel is None:
+            try:
+                channel = await self.bot.fetch_channel(channel_id)
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException):
+                return
+        get_partial_message = getattr(channel, "get_partial_message", None)
+        if not callable(get_partial_message):
+            return
+
+        content = f"`{command}`"
+        reply_id = int(entry.get("reply_id") or 0)
+        if reply_id:
+            try:
+                await get_partial_message(reply_id).edit(content=content)
+            except discord.NotFound:
+                reply_id = 0
+            except (discord.Forbidden, discord.HTTPException) as exc:
+                logger.warning("Could not update exact boss HP reply %s: %s", reply_id, exc)
+                return
+
+        if not reply_id:
+            try:
+                sent = await channel.send(
+                    content,
+                    reference=get_partial_message(source_message_id),
+                    mention_author=False,
+                )
+                reply_id = sent.id
+            except (discord.NotFound, discord.Forbidden, discord.HTTPException) as exc:
+                logger.warning(
+                    "Could not post exact boss HP below status %s: %s",
+                    source_message_id,
+                    exc,
+                )
+                return
+
+        replies[key] = {
+            "reply_id": reply_id,
+            "command": command,
+            "updated_at": int(time.time()),
+        }
+        if len(replies) > 50:
+            replies = dict(
+                sorted(
+                    replies.items(),
+                    key=lambda item: int((item[1] or {}).get("updated_at") or 0),
+                )[-50:]
+            )
+        config["generated_boss_replies"] = replies
+        save_cooldown_config(self.cooldown_config)
+
+    async def refresh_generated_boss_command_from_logs(
+        self,
+        guild_id: int,
+        channel_id: int,
+        source_message_id: int,
+        data: dict[str, Any],
+    ) -> None:
+        """Repost the saved command and upgrade its HP from the freshest public log."""
+        async with self.get_boss_hp_refresh_lock(guild_id):
+            if not self.has_recent_generated_boss_command(guild_id):
+                return
+            if not is_explicit_active_boss_status(data):
+                return
+
+            config = self.cooldown_config.setdefault(str(guild_id), {})
+            command = str(config.get("generated_boss_command") or "")
+            expiry = extract_future_boss_expiry(data)
+            bound_expiry = int(config.get("generated_boss_bound_expiry") or 0)
+            if bound_expiry and expiry and bound_expiry != expiry:
+                logger.info(
+                    "Ignored boss HP card %s in guild %s: expiry %s does not match %s",
+                    source_message_id,
+                    guild_id,
+                    expiry,
+                    bound_expiry,
+                )
+                return
+
+            changed = False
+            if not bound_expiry and expiry:
+                config["generated_boss_bound_expiry"] = expiry
+                bound_expiry = expiry
+                changed = True
+
+            if changed:
+                save_cooldown_config(self.cooldown_config)
+            # Put the currently best command under the status card immediately.
+            # A public log fetch may then upgrade this same reply in place.
+            await self.upsert_generated_boss_reply(
+                guild_id,
+                channel_id,
+                source_message_id,
+                command,
+            )
+            changed = False
+
+            text = extract_all_text_from_raw(data)
+            uuids = extract_battle_log_uuids(text)
+            freshest = await self.freshest_battle_log_hp(uuids) if uuids else None
+            previous_timestamp = int(config.get("generated_boss_log_date_ms") or 0)
+            if (
+                freshest is not None
+                and freshest.timestamp_ms >= previous_timestamp
+                and self.battle_log_matches_boss_lifetime(freshest, expiry or bound_expiry)
+            ):
+                command = replace_command_hp(command, freshest.final_hp)
+                config["generated_boss_command"] = command
+                config["generated_boss_hp"] = list(freshest.final_hp)
+                config["generated_boss_log_uuid"] = freshest.uuid
+                config["generated_boss_log_date_ms"] = freshest.timestamp_ms
+                changed = True
+                logger.info(
+                    "Exact boss HP from log %s in guild %s: %s",
+                    freshest.uuid,
+                    guild_id,
+                    ",".join(map(str, freshest.final_hp)),
+                )
+
+            if changed:
+                save_cooldown_config(self.cooldown_config)
+                await self.upsert_generated_boss_reply(
+                    guild_id,
+                    channel_id,
+                    source_message_id,
+                    command,
+                )
+
     def is_spawn_window_open(self, guild_id: int) -> bool:
         """True only when the guild can legitimately receive a new boss."""
         if not self.is_cooldown_configured(guild_id):
@@ -3476,16 +3786,32 @@ class BossGenerator(commands.Cog):
             cooldown_gateway_needed = self.should_inspect_guild_boss_gateway(
                 message.guild.id
             )
-            if not generator_needed and not cooldown_gateway_needed:
+            command_refresh_available = self.has_recent_generated_boss_command(
+                message.guild.id
+            )
+            if (
+                not generator_needed
+                and not cooldown_gateway_needed
+                and not command_refresh_available
+            ):
                 return
 
             # Message-create events already contain Components V2. Build raw-like
             # data locally rather than GETting every OwO response from Discord.
             data = message_to_raw_data(message)
 
-            if cooldown_gateway_needed and is_guild_boss_status(data):
+            guild_boss_status = is_guild_boss_status(data)
+            if cooldown_gateway_needed and guild_boss_status:
                 await self.track_latest_guild_boss_message(
                     message.guild.id, message.channel.id, message.id, data
+                )
+
+            if command_refresh_available and guild_boss_status:
+                await self.refresh_generated_boss_command_from_logs(
+                    message.guild.id,
+                    message.channel.id,
+                    message.id,
+                    data,
                 )
 
             if generator_needed:
@@ -3526,32 +3852,47 @@ class BossGenerator(commands.Cog):
             if payload.guild_id is None:
                 return
 
+            partial_data = dict(payload.data)
             generator_needed = payload.channel_id in active_sessions
             cooldown_gateway_needed = self.should_inspect_guild_boss_gateway(
                 payload.guild_id
             )
-            if not generator_needed and not cooldown_gateway_needed:
+            command_refresh_needed = self.should_refresh_generated_boss_command(
+                payload.guild_id,
+                payload.message_id,
+                partial_data,
+            )
+            if (
+                not generator_needed
+                and not cooldown_gateway_needed
+                and not command_refresh_needed
+            ):
                 return
 
             # Discord edit events may contain only the changed Components V2
             # fragment. Never let a partial payload finish a known active boss:
             # fetch that exact card first. Unrelated edits remain request-free.
-            if cooldown_gateway_needed:
-                data = dict(payload.data)
-                known_active = self.is_known_active_boss_message(
+            data = partial_data
+            known_active = (
+                self.is_known_active_boss_message(
                     payload.guild_id,
                     payload.message_id,
                 )
-                if known_active:
-                    async with self.get_guild_boss_fetch_lock(payload.guild_id):
-                        fetched = await fetch_raw_message(
-                            self.bot,
-                            payload.channel_id,
-                            payload.message_id,
-                        )
-                    if not fetched:
-                        return
-                    data = fetched
+                if cooldown_gateway_needed
+                else False
+            )
+            if known_active or generator_needed or command_refresh_needed:
+                async with self.get_guild_boss_fetch_lock(payload.guild_id):
+                    fetched = await fetch_raw_message(
+                        self.bot,
+                        payload.channel_id,
+                        payload.message_id,
+                    )
+                if not fetched:
+                    return
+                data = fetched
+
+            if cooldown_gateway_needed:
                 author_id = int((data.get("author") or {}).get("id", 0) or 0)
                 tracked = self.is_tracked_boss_message(
                     payload.guild_id, payload.channel_id, payload.message_id
@@ -3564,15 +3905,22 @@ class BossGenerator(commands.Cog):
                         data,
                     )
 
+            if (
+                command_refresh_needed
+                and int((data.get("author") or {}).get("id", 0) or 0) == OWO_BOT_ID
+                and is_guild_boss_status(data)
+            ):
+                await self.refresh_generated_boss_command_from_logs(
+                    payload.guild_id,
+                    payload.channel_id,
+                    payload.message_id,
+                    data,
+                )
+
             # Page navigation edits are intentionally fetched because the user has
             # explicitly armed a short generator session. This is a tiny, bounded
             # request count and is unrelated to server-wide grinding traffic.
             if generator_needed:
-                data = await fetch_raw_message(
-                    self.bot, payload.channel_id, payload.message_id
-                )
-                if not data:
-                    return
                 if int((data.get("author") or {}).get("id", 0)) != OWO_BOT_ID:
                     return
 
@@ -3634,6 +3982,24 @@ class BossGenerator(commands.Cog):
         # Send the command as normal message content rather than inside an embed.
         # Inline code in a regular message is much easier to copy on Discord mobile.
         await channel.send(f"`{command}`")
+        guild_id = int(getattr(getattr(channel, "guild", None), "id", 0) or 0)
+        if guild_id:
+            config = self.cooldown_config.setdefault(str(guild_id), {})
+            config["generated_boss_command"] = command
+            config["generated_boss_hp"] = [int(value) for value in hp_values]
+            config["generated_boss_created_at"] = int(time.time())
+            config["generated_boss_log_date_ms"] = 0
+            config.pop("generated_boss_log_uuid", None)
+            config["generated_boss_replies"] = {}
+            active_expiry = int(config.get("active_boss_expires_at") or 0)
+            if (
+                active_expiry > int(time.time())
+                and str(config.get("last_result") or "active") == "active"
+            ):
+                config["generated_boss_bound_expiry"] = active_expiry
+            else:
+                config.pop("generated_boss_bound_expiry", None)
+            save_cooldown_config(self.cooldown_config)
         if warnings:
             await channel.send(
                 "⚠️ **Parser note**\n"

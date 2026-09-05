@@ -1,3 +1,9 @@
+## v0.14.14-beta notes
+
+After the bot generates a Neon boss command, every official active OwO guild-boss status card receives one copyable command reply. When battle-log links appear, the same reply is edited with the exact final enemy HP from the freshest public log. The three values use OwO's authoritative enemy-team order; older cards cannot roll HP backward, and replies survive message edits and bot restarts.
+
+The reader supports OwO's current compressed v2 logs and both official public endpoints. Requests, response size, concurrency, cache size, command lifetime, and stored reply history are bounded. Logs outside the active boss lifetime and malformed/non-three-boss payloads are rejected. If no valid log is available, the existing 100,000/OCR command remains usable instead of being replaced with guessed data. See [exact HP behavior and deployment notes](RELEASE_NOTES_v0.14.14-beta.md).
+
 ## v0.14.13-beta notes
 
 Verified animal aliases such as `fish`/`gfish` share one replacement target and prefer the existing high-quality Dex icon. Hidden squid remains separate. Manual replacements always win. Superseded animal `_v3` icons may be removed with the backup-first maintenance script; sole remaining artwork is retained, and old deleted IDs cannot be restored in historical messages.
