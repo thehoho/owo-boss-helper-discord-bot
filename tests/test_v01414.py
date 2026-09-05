@@ -10,6 +10,7 @@ from cogs.battle_log_hp import (
     decompress_json,
     extract_battle_log_hp,
     extract_battle_log_uuids,
+    extract_battle_log_uuids_from_payload,
     replace_command_hp,
 )
 from cogs.boss_generator import BossGenerator
@@ -100,6 +101,25 @@ class BattleLogCommandTests(unittest.TestCase):
         )
         self.assertEqual(extract_battle_log_uuids(text), [first, second])
 
+    def test_uuid_extraction_reads_nested_component_url_fields(self) -> None:
+        first = "483ee741-5dbf-4aa8-acdc-a8dd9a4e5914"
+        second = "d623f308-a0dc-41b3-860c-f10ab5258641"
+        payload = {
+            "content": "No log URL is rendered as text here.",
+            "components": [
+                {
+                    "components": [
+                        {"label": "scroll", "url": f"https://owobot.com/battle-log?uuid={first}"},
+                        {"accessory": {"url": f"https://owobot.com/battle-log?uuid={second}"}},
+                    ]
+                }
+            ],
+        }
+        self.assertEqual(
+            extract_battle_log_uuids_from_payload(payload),
+            [first, second],
+        )
+
     def test_only_hp_values_are_replaced(self) -> None:
         command = (
             "neon b myself vs 62 cow worn sword, 41 cat worn bow, "
@@ -167,12 +187,13 @@ class BattleLogRefreshTests(unittest.IsolatedAsyncioTestCase):
             "content": (
                 "# A Guild Boss Appeared!\n"
                 "### Top 10 Damage Dealt\n"
-                f"[log](https://owobot.com/battle-log?uuid={uuid})\n"
                 "### Rewards\n"
                 f"runs away <t:{expiry}:R> 1 fighters 2,322 defeated"
             ),
             "embeds": [],
-            "components": [],
+            "components": [
+                {"components": [{"label": "scroll", "url": f"https://owobot.com/battle-log?uuid={uuid}"}]}
+            ],
         }
 
         with patch("cogs.boss_generator.save_cooldown_config"):
@@ -187,6 +208,68 @@ class BattleLogRefreshTests(unittest.IsolatedAsyncioTestCase):
         exact_command = cog.upsert_generated_boss_reply.await_args_list[1].args[-1]
         self.assertIn("-hp 100000 100000 100000", first_command)
         self.assertIn("-hp 72001 50002 40003", exact_command)
+
+    async def test_older_status_card_is_left_untouched(self) -> None:
+        now = int(time.time())
+        cog = BossGenerator.__new__(BossGenerator)
+        cog.bot = SimpleNamespace()
+        cog.cooldown_config = {
+            "1": {
+                "generated_boss_command": "neon b myself vs x -hp 1 2 3 -m",
+                "generated_boss_created_at": now,
+                "generated_boss_latest_status_message_id": 20,
+                "generated_boss_latest_status_channel_id": 2,
+            }
+        }
+        cog.boss_hp_refresh_locks = {}
+        cog.freshest_battle_log_hp = AsyncMock()
+        cog.upsert_generated_boss_reply = AsyncMock()
+        data = {
+            "content": (
+                "# A Guild Boss Appeared!\n### Top 10 Damage Dealt\n"
+                f"### Rewards\nruns away <t:{now + 3600}:R> 1 fighters 2,322 defeated"
+            ),
+            "embeds": [],
+            "components": [],
+        }
+
+        await cog.refresh_generated_boss_command_from_logs(1, 2, 19, data)
+
+        cog.freshest_battle_log_hp.assert_not_awaited()
+        cog.upsert_generated_boss_reply.assert_not_awaited()
+
+    async def test_periodic_reconcile_fetches_only_newest_known_active_card(self) -> None:
+        now = int(time.time())
+        cog = BossGenerator.__new__(BossGenerator)
+        cog.bot = SimpleNamespace()
+        cog.cooldown_config = {
+            "1": {
+                "generated_boss_command": "neon b myself vs x -hp 1 2 3 -m",
+                "generated_boss_created_at": now,
+                "generated_boss_latest_status_message_id": 10,
+                "generated_boss_latest_status_channel_id": 100,
+                "active_boss_message_id": 20,
+                "active_boss_channel_id": 200,
+            }
+        }
+        cog.refresh_generated_boss_command_from_logs = AsyncMock()
+        data = {
+            "author": {"id": "408785106942164992"},
+            "content": (
+                "# A Guild Boss Appeared!\n### Top 10 Damage Dealt\n"
+                f"### Rewards\nruns away <t:{now + 3600}:R> 1 fighters 2,322 defeated"
+            ),
+            "embeds": [],
+            "components": [],
+        }
+
+        with patch("cogs.boss_generator.fetch_raw_message", AsyncMock(return_value=data)) as fetch:
+            await cog.reconcile_generated_boss_commands_once()
+
+        fetch.assert_awaited_once_with(cog.bot, 200, 20)
+        cog.refresh_generated_boss_command_from_logs.assert_awaited_once_with(
+            1, 200, 20, data
+        )
 
 
 if __name__ == "__main__":

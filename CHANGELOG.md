@@ -1,3 +1,12 @@
+## v0.14.15-beta - Live Exact-HP Refresh
+
+- Read public battle-log UUIDs from every nested Components V2 URL field instead of rendered text only.
+- Update the saved command as soon as a newer fight log appears on the latest active boss card.
+- Keep older command replies intact while preventing stale cards from being rewritten.
+- Added a bounded one-minute reconciliation fallback for missed Discord message-edit events.
+- Cache already-read immutable logs and persist the newest applied log timestamp so unchanged cards are no-ops.
+- Updated the public version to 0.14.15-beta; no database migration or additional Discord permission is required.
+
 ## v0.14.14-beta - Exact Boss HP from Battle Logs
 
 - Persisted the latest generated Neon boss command and bound it to one active boss lifetime.

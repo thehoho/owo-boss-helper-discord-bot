@@ -45,6 +45,36 @@ def extract_battle_log_uuids(text: str) -> list[str]:
     return values
 
 
+def extract_battle_log_uuids_from_payload(payload: Any) -> list[str]:
+    """Find link UUIDs in every nested string, including component URL fields."""
+    values: list[str] = []
+    seen_uuids: set[str] = set()
+    seen_objects: set[int] = set()
+
+    def walk(value: Any) -> None:
+        if isinstance(value, str):
+            for uuid in extract_battle_log_uuids(value):
+                if uuid not in seen_uuids:
+                    seen_uuids.add(uuid)
+                    values.append(uuid)
+            return
+        if value is None or isinstance(value, (int, float, bool, bytes)):
+            return
+        object_id = id(value)
+        if object_id in seen_objects:
+            return
+        seen_objects.add(object_id)
+        if isinstance(value, dict):
+            for child in value.values():
+                walk(child)
+        elif isinstance(value, (list, tuple, set)):
+            for child in value:
+                walk(child)
+
+    walk(payload)
+    return values
+
+
 def replace_command_hp(command: str, hp_values: tuple[int, int, int]) -> str:
     """Replace exactly the three values following -hp in a Neon command."""
     replacement = " -hp " + " ".join(str(max(0, int(value))) for value in hp_values)

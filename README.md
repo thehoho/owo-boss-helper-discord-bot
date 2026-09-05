@@ -1,3 +1,7 @@
+## v0.14.15-beta notes
+
+Exact boss HP now follows newly added battle-log links on the latest active OwO boss card. Components V2 link destinations are scanned directly, gateway edits update the current reply immediately, and a one-minute reconciliation pass catches missed Discord edit events. Older command replies remain in place and are never rewritten after a newer active card appears. See [refresh behavior and deployment notes](RELEASE_NOTES_v0.14.15-beta.md).
+
 ## v0.14.14-beta notes
 
 After the bot generates a Neon boss command, every official active OwO guild-boss status card receives one copyable command reply. When battle-log links appear, the same reply is edited with the exact final enemy HP from the freshest public log. The three values use OwO's authoritative enemy-team order; older cards cannot roll HP backward, and replies survive message edits and bot restarts.

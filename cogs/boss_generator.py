@@ -38,7 +38,7 @@ from discord.ext import commands
 from .battle_log_hp import (
     BattleLogHP,
     extract_battle_log_hp,
-    extract_battle_log_uuids,
+    extract_battle_log_uuids_from_payload,
     replace_command_hp,
 )
 from .helper_prefix import (
@@ -96,6 +96,7 @@ BOSS_OUTCOME_WINDOW_SKEW_SECONDS = 90
 BOSS_WATCH_INTERVAL_SECONDS = 15
 BOSS_COMMAND_UNBOUND_MAX_AGE_SECONDS = 20 * 60
 BOSS_COMMAND_BOUND_MAX_AGE_SECONDS = 4 * 60 * 60
+BOSS_HP_RECONCILE_SECONDS = 60
 BATTLE_LOG_SUCCESS_CACHE_SECONDS = 6 * 60 * 60
 BATTLE_LOG_FAILURE_CACHE_SECONDS = 5
 BATTLE_LOG_MAX_LINKS = 40
@@ -1588,6 +1589,7 @@ class BossGenerator(commands.Cog):
         self.hp_templates = load_hp_templates()
         self.boss_sticky_refresh_tasks: dict[int, asyncio.Task[None]] = {}
         self.boss_report_task: asyncio.Task[None] | None = None
+        self.boss_hp_reconcile_task: asyncio.Task[None] | None = None
         self._restored = False
 
     def ui_emoji(self, name: str, fallback: str) -> str:
@@ -2139,6 +2141,9 @@ class BossGenerator(commands.Cog):
         if self.boss_report_task:
             self.boss_report_task.cancel()
             self.boss_report_task = None
+        if self.boss_hp_reconcile_task:
+            self.boss_hp_reconcile_task.cancel()
+            self.boss_hp_reconcile_task = None
         if self.http_session and not self.http_session.closed:
             asyncio.create_task(self.http_session.close())
 
@@ -2764,6 +2769,9 @@ class BossGenerator(commands.Cog):
         self.restore_guild_boss_watchers()
         await self.rollover_all_boss_reports()
         self.boss_report_task = asyncio.create_task(self.boss_report_loop())
+        self.boss_hp_reconcile_task = asyncio.create_task(
+            self.boss_hp_reconcile_loop()
+        )
         logger.info(
             "Restored cooldown state for %s configured guild(s)",
             len(self.cooldown_config),
@@ -3315,6 +3323,23 @@ class BossGenerator(commands.Cog):
                 return
 
             changed = False
+            latest_status_message_id = max(
+                int(config.get("generated_boss_latest_status_message_id") or 0),
+                int(config.get("active_boss_message_id") or 0),
+            )
+            if latest_status_message_id and source_message_id < latest_status_message_id:
+                # Preserve replies under older cards, but never rewrite one after a
+                # newer active OwO status has become authoritative.
+                return
+            if (
+                source_message_id
+                != int(config.get("generated_boss_latest_status_message_id") or 0)
+                or channel_id
+                != int(config.get("generated_boss_latest_status_channel_id") or 0)
+            ):
+                config["generated_boss_latest_status_message_id"] = source_message_id
+                config["generated_boss_latest_status_channel_id"] = channel_id
+                changed = True
             if not bound_expiry and expiry:
                 config["generated_boss_bound_expiry"] = expiry
                 bound_expiry = expiry
@@ -3332,13 +3357,14 @@ class BossGenerator(commands.Cog):
             )
             changed = False
 
-            text = extract_all_text_from_raw(data)
-            uuids = extract_battle_log_uuids(text)
+            # Components V2 stores link destinations in nested `url` values. They
+            # are not part of the rendered label text, so inspect the full payload.
+            uuids = extract_battle_log_uuids_from_payload(data)
             freshest = await self.freshest_battle_log_hp(uuids) if uuids else None
             previous_timestamp = int(config.get("generated_boss_log_date_ms") or 0)
             if (
                 freshest is not None
-                and freshest.timestamp_ms >= previous_timestamp
+                and freshest.timestamp_ms > previous_timestamp
                 and self.battle_log_matches_boss_lifetime(freshest, expiry or bound_expiry)
             ):
                 command = replace_command_hp(command, freshest.final_hp)
@@ -3362,6 +3388,54 @@ class BossGenerator(commands.Cog):
                     source_message_id,
                     command,
                 )
+
+    async def reconcile_generated_boss_commands_once(self) -> None:
+        """Refresh the newest active boss card when a gateway edit was missed."""
+        for guild_key, raw_config in list(self.cooldown_config.items()):
+            try:
+                guild_id = int(guild_key)
+            except (TypeError, ValueError):
+                continue
+            if not self.has_recent_generated_boss_command(guild_id):
+                continue
+            config = raw_config if isinstance(raw_config, dict) else {}
+            candidates = [
+                (
+                    int(config.get("generated_boss_latest_status_message_id") or 0),
+                    int(config.get("generated_boss_latest_status_channel_id") or 0),
+                ),
+                (
+                    int(config.get("active_boss_message_id") or 0),
+                    int(config.get("active_boss_channel_id") or 0),
+                ),
+            ]
+            message_id, channel_id = max(candidates, key=lambda item: item[0])
+            if not message_id or not channel_id:
+                continue
+            data = await fetch_raw_message(self.bot, channel_id, message_id)
+            if not data:
+                continue
+            author_id = int((data.get("author") or {}).get("id", 0) or 0)
+            if author_id != OWO_BOT_ID or not is_explicit_active_boss_status(data):
+                continue
+            await self.refresh_generated_boss_command_from_logs(
+                guild_id,
+                channel_id,
+                message_id,
+                data,
+            )
+
+    async def boss_hp_reconcile_loop(self) -> None:
+        """Poll active generated commands once a minute as an edit-event fallback."""
+        while True:
+            try:
+                await self.reconcile_generated_boss_commands_once()
+                await asyncio.sleep(BOSS_HP_RECONCILE_SECONDS)
+            except asyncio.CancelledError:
+                return
+            except Exception:
+                logger.exception("Could not reconcile generated boss HP commands")
+                await asyncio.sleep(BOSS_HP_RECONCILE_SECONDS)
 
     def is_spawn_window_open(self, guild_id: int) -> bool:
         """True only when the guild can legitimately receive a new boss."""
@@ -3997,8 +4071,15 @@ class BossGenerator(commands.Cog):
                 and str(config.get("last_result") or "active") == "active"
             ):
                 config["generated_boss_bound_expiry"] = active_expiry
+                active_message_id = int(config.get("active_boss_message_id") or 0)
+                active_channel_id = int(config.get("active_boss_channel_id") or 0)
+                if active_message_id and active_channel_id:
+                    config["generated_boss_latest_status_message_id"] = active_message_id
+                    config["generated_boss_latest_status_channel_id"] = active_channel_id
             else:
                 config.pop("generated_boss_bound_expiry", None)
+                config.pop("generated_boss_latest_status_message_id", None)
+                config.pop("generated_boss_latest_status_channel_id", None)
             save_cooldown_config(self.cooldown_config)
         if warnings:
             await channel.send(
