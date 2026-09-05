@@ -13,7 +13,7 @@ from cogs.battle_log_hp import (
     extract_battle_log_uuids_from_payload,
     replace_command_hp,
 )
-from cogs.boss_generator import BossGenerator
+from cogs.boss_generator import BossGenerator, read_bounded_http_body
 
 
 class BattleLogDecoderTests(unittest.TestCase):
@@ -154,6 +154,23 @@ class BattleLogCommandTests(unittest.TestCase):
 
 
 class BattleLogRefreshTests(unittest.IsolatedAsyncioTestCase):
+    async def test_chunked_http_body_is_fully_joined_and_bounded(self) -> None:
+        class FakeContent:
+            def __init__(self, chunks: list[bytes]):
+                self.chunks = chunks
+
+            async def iter_chunked(self, _size: int):
+                for chunk in self.chunks:
+                    yield chunk
+
+        response = SimpleNamespace(content=FakeContent([b'{"battle":', b"[]}"]))
+        self.assertEqual(
+            await read_bounded_http_body(response, 100),
+            b'{"battle":[]}',
+        )
+        with self.assertRaises(ValueError):
+            await read_bounded_http_body(response, 5)
+
     async def test_status_reply_is_upgraded_to_freshest_exact_hp(self) -> None:
         now = int(time.time())
         expiry = now + 3_600

@@ -520,6 +520,18 @@ async def fetch_raw_message(bot: commands.Bot, channel_id: int, message_id: int)
         return None
 
 
+async def read_bounded_http_body(response: aiohttp.ClientResponse, max_bytes: int) -> bytes:
+    """Read every HTTP chunk while enforcing a decoded response-size limit."""
+    chunks: list[bytes] = []
+    total = 0
+    async for chunk in response.content.iter_chunked(64 * 1024):
+        total += len(chunk)
+        if total > max_bytes:
+            raise ValueError("HTTP response body exceeds the configured limit.")
+        chunks.append(chunk)
+    return b"".join(chunks)
+
+
 def message_to_raw_data(message: discord.Message) -> dict[str, Any]:
     """Build raw-like data from the gateway Message without another API request.
 
@@ -3157,10 +3169,10 @@ class BossGenerator(commands.Cog):
                     ):
                         logger.warning("Rejected oversized battle log %s", uuid)
                         break
-                    body = await response.content.read(BATTLE_LOG_MAX_RESPONSE_BYTES + 1)
-                if len(body) > BATTLE_LOG_MAX_RESPONSE_BYTES:
-                    logger.warning("Rejected oversized battle log %s", uuid)
-                    break
+                    body = await read_bounded_http_body(
+                        response,
+                        BATTLE_LOG_MAX_RESPONSE_BYTES,
+                    )
                 payload = json.loads(body)
                 result = await asyncio.to_thread(extract_battle_log_hp, payload, uuid)
                 break
