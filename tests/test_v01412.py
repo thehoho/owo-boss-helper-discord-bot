@@ -312,3 +312,4 @@ class InterfaceTests(unittest.IsolatedAsyncioTestCase):
 
     def test_backup_includes_override_artwork_database(self):
         self.assertIn("emoji_overrides.db", Path("deploy/backup.sh").read_text())
+        self.assertIn('find -L "${BACKUP_DIR}" -maxdepth 1', Path("deploy/backup.sh").read_text())

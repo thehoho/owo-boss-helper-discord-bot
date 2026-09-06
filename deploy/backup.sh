@@ -26,6 +26,9 @@ done
 tar -C "${WORK_DIR}" -czf "${ARCHIVE}" .
 chmod 600 "${ARCHIVE}"
 rm -rf "${WORK_DIR}"
-find "${BACKUP_DIR}" -type f -name 'owo-boss-helper-*.tar.gz' -mtime "+${KEEP_DAYS}" -delete
+# BACKUP_DIR may be a symlink to the protected data volume. Follow that one
+# explicit root so retention still reaches the dated archives inside it.
+find -L "${BACKUP_DIR}" -maxdepth 1 -type f \
+    -name 'owo-boss-helper-*.tar.gz' -mtime "+${KEEP_DAYS}" -delete
 
 echo "Created ${ARCHIVE}"
