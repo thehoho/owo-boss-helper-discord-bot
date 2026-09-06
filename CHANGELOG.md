@@ -1,3 +1,12 @@
+## v0.15.1-beta - Notification Guide and Reward-specific x2 Rules
+
+- Added a complete, prefix-aware `H boss notify` guide and linked it from the main `H help` command.
+- Standardized public text shortcuts on `WS`, `WC`, `BWC`, and `XP`; removed the old `crate` and `bcrate` shorthand.
+- Added reward-specific x2 rules through `WS X2`, `WC X2`, `BWC X2`, and `XP X2`, while plain `X2` continues to match any doubled reward.
+- Added matching slash-command choices for every specific x2 reward and clearer shortcut labels for normal minimum rules.
+- Preserved explicit DM consent, recurring and one-boss modes, per-boss delivery deduplication, and authoritative defeat/escape handling.
+- Updated the public version to 0.15.1-beta; no database migration or permission change is required.
+
 ## v0.15.0-beta - Opt-in Boss Reward and End DMs
 
 - Added private, member-controlled reward rules for minimum weapon shards, weapon crates, boss weapon crates, and XP.

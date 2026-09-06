@@ -34,20 +34,27 @@ REWARD_LABELS = {
     "boss_crates": "boss weapon crates",
     "xp": "XP",
     "x2": "any x2 reward",
+    "shards_x2": "x2 weapon shards",
+    "weapon_crates_x2": "x2 weapon crates",
+    "boss_crates_x2": "x2 boss weapon crates",
+    "xp_x2": "x2 XP",
     "end": "boss end",
 }
 REWARD_ALIASES = {
-    "shard": "shards", "shards": "shards", "ws": "shards",
-    "weaponshard": "shards", "weaponshards": "shards",
-    "crate": "weapon_crates", "crates": "weapon_crates", "wc": "weapon_crates",
-    "wcrate": "weapon_crates", "wcrates": "weapon_crates",
-    "weaponcrate": "weapon_crates", "weaponcrates": "weapon_crates",
-    "bcrate": "boss_crates", "bcrates": "boss_crates", "bc": "boss_crates",
-    "bwc": "boss_crates", "bosscrate": "boss_crates", "bosscrates": "boss_crates",
-    "bossweaponcrate": "boss_crates", "bossweaponcrates": "boss_crates",
+    "shards": "shards", "ws": "shards", "weaponshards": "shards",
+    "wc": "weapon_crates", "weaponcrate": "weapon_crates",
+    "weaponcrates": "weapon_crates",
+    "bwc": "boss_crates", "bossweaponcrate": "boss_crates",
+    "bossweaponcrates": "boss_crates",
     "xp": "xp", "experience": "xp", "x2": "x2", "double": "x2",
     "doubled": "x2", "end": "end", "ends": "end", "ended": "end",
     "finish": "end", "finished": "end",
+}
+SPECIFIC_X2_TYPES = {
+    "shards": "shards_x2",
+    "weapon_crates": "weapon_crates_x2",
+    "boss_crates": "boss_crates_x2",
+    "xp": "xp_x2",
 }
 PREFIX_ALIASES = {
     "h boss notify", "h boss notification", "h boss notifications", "h boss ping",
@@ -280,6 +287,9 @@ def parse_minimum(value: str) -> int | None:
 def reward_matches(subscription: BossSubscription, rewards: BossRewards) -> bool:
     if subscription.reward_type == "x2":
         return bool(rewards.doubled_mask)
+    if subscription.reward_type.endswith("_x2"):
+        base_type = subscription.reward_type.removesuffix("_x2")
+        return base_type in rewards.doubled_types()
     value = {
         "shards": rewards.shards,
         "weapon_crates": rewards.weapon_crates,
@@ -287,6 +297,18 @@ def reward_matches(subscription: BossSubscription, rewards: BossRewards) -> bool
         "xp": rewards.xp,
     }.get(subscription.reward_type)
     return value is not None and value >= subscription.minimum
+
+
+def is_x2_rule(reward_type: str) -> bool:
+    return reward_type == "x2" or reward_type.endswith("_x2")
+
+
+def resolve_reward_type(value: str, modifiers: set[str] | None = None) -> str | None:
+    compact = re.sub(r"[^a-z0-9]", "", (value or "").casefold())
+    reward_type = REWARD_ALIASES.get(compact)
+    if reward_type in SPECIFIC_X2_TYPES and "x2" in (modifiers or set()):
+        return SPECIFIC_X2_TYPES[reward_type]
+    return reward_type
 
 
 class ClosingConnection(sqlite3.Connection):
@@ -856,7 +878,7 @@ class BossNotifications(commands.Cog):
         )
         minimum_text = (
             ""
-            if subscription.reward_type in {"x2", "end"}
+            if is_x2_rule(subscription.reward_type) or subscription.reward_type == "end"
             else f" of at least **{subscription.minimum:,}**"
         )
         result = (
@@ -918,18 +940,12 @@ class BossNotifications(commands.Cog):
             self.store.list_subscriptions, guild_id, user_id
         )
         if not rules:
-            return (
-                "You have no boss DM alerts in this server.\n"
-                f"Use `{helper_prefix} boss notify xp 20k`, "
-                f"`{helper_prefix} boss notify bcrate 4`, "
-                f"`{helper_prefix} boss notify x2`, or "
-                f"`{helper_prefix} boss notify end current`."
-            )
-        lines = ["🔔 **Your boss DM alerts in this server**"]
+            return "No boss DM alerts are enabled in this server."
+        lines: list[str] = []
         for rule in rules:
             threshold = (
                 ""
-                if rule.reward_type in {"x2", "end"}
+                if is_x2_rule(rule.reward_type) or rule.reward_type == "end"
                 else f" ≥ {rule.minimum:,}"
             )
             mode = "recurring" if rule.mode == "recurring" else (
@@ -938,11 +954,81 @@ class BossNotifications(commands.Cog):
             lines.append(
                 f"• **{REWARD_LABELS[rule.reward_type]}**{threshold} — {mode}"
             )
-        lines.append(
-            f"Disable one with `{helper_prefix} boss notify <reward> off`, "
-            f"or all with `{helper_prefix} boss notify off`."
-        )
         return "\n".join(lines)
+
+    async def build_guide_embed(
+        self,
+        guild_id: int,
+        user_id: int,
+        helper_prefix: str = "h",
+    ) -> discord.Embed:
+        command = f"{helper_prefix} boss notify"
+        embed = discord.Embed(
+            title="🔔 Boss Notification Guide",
+            description=(
+                "Get private, opt-in DMs when a guild boss has rewards you want, "
+                "or when it is defeated or escapes."
+            ),
+            color=0x5865F2,
+        )
+        embed.add_field(
+            name="Reward shortcuts",
+            value=(
+                "`WS` — weapon shards\n"
+                "`WC` — weapon crates\n"
+                "`BWC` — boss weapon crates\n"
+                "`XP` — experience"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="Minimum reward alerts",
+            value=(
+                f"`{command} ws 175`\n"
+                f"`{command} wc 4`\n"
+                f"`{command} bwc 3`\n"
+                f"`{command} xp 20k`"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="x2 and boss-end alerts",
+            value=(
+                f"`{command} x2` — any x2 reward\n"
+                f"`{command} ws x2` — x2 shards only\n"
+                f"`{command} wc x2` / `{command} bwc x2` / "
+                f"`{command} xp x2` — that reward only\n"
+                f"`{command} end` — boss defeated or escaped"
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="One boss or turn alerts off",
+            value=(
+                "Add `current` to any enable command to watch only the active boss, "
+                "or the next boss if none is active.\n"
+                f"Use `{command} ws off` for one rule, `{command} ws x2 off` for "
+                f"that x2 rule, or `{command} off` for all rules in this server."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="Your enabled alerts",
+            value=await self.status_text(guild_id, user_id, helper_prefix),
+            inline=False,
+        )
+        embed.add_field(
+            name="Slash command",
+            value=(
+                "Use `/boss-notify` to choose the reward, minimum, recurring or "
+                "one-boss mode, and whether to enable or disable it."
+            ),
+            inline=False,
+        )
+        embed.set_footer(
+            text="Your first rule is saved only after you confirm and the test DM succeeds."
+        )
+        return embed
 
     @app_commands.command(
         name="boss-notify",
@@ -956,11 +1042,15 @@ class BossNotifications(commands.Cog):
     )
     @app_commands.choices(
         reward=[
-            app_commands.Choice(name="Weapon shards", value="shards"),
-            app_commands.Choice(name="Weapon crates", value="weapon_crates"),
-            app_commands.Choice(name="Boss weapon crates", value="boss_crates"),
-            app_commands.Choice(name="Experience", value="xp"),
+            app_commands.Choice(name="Weapon shards (WS)", value="shards"),
+            app_commands.Choice(name="Weapon crates (WC)", value="weapon_crates"),
+            app_commands.Choice(name="Boss weapon crates (BWC)", value="boss_crates"),
+            app_commands.Choice(name="Experience (XP)", value="xp"),
             app_commands.Choice(name="Any x2 reward", value="x2"),
+            app_commands.Choice(name="x2 weapon shards (WS X2)", value="shards_x2"),
+            app_commands.Choice(name="x2 weapon crates (WC X2)", value="weapon_crates_x2"),
+            app_commands.Choice(name="x2 boss weapon crates (BWC X2)", value="boss_crates_x2"),
+            app_commands.Choice(name="x2 experience (XP X2)", value="xp_x2"),
             app_commands.Choice(name="Boss defeated or escaped", value="end"),
             app_commands.Choice(name="All my alerts", value="all"),
         ],
@@ -986,7 +1076,7 @@ class BossNotifications(commands.Cog):
         helper_prefix = await get_guild_helper_prefix(interaction.guild_id)
         if reward is None:
             await interaction.response.send_message(
-                await self.status_text(
+                embed=await self.build_guide_embed(
                     interaction.guild_id, interaction.user.id, helper_prefix
                 ),
                 ephemeral=True,
@@ -1013,7 +1103,9 @@ class BossNotifications(commands.Cog):
                 ephemeral=True,
             )
             return
-        effective_minimum = 1 if reward_type in {"x2", "end"} else int(minimum)
+        effective_minimum = (
+            1 if is_x2_rule(reward_type) or reward_type == "end" else int(minimum)
+        )
         text, view = await self.request_subscription(
             interaction.guild_id,
             interaction.user,
@@ -1041,7 +1133,7 @@ class BossNotifications(commands.Cog):
         if not tokens or tokens[0].casefold() in {"status", "list", "help"}:
             await safe_reply(
                 message,
-                await self.status_text(
+                embed=await self.build_guide_embed(
                     message.guild.id, message.author.id, helper_prefix
                 ),
                 mention_author=False,
@@ -1057,15 +1149,15 @@ class BossNotifications(commands.Cog):
                 mention_author=False,
             )
             return
-        reward_type = REWARD_ALIASES.get(compact_reward)
+        lowered = {token.casefold() for token in tokens[1:]}
+        reward_type = resolve_reward_type(compact_reward, lowered)
         if reward_type is None:
             await safe_reply(
                 message,
-                "Unknown reward. Use `shards`, `crate`, `bcrate`, `xp`, `x2`, or `end`.",
+                "Unknown reward. Use `WS`, `WC`, `BWC`, `XP`, `X2`, or `end`.",
                 mention_author=False,
             )
             return
-        lowered = {token.casefold() for token in tokens[1:]}
         if lowered & {"off", "disable", "clear"}:
             await safe_reply(
                 message,
@@ -1080,9 +1172,11 @@ class BossNotifications(commands.Cog):
             token
             for token in tokens[1:]
             if token.casefold()
-            not in {"once", "current", "one", "recurring", "always", "every"}
+            not in {
+                "x2", "once", "current", "one", "recurring", "always", "every"
+            }
         ]
-        if reward_type in {"x2", "end"}:
+        if is_x2_rule(reward_type) or reward_type == "end":
             minimum = 1
         else:
             minimum = parse_minimum(amount_tokens[0]) if amount_tokens else None

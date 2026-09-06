@@ -2592,6 +2592,7 @@ class BossGenerator(commands.Cog):
         help_command = helper_command(helper_prefix, "help")
         boss_cd = helper_command(helper_prefix, "boss cd")
         boss_report = helper_command(helper_prefix, "boss report")
+        boss_notify = helper_command(helper_prefix, "boss notify")
         boss_tickets = helper_command(helper_prefix, "boss t")
         boss_list = helper_command(helper_prefix, "boss list")
         boss_lookup = f"{helper_alias(helper_prefix, 'hbt')} <name/mention/ID>"
@@ -2628,6 +2629,16 @@ class BossGenerator(commands.Cog):
                 "`/boss-decision-role`, fighter pings with `/boss-fighter-role`, and "
                 "daily reset reports with `/boss-report-channel`. Repost the latest "
                 f"completed report with `{boss_report}`."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🔔 Personal boss notifications",
+            value=(
+                f"Open `{boss_notify}` or `/boss-notify` for the opt-in DM guide. "
+                "Watch minimum `WS`, `WC`, `BWC`, or `XP`; any `X2` or one "
+                "specific reward's x2; and boss defeat/escape. Rules can repeat "
+                "or apply to the current/next boss only."
             ),
             inline=False,
         )

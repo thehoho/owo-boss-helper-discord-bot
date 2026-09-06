@@ -190,7 +190,7 @@ class TapDeckTests(unittest.TestCase):
 
 class PublicSurfaceTests(unittest.TestCase):
     def test_version_and_help_include_the_whole_batch(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.15.0-beta")
+        self.assertEqual(BOT_VERSION, "0.15.1-beta")
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback
         embed = BossGenerator.build_help_embed(cog, "b", "o")
@@ -204,6 +204,9 @@ class PublicSurfaceTests(unittest.TestCase):
         self.assertNotIn("an owo administrator", text.casefold())
         self.assertIn("Team 1", text)
         self.assertIn("Team 2", text)
+        self.assertIn("b boss notify", text)
+        self.assertIn("WS", text)
+        self.assertIn("BWC", text)
         self.assertLessEqual(max(len(field.value) for field in embed.fields), 1024)
         total = len(embed.title or "") + len(embed.description or "")
         total += sum(len(field.name) + len(field.value) for field in embed.fields)

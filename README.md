@@ -1,3 +1,9 @@
+## v0.15.1-beta notes
+
+`H boss notify` now opens a complete, prefix-aware notification guide and the main `H help` overview points members to it. The public reward shortcuts are `WS` (weapon shards), `WC` (weapon crates), `BWC` (boss weapon crates), and `XP`; the older `crate` and `bcrate` shorthand is no longer accepted.
+
+Plain `X2` watches for any doubled reward. Members can now target one doubled reward with `WS X2`, `WC X2`, `BWC X2`, or `XP X2`. The same choices are available in `/boss-notify`, including recurring or current/next-boss-only scope and individual disabling. See [notification shortcut and guide notes](RELEASE_NOTES_v0.15.1-beta.md).
+
 ## v0.15.0-beta notes
 
 Members can now opt into private guild-boss reward and end alerts with `/boss-notify` or the server's helper prefix. Rules support minimum weapon shards, weapon crates, boss weapon crates, or XP; any x2 reward; and defeated/escaped outcomes. Each rule can repeat for every boss or apply only to the current/next boss.
@@ -129,8 +135,8 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 ### Personal boss notifications
 
 - Use `/boss-notify` or `H boss notify` to view and manage private alerts in a server.
-- Set recurring minimums with `H boss notify shards 175`, `H boss notify crate 4`, `H boss notify bcrate 3`, or `H boss notify xp 20k`.
-- Use `H boss notify x2` for any doubled reward and `H boss notify end` for defeated-or-escaped alerts.
+- Set recurring minimums with `H boss notify ws 175`, `H boss notify wc 4`, `H boss notify bwc 3`, or `H boss notify xp 20k`.
+- Use `H boss notify x2` for any doubled reward; use `WS X2`, `WC X2`, `BWC X2`, or `XP X2` after `H boss notify` to target one doubled reward. Use `H boss notify end` for defeated-or-escaped alerts.
 - Add `current` for a one-boss rule, such as `H boss notify end current`; if no boss is active, it applies to the next boss.
 - Disable one rule with `H boss notify xp off`, or every alert in that server with `H boss notify off`.
 - Rules use minimum thresholds and are ORed: one matching rule is enough, and one combined reward DM is sent per boss.

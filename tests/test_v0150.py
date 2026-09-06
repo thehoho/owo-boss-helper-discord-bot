@@ -19,6 +19,7 @@ from cogs.boss_notifications import (
     extract_reward_media_url,
     parse_minimum,
     read_boss_rewards,
+    resolve_reward_type,
     reward_matches,
 )
 from cogs.bot_info import BOT_VERSION
@@ -95,6 +96,33 @@ class RewardReaderTests(unittest.TestCase):
         self.assertFalse(reward_matches(BossSubscription(1, 2, "boss_crates", 4, "recurring", 0), rewards))
         self.assertTrue(reward_matches(BossSubscription(1, 2, "x2", 1, "recurring", 0), rewards))
 
+    def test_public_shortcuts_and_reward_specific_x2_matching(self) -> None:
+        self.assertEqual(resolve_reward_type("WS"), "shards")
+        self.assertEqual(resolve_reward_type("WC"), "weapon_crates")
+        self.assertEqual(resolve_reward_type("BWC"), "boss_crates")
+        self.assertEqual(resolve_reward_type("XP"), "xp")
+        self.assertEqual(resolve_reward_type("WS", {"x2"}), "shards_x2")
+        self.assertEqual(resolve_reward_type("WC", {"x2"}), "weapon_crates_x2")
+        self.assertEqual(resolve_reward_type("BWC", {"x2"}), "boss_crates_x2")
+        self.assertEqual(resolve_reward_type("XP", {"x2"}), "xp_x2")
+        self.assertIsNone(resolve_reward_type("crate"))
+        self.assertIsNone(resolve_reward_type("bcrate"))
+
+        rewards = BossRewards(202, 4, 3, 24_437, doubled_mask=4)
+        self.assertTrue(
+            reward_matches(
+                BossSubscription(1, 2, "boss_crates_x2", 1, "recurring", 0),
+                rewards,
+            )
+        )
+        for reward_type in ("shards_x2", "weapon_crates_x2", "xp_x2"):
+            self.assertFalse(
+                reward_matches(
+                    BossSubscription(1, 2, reward_type, 1, "recurring", 0),
+                    rewards,
+                )
+            )
+
 
 class NotificationStoreTests(unittest.TestCase):
     def test_consent_rules_once_scope_snapshots_and_delivery_dedup(self) -> None:
@@ -167,12 +195,25 @@ class NotificationSurfaceTests(unittest.IsolatedAsyncioTestCase):
                 cog = BossNotifications(bot)
                 await bot.add_cog(cog)
                 self.assertIsNotNone(bot.tree.get_command("boss-notify"))
+                guide = await cog.build_guide_embed(1, 2, "b")
+                guide_text = "\n".join(field.value for field in guide.fields)
+                self.assertIn("b boss notify ws 175", guide_text)
+                self.assertIn("b boss notify wc x2", guide_text)
+                self.assertIn("b boss notify bwc x2", guide_text)
+                self.assertIn("/boss-notify", guide_text)
+                self.assertLessEqual(
+                    sum(
+                        len(field.name) + len(field.value)
+                        for field in guide.fields
+                    ),
+                    6000,
+                )
             finally:
                 module.DATABASE_FILE = original
                 await bot.close()
 
     def test_release_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.15.0-beta")
+        self.assertEqual(BOT_VERSION, "0.15.1-beta")
 
 
 if __name__ == "__main__":
