@@ -106,13 +106,23 @@ EFFECTS: tuple[CatalogEntry, ...] = (
     CatalogEntry("attack_up_plus_plus", "Attack Up++", "effect_attack_up_plus_plus", ("attack_up_plus_plus", "atkuppp", "attuppp", "attackupplusplus")),
     _entry("celebration", "Celebration", "celebration", "celeb", prefix="effect"),
     _entry("defense_up", "Defense Up", "defense_up", "defup", "dfup", prefix="effect"),
+    _entry("exposed", "Exposed", "exposed", prefix="effect"),
     _entry("flame", "Flame", "flame", prefix="effect"),
     _entry("freeze", "Freeze", "freeze", prefix="effect"),
+    _entry("frostbite", "Frostbite", "frostbite", prefix="effect"),
+    _entry("heavy_arrow", "Heavy Arrow", "heavy_arrow", "heavyarrow", prefix="effect"),
     _entry("leech", "Leech", "leech", prefix="effect"),
     _entry("mortality", "Mortality", "mortality", "mort", prefix="effect"),
+    _entry("pest", "Pest", "pest", prefix="effect"),
     _entry("poison", "Poison", "poison", prefix="effect"),
+    _entry("sacred_ward", "Sacred Ward", "sacred_ward", "sacredward", prefix="effect"),
+    _entry("sin", "Sin", "sin", prefix="effect"),
+    _entry("spellskin", "Spellskin", "spellskin", "spell_skin", prefix="effect"),
     _entry("stinky", "Stinky", "stinky", prefix="effect"),
+    _entry("stoneskin", "Stoneskin", "stoneskin", "stone_skin", prefix="effect"),
     _entry("taunt", "Taunt", "taunt", prefix="effect"),
+    _entry("tether", "Tether", "tether", "trtether", prefix="effect"),
+    _entry("virtue", "Virtue", "virtue", "vir", prefix="effect"),
 )
 
 

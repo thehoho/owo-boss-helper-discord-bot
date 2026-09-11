@@ -148,7 +148,7 @@ class HelpAndEmojiTests(unittest.TestCase):
 
     def test_complete_emoji_catalog_is_discord_safe(self) -> None:
         assets = discover_emoji_assets()
-        self.assertEqual(len(assets), 324)
+        self.assertEqual(len(assets), 334)
         self.assertEqual(assets["clown"].name, "clown.png")
         self.assertEqual(sum(name.startswith("pet_") for name in assets), 228)
         self.assertEqual(sum(name.startswith("weapon_") for name in assets), 29)

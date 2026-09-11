@@ -1,3 +1,12 @@
+## v0.15.3-beta - Complete Effect Catalog and Guide Browser Interaction Fix
+
+- Added the 10 missing current battle effects: Exposed, Frostbite, Heavy Arrow, Pest, Sacred Ward, Sin, Spellskin, Stoneskin, Tether, and Virtue.
+- Expanded guide variables, `/guide-emojis`, and owner replacement browsing to all 22 battle effects with stable `EF_` names and familiar aliases.
+- Fixed `H guide` category selections losing their parent view during component rebuilding and producing “application did not respond” errors.
+- Deferred both category refreshes and private guide opens before database/rendering work so Discord receives an acknowledgement within its interaction deadline.
+- Added regression coverage that clicks both dropdowns through the real view lifecycle.
+- Updated the public version to 0.15.3-beta; no database migration or additional Discord permission is required.
+
 ## v0.15.2-beta - Cross-channel Boss Guidance, Effect Icons, and Guide Categories
 
 - Mirrored the active configured HIT, SKIP, or custom boss decision once after generated commands on official active boss cards outside the configured boss channel.
@@ -6,6 +15,7 @@
 - Added live category dropdowns to `H guide` and `/team-guide`; categories come from saved guide metadata and selected guide details open privately.
 - Added regression coverage for mirror gating/deduplication, effect assets and aliases, and normalized guide category browsing.
 - Updated the public version to 0.15.2-beta; no database migration or additional Discord permission is required.
+
 ## v0.15.1-beta - Notification Guide and Reward-specific x2 Rules
 
 - Added a complete, prefix-aware `H boss notify` guide and linked it from the main `H help` command.
@@ -135,6 +145,7 @@
 - Extended HP OCR to split commas that touch adjacent digits in OwO's current boss-image rendering.
 - Added the exact failing cow `166463` and owl `207864` images as regression fixtures.
 - Updated the public version to `0.14.5-beta`; no database migration or additional Discord permission is required.
+
 ## v0.14.4-beta - Faster Smart Replace and Staff-Reviewed TapDeck Wording
 
 - Corrected TapDeck's rules wording: the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time; current rules remain authoritative.
@@ -143,6 +154,7 @@
 - Recognizes OwO's refreshed two-animal team page as confirmation of a requested position deletion when the requested slot is absent.
 - Shows an explicit confirmation-and-cooldown status before consecutive team or weapon commands instead of appearing frozen during the legitimate shared cooldown.
 - Updated the public version to `0.14.4-beta`; no database migration or additional Discord permission is required.
+
 ## v0.14.3-beta - TapDeck Naming Correction
 
 - Corrected the public command spelling to `H TapDeck` and `/tapdeck` in help, documentation, and release notes.
@@ -168,6 +180,7 @@
 - Added `H Grind`, `H TapDeck`, and `/tapdeck` with verified public-source and privacy links plus a daily-cached GitHub lookup for the newest TapDeck Lite APK.
 - Updated `H help`, `H about`, README, tests, and the public version to `0.14.1-beta`.
 - No database migration or additional Discord permission is required.
+
 ## v0.14.0-beta - Smart Team Replacement
 
 - Replaced the saved-team **Quick replace** button with **Smart replace**.

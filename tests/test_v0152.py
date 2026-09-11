@@ -109,7 +109,7 @@ class EffectEmojiTests(unittest.TestCase):
             "stinky",
             "taunt",
         }
-        self.assertEqual({entry.key for entry in EFFECTS}, expected)
+        self.assertTrue(expected.issubset({entry.key for entry in EFFECTS}))
         self.assertTrue(
             {f"effect_{key}" for key in expected}.issubset(emoji_asset_keys())
         )

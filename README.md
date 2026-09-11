@@ -1,8 +1,15 @@
+## v0.15.3-beta notes
+
+The battle-effect catalog now contains all 22 supplied current icons, including Exposed, Frostbite, Heavy Arrow, Pest, Sacred Ward, Sin, Spellskin, Stoneskin, Tether, and Virtue. They are portable application emojis available to guide variables, `/guide-emojis`, and owner replacement tools.
+
+`H guide` and `/team-guide` category filtering and private guide opening now acknowledge Discord before rebuilding or reading, eliminating the dropdown “application did not respond” failure. See [effect completion and guide interaction notes](RELEASE_NOTES_v0.15.3-beta.md).
+
 ## v0.15.2-beta notes
 
 When an official active guild-boss card appears outside the configured boss channel, the bot now follows its generated command with one separate copy of the current HIT, SKIP, or custom sticky decision. The configured-channel sticky is unchanged, and later exact-HP edits update only the command instead of repeating the guidance.
 
 `H guide` and `/team-guide` now open a category browser generated from the categories already saved on guides. Battle effects are available as portable application emojis in guides, including `{taunt}`, `{poison}`, `{freeze}`, and explicit `EF_` variables. See [cross-channel guidance, effect icon, and guide browser notes](RELEASE_NOTES_v0.15.2-beta.md).
+
 ## v0.15.1-beta notes
 
 `H boss notify` now opens a complete, prefix-aware notification guide and the main `H help` overview points members to it. The public reward shortcuts are `WS` (weapon shards), `WC` (weapon crates), `BWC` (boss weapon crates), and `XP`; the older `crate` and `bcrate` shorthand is no longer accepted.
@@ -76,9 +83,11 @@ Boss outcomes are now tied to official message identities observed while the cur
 ## v0.14.5-beta notes
 
 The guild-boss tracker now understands OwO's updated active summary and no longer mistakes a numeric `defeated` reward counter for the active boss's outcome. A newer authoritative active card can safely repair state poisoned by the old parser. HP recognition now handles commas touching adjacent digits in the current boss-image rendering, including the reported cow and owl cases.
+
 ## v0.14.4-beta notes
 
 Smart Replace now starts mixed plans with a useful weapon command after the team scan, interleaves team and weapon work where possible, recognizes OwO's refreshed team page after a requested deletion, and visibly explains any required shared-cooldown wait. Team selection also accepts the configured equivalents of `teams 1` and `teams 2`. TapDeck's rules note now accurately records that the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time; members must still follow current rules.
+
 ## v0.14.3-beta notes
 
 Corrected the TapDeck name everywhere members can read or type it. The information card now opens with `H Grind`, `H TapDeck`, or `/tapdeck`; obsolete misspelled command forms were removed.

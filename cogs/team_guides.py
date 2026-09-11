@@ -1191,6 +1191,13 @@ class GuideCategorySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        browser = self.view
+        if not isinstance(browser, GuideBrowserView):
+            await interaction.response.send_message(
+                "This guide browser has expired. Run the guide command again.",
+                ephemeral=True,
+            )
+            return
         value = self.values[0]
         category_index = -1
         if value.startswith("category:"):
@@ -1198,8 +1205,16 @@ class GuideCategorySelect(discord.ui.Select):
                 category_index = int(value.partition(":")[2])
             except ValueError:
                 category_index = -1
-        await self.view.select_category(category_index)
-        await interaction.response.edit_message(embed=self.view.build_embed(), view=self.view)
+        # A category refresh rebuilds the view and detaches this select, which
+        # clears ``self.view``. Keep the parent reference before rebuilding and
+        # acknowledge Discord immediately so SQLite work cannot hit the
+        # interaction's three-second response deadline.
+        await interaction.response.defer()
+        await browser.select_category(category_index)
+        await interaction.edit_original_response(
+            embed=browser.build_embed(),
+            view=browser,
+        )
 
 
 class GuideEntrySelect(discord.ui.Select):
@@ -1229,23 +1244,31 @@ class GuideEntrySelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        browser = self.view
+        if not isinstance(browser, GuideBrowserView):
+            await interaction.response.send_message(
+                "This guide browser has expired. Run the guide command again.",
+                ephemeral=True,
+            )
+            return
         if not self.values or self.values[0] == "none":
             await interaction.response.send_message(
                 "No guide is available in this category.",
                 ephemeral=True,
             )
             return
-        guide = await asyncio.to_thread(self.view.cog.store.get, int(self.values[0]))
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        guide = await asyncio.to_thread(browser.cog.store.get, int(self.values[0]))
         if guide is None:
-            await interaction.response.send_message(
-                "That guide is no longer available. Refresh the guide browser.",
-                ephemeral=True,
+            await interaction.edit_original_response(
+                content="That guide is no longer available. Refresh the guide browser.",
+                embed=None,
+                view=None,
             )
             return
-        await interaction.response.send_message(
-            embed=build_guide_embed(self.view.cog.bot, guide),
-            view=PublicGuideView(self.view.cog, guide),
-            ephemeral=True,
+        await interaction.edit_original_response(
+            embed=build_guide_embed(browser.cog.bot, guide),
+            view=PublicGuideView(browser.cog, guide),
             allowed_mentions=discord.AllowedMentions.none(),
         )
 
