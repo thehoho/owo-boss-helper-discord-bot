@@ -18,7 +18,7 @@ from PIL import Image
 
 from .emoji_assets import MAX_UPLOAD_BYTES, custom_emoji_url, emoji_label, normalize_upload
 from .emoji_catalog import canonical_emoji_key, effective_override, emoji_key_group, is_catalog_emoji
-from .game_catalog import PASSIVES, RANKS, WEAPONS, special_animals
+from .game_catalog import EFFECTS, PASSIVES, RANKS, WEAPONS, special_animals
 from .team_guides import guide_variable_emoji_key
 from .ui_emojis import (
     DEX_ARTWORK, default_artwork_key, default_emoji_image, discover_emoji_assets, emoji_asset_keys, get_ui_emoji_manager, prepare_emoji_image,
@@ -28,7 +28,8 @@ logger = logging.getLogger(__name__)
 PAGE_SIZE = 20
 BROWSE_TARGET = "__browse_all__"
 CATEGORIES = {"all": "All icons", "pet": "Animals", "weapon": "Weapons",
-              "passive": "Passives", "rank": "Ranks", "stat": "Stats", "ui": "Other / guide icons"}
+              "passive": "Passives", "effect": "Battle effects", "rank": "Ranks",
+              "stat": "Stats", "ui": "Other / guide icons"}
 
 
 @dataclass(frozen=True)
@@ -42,7 +43,7 @@ class EmojiReference:
 
 @lru_cache(maxsize=1)
 def reference_entries() -> tuple[EmojiReference, ...]:
-    catalog = {entry.emoji_key: (entry.name, entry.aliases) for entry in (*WEAPONS, *PASSIVES, *RANKS)}
+    catalog = {entry.emoji_key: (entry.name, entry.aliases) for entry in (*WEAPONS, *PASSIVES, *EFFECTS, *RANKS)}
     for animal in special_animals():
         catalog[f"pet_{animal['emoji_stem']}"] = (str(animal["name"]), tuple(animal["aliases"]))
     for key, (_, name, aliases_json, _) in DEX_ARTWORK.items():

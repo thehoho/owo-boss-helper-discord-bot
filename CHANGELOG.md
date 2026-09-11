@@ -1,3 +1,11 @@
+## v0.15.2-beta - Cross-channel Boss Guidance, Effect Icons, and Guide Categories
+
+- Mirrored the active configured HIT, SKIP, or custom boss decision once after generated commands on official active boss cards outside the configured boss channel.
+- Kept the configured-channel sticky lifecycle unchanged and deduplicated each mirror per source boss card, including across HP refresh edits and restarts.
+- Added 12 official OwO battle-effect icons as application emojis with stable `EF_` names, aliases, enlarged reference previews, replacement support, and guide variables.
+- Added live category dropdowns to `H guide` and `/team-guide`; categories come from saved guide metadata and selected guide details open privately.
+- Added regression coverage for mirror gating/deduplication, effect assets and aliases, and normalized guide category browsing.
+- Updated the public version to 0.15.2-beta; no database migration or additional Discord permission is required.
 ## v0.15.1-beta - Notification Guide and Reward-specific x2 Rules
 
 - Added a complete, prefix-aware `H boss notify` guide and linked it from the main `H help` command.

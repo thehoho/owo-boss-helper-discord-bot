@@ -14,9 +14,11 @@ files when Discord accepts them.
 - `weapons/`: 29 weapon icons from the OwO Boss Command Generator desktop app.
 - `passives/`: 28 passive icons from the OwO Boss Command Generator desktop app.
 - `stats/`: six official HP, ATT, PR, WP, MAG, and MR base-stat icons.
+- `effects/`: 12 official OwO battle-effect icons with pinned source IDs and
+  attribution recorded in `effects/README.md`.
 
-Together with the six interface emojis in `assets/ui_emojis/`, startup discovers
-311 configured application-owned emojis. Static artwork is cropped to its visible
+Together with the seven interface emojis in `assets/ui_emojis/`, startup discovers
+324 configured application-owned emojis. Static artwork is cropped to its visible
 alpha bounds and scaled to fill Discord's canvas. The game catalog uses a revised
 Discord-side name set so corrected artwork can upload without deleting the previous
 working emojis. Patreon and Custom Patreon animals are not
@@ -34,6 +36,10 @@ asset paths. The wiki states
 that community content is available under
 CC BY-SA unless otherwise noted; individual image pages may carry additional
 source or license information.
+
+Battle-effect artwork and Discord emoji IDs come from OwO Bot's published buff
+classes at pinned commit `9aec92b274bae64ea078fc04540398713e7f7928`.
+See `effects/README.md` for the exact source paths and license attribution.
 
 Weapon and passive artwork came from the project-owned desktop source tree at
 `D:\OwO-Boss-Command-Generator\assets`.

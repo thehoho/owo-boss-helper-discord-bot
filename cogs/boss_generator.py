@@ -1995,6 +1995,25 @@ class BossGenerator(commands.Cog):
             return f"# SKIP {emoji}".rstrip()
         return "# Boss decision needed"
 
+    def boss_sticky_mirror_content(self, guild_id: int, channel_id: int) -> str | None:
+        """Return the current sticky text when it should follow an off-channel boss card."""
+        config = self.cooldown_config.get(str(guild_id), {})
+        configured_channel_id = int(config.get("channel_id") or 0)
+        if (
+            not configured_channel_id
+            or configured_channel_id == int(channel_id)
+            or not self.boss_sticky_enabled(config)
+            or not int(config.get("decision_message_id") or 0)
+            or str(config.get("last_result") or "active") != "active"
+        ):
+            return None
+        if not (
+            str(config.get("boss_decision") or "") in {"hit", "skip", "custom"}
+            or str(config.get("sticky_custom_text") or "").strip()
+        ):
+            return None
+        return self.boss_decision_default_content(config)
+
     async def send_fighter_ping_message(
         self,
         guild_id: int,
@@ -3262,7 +3281,9 @@ class BossGenerator(commands.Cog):
         key = str(source_message_id)
         entry = replies.get(key)
         entry = entry if isinstance(entry, dict) else {}
-        if str(entry.get("command") or "") == command and int(entry.get("reply_id") or 0):
+        same_command = str(entry.get("command") or "") == command
+        reply_id = int(entry.get("reply_id") or 0)
+        if same_command and reply_id and bool(entry.get("sticky_mirror_checked")):
             return
 
         channel = self.bot.get_channel(channel_id)
@@ -3276,8 +3297,7 @@ class BossGenerator(commands.Cog):
             return
 
         content = f"`{command}`"
-        reply_id = int(entry.get("reply_id") or 0)
-        if reply_id:
+        if reply_id and not same_command:
             try:
                 await get_partial_message(reply_id).edit(content=content)
             except discord.NotFound:
@@ -3302,7 +3322,30 @@ class BossGenerator(commands.Cog):
                 )
                 return
 
+        # The configured alert channel keeps its normal persistent sticky. For a
+        # boss card checked elsewhere, place one independent copy immediately
+        # after the generated command so members also see HIT/SKIP/custom advice.
+        # Record the attempt per OwO card so later battle-log edits never spam it.
+        if not bool(entry.get("sticky_mirror_checked")):
+            entry["sticky_mirror_checked"] = True
+            sticky_content = self.boss_sticky_mirror_content(guild_id, channel_id)
+            if sticky_content:
+                try:
+                    sticky_message = await channel.send(
+                        sticky_content,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                    entry["sticky_mirror_id"] = sticky_message.id
+                    entry["sticky_mirror_content"] = sticky_content
+                except (discord.Forbidden, discord.HTTPException) as exc:
+                    logger.warning(
+                        "Could not mirror boss sticky below status %s: %s",
+                        source_message_id,
+                        exc,
+                    )
+
         replies[key] = {
+            **entry,
             "reply_id": reply_id,
             "command": command,
             "updated_at": int(time.time()),

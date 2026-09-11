@@ -50,6 +50,7 @@ GAME_EMOJI_CATEGORIES: dict[str, str] = {
     "pet": "animals",
     "weapon": "weapons",
     "passive": "passives",
+    "effect": "effects",
     "rank": "ranks",
     "stat": "stats",
 }

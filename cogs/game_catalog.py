@@ -100,6 +100,22 @@ PASSIVES: tuple[CatalogEntry, ...] = (
 )
 
 
+EFFECTS: tuple[CatalogEntry, ...] = (
+    CatalogEntry("attack_up", "Attack Up", "effect_attack_up", ("attack_up", "atkup", "attup", "attackup")),
+    CatalogEntry("attack_up_plus", "Attack Up+", "effect_attack_up_plus", ("attack_up_plus", "atkupp", "attupp", "attackupplus")),
+    CatalogEntry("attack_up_plus_plus", "Attack Up++", "effect_attack_up_plus_plus", ("attack_up_plus_plus", "atkuppp", "attuppp", "attackupplusplus")),
+    _entry("celebration", "Celebration", "celebration", "celeb", prefix="effect"),
+    _entry("defense_up", "Defense Up", "defense_up", "defup", "dfup", prefix="effect"),
+    _entry("flame", "Flame", "flame", prefix="effect"),
+    _entry("freeze", "Freeze", "freeze", prefix="effect"),
+    _entry("leech", "Leech", "leech", prefix="effect"),
+    _entry("mortality", "Mortality", "mortality", "mort", prefix="effect"),
+    _entry("poison", "Poison", "poison", prefix="effect"),
+    _entry("stinky", "Stinky", "stinky", prefix="effect"),
+    _entry("taunt", "Taunt", "taunt", prefix="effect"),
+)
+
+
 RANKS: tuple[CatalogEntry, ...] = (
     _entry("common", "Common", "common", "c", prefix="rank"),
     _entry("uncommon", "Uncommon", "uncommon", "u", prefix="rank"),
@@ -130,6 +146,7 @@ def _index(entries: Iterable[CatalogEntry]) -> dict[str, CatalogEntry]:
 
 WEAPON_INDEX = _index(WEAPONS)
 PASSIVE_INDEX = _index(PASSIVES)
+EFFECT_INDEX = _index(EFFECTS)
 RANK_INDEX = _index(RANKS)
 
 
@@ -139,6 +156,10 @@ def resolve_weapon(value: str) -> CatalogEntry | None:
 
 def resolve_passive(value: str) -> CatalogEntry | None:
     return PASSIVE_INDEX.get(normalize_catalog_token(value))
+
+
+def resolve_effect(value: str) -> CatalogEntry | None:
+    return EFFECT_INDEX.get(normalize_catalog_token(value))
 
 
 def resolve_rank(value: str) -> CatalogEntry | None:

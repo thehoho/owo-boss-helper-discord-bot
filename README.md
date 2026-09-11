@@ -1,3 +1,8 @@
+## v0.15.2-beta notes
+
+When an official active guild-boss card appears outside the configured boss channel, the bot now follows its generated command with one separate copy of the current HIT, SKIP, or custom sticky decision. The configured-channel sticky is unchanged, and later exact-HP edits update only the command instead of repeating the guidance.
+
+`H guide` and `/team-guide` now open a category browser generated from the categories already saved on guides. Battle effects are available as portable application emojis in guides, including `{taunt}`, `{poison}`, `{freeze}`, and explicit `EF_` variables. See [cross-channel guidance, effect icon, and guide browser notes](RELEASE_NOTES_v0.15.2-beta.md).
 ## v0.15.1-beta notes
 
 `H boss notify` now opens a complete, prefix-aware notification guide and the main `H help` overview points members to it. The public reward shortcuts are `WS` (weapon shards), `WC` (weapon crates), `BWC` (boss weapon crates), and `XP`; the older `crate` and `bcrate` shorthand is no longer accepted.

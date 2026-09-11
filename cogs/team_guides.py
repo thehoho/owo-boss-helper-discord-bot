@@ -17,11 +17,13 @@ from discord import app_commands
 from discord.ext import commands
 
 from .game_catalog import (
+    EFFECTS,
     PASSIVES,
     RANKS,
     WEAPONS,
     CatalogEntry,
     normalize_catalog_token,
+    resolve_effect,
     resolve_passive,
     resolve_rank,
     resolve_special_animal,
@@ -43,6 +45,8 @@ MAX_FULL_GUIDE = 4000
 MAX_GUIDE_ALIASES = 12
 MAX_GUIDE_CATEGORIES = 8
 FULL_GUIDE_PAGE_LENGTH = 3800
+GUIDE_BROWSER_CATEGORY_LIMIT = 24
+GUIDE_BROWSER_GUIDE_LIMIT = 25
 GUIDE_VARIABLE_RE = re.compile(r"\{([A-Za-z0-9_ -]{1,64})\}")
 GUIDE_STAT_ALIASES = {
     "hp": "hp",
@@ -434,6 +438,62 @@ class TeamGuideStore:
                 ).fetchall()
             return [self._from_row(connection, row) for row in rows]
 
+    def get(self, guide_id: int) -> TeamGuide | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                "SELECT * FROM team_guides WHERE guide_id = ?",
+                (int(guide_id),),
+            ).fetchone()
+            return self._from_row(connection, row) if row else None
+
+    def list_categories(
+        self,
+        limit: int = GUIDE_BROWSER_CATEGORY_LIMIT,
+    ) -> list[tuple[str, str, int]]:
+        totals: dict[str, int] = {}
+        labels: dict[str, str] = {}
+        with self._connect() as connection:
+            rows = connection.execute("SELECT categories_json FROM team_guides").fetchall()
+        for row in rows:
+            try:
+                values = json.loads(str(row["categories_json"]))
+            except (TypeError, ValueError, json.JSONDecodeError):
+                continue
+            if not isinstance(values, list):
+                continue
+            seen: set[str] = set()
+            for raw_value in values:
+                label = re.sub(r"\s+", " ", str(raw_value)).strip()
+                key = normalize_catalog_token(label)
+                if not label or not key or key in seen:
+                    continue
+                seen.add(key)
+                labels.setdefault(key, label)
+                totals[key] = totals.get(key, 0) + 1
+        ordered = sorted(totals, key=lambda key: (-totals[key], labels[key].casefold()))
+        return [(labels[key], key, totals[key]) for key in ordered[: max(0, int(limit))]]
+
+    def list_guides_by_category(
+        self,
+        category: str,
+        limit: int = GUIDE_BROWSER_GUIDE_LIMIT,
+    ) -> list[TeamGuide]:
+        category_key = normalize_catalog_token(category)
+        if not category_key:
+            return self.list_guides("", limit)
+        matches: list[TeamGuide] = []
+        with self._connect() as connection:
+            rows = connection.execute(
+                "SELECT * FROM team_guides ORDER BY updated_at DESC"
+            ).fetchall()
+            for row in rows:
+                guide = self._from_row(connection, row)
+                if any(normalize_catalog_token(value) == category_key for value in guide.categories):
+                    matches.append(guide)
+                    if len(matches) >= int(limit):
+                        break
+        return matches
+
     def related(self, guide: TeamGuide, limit: int = 5) -> list[TeamGuide]:
         candidates = self.list_guides(limit=100)
         categories = {normalize_catalog_token(value) for value in guide.categories}
@@ -527,6 +587,13 @@ def guide_variable_emoji_key(value: str) -> str | None:
     if compact in STANDARD_ANIMAL_NAMES:
         return animal_emoji_key(compact)
 
+    effect = resolve_effect(compact) or resolve_compact_catalog_entry(
+        EFFECTS,
+        compact,
+    )
+    if effect:
+        return effect.emoji_key
+
     weapon_value = GUIDE_WEAPON_VARIABLE_ALIASES.get(compact, compact)
     weapon = resolve_weapon(weapon_value) or resolve_compact_catalog_entry(
         WEAPONS,
@@ -545,6 +612,13 @@ def guide_variable_emoji_key(value: str) -> str | None:
 
     # Keep the original Neon-style prefixes for compatibility and explicit
     # disambiguation, but only claim a prefix when its value actually resolves.
+    if compact.startswith("ef"):
+        effect = resolve_effect(compact[2:]) or resolve_compact_catalog_entry(
+            EFFECTS,
+            compact[2:],
+        )
+        if effect:
+            return effect.emoji_key
     if compact.startswith("fp"):
         passive_value = GUIDE_PASSIVE_VARIABLE_ALIASES.get(
             compact[2:],
@@ -675,18 +749,19 @@ def build_emoji_variable_help_embed(bot: commands.Bot) -> discord.Embed:
         return f"{tick}{variable}{tick} → {rendered}"
 
     description = (
-        "Put a familiar animal, weapon, passive, stat, or rank name inside braces "
+        "Put a familiar animal, weapon, passive, battle-effect, stat, or rank name inside braces "
         "anywhere in the summary, full guide, or slot notes. Preview turns known "
         "names into the bot's portable application emojis. Browse every icon, name, "
         "and alias with **/guide-emojis**. Exact keys such as {weapon_sword} also work. Existing Discord "
         "Markdown, Unicode emojis, and custom emoji markup stay unchanged.\n\n"
         f"**Weapons**\n{example('{sword}')}  {example('{pdagger}')}  {example('{arcane}')}\n"
         f"**Passives**\n{example('{strength}')}  {example('{lifesteal}')}  {example('{mana_mtap}')}\n"
+        f"**Battle effects**\n{example('{taunt}')}  {example('{poison}')}  {example('{freeze}')}\n"
         f"**Animals**\n{example('{fish}')}  {example('{gfish}')}  {example('{beeday}')}\n"
         f"**Base stats**\n{example('{hp_stat}')}  {example('{att_stat}')}  {example('{wp_stat}')}  {example('{mag_stat}')}\n"
         f"**Ranks**\n{example('{legendary}')}  {example('{fabled}')}\n\n"
         "-# Prefixes remain optional for disambiguation: w = weapon, fp = passive, "
-        "a = animal, s = base stat, r = rank. Bare animal names win: {wolf} is the "
+        "ef = battle effect, a = animal, s = base stat, r = rank. Bare animal names win: {wolf} is the "
         "animal, while {lwolf} is Lone Wolf; {snail_passive} selects the passive."
     )
     return discord.Embed(title="💡 Team-guide emoji variables", description=description, color=0xFEE75C)
@@ -1089,6 +1164,146 @@ class FullGuideView(discord.ui.View):
         await interaction.response.edit_message(embed=self.pages[self.index], view=self)
 
 
+class GuideCategorySelect(discord.ui.Select):
+    def __init__(self, browser: "GuideBrowserView") -> None:
+        options = [
+            discord.SelectOption(
+                label="All categories",
+                value="all",
+                description="Show the newest guides from every category",
+                emoji="📚",
+                default=not browser.category_key,
+            )
+        ]
+        options.extend(
+            discord.SelectOption(
+                label=label[:100],
+                value=f"category:{index}",
+                description=f"{count} guide{'s' if count != 1 else ''}"[:100],
+                default=key == browser.category_key,
+            )
+            for index, (label, key, count) in enumerate(browser.categories)
+        )
+        super().__init__(
+            placeholder="Filter guides by category",
+            options=options,
+            row=0,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        value = self.values[0]
+        category_index = -1
+        if value.startswith("category:"):
+            try:
+                category_index = int(value.partition(":")[2])
+            except ValueError:
+                category_index = -1
+        await self.view.select_category(category_index)
+        await interaction.response.edit_message(embed=self.view.build_embed(), view=self.view)
+
+
+class GuideEntrySelect(discord.ui.Select):
+    def __init__(self, browser: "GuideBrowserView") -> None:
+        options = [
+            discord.SelectOption(
+                label=guide.name[:100],
+                value=str(guide.guide_id),
+                description=(
+                    f"{guide.aliases[0] if guide.aliases else normalize_guide_alias(guide.name)}"
+                    f" • by {guide.authors}"
+                )[:100],
+            )
+            for guide in browser.guides[:GUIDE_BROWSER_GUIDE_LIMIT]
+        ]
+        super().__init__(
+            placeholder=(
+                f"Open a guide in {browser.category_label}"
+                if browser.category_key
+                else "Open one of these guides"
+            )[:150],
+            options=options or [
+                discord.SelectOption(label="No guides in this category", value="none")
+            ],
+            disabled=not options,
+            row=1,
+        )
+
+    async def callback(self, interaction: discord.Interaction) -> None:
+        if not self.values or self.values[0] == "none":
+            await interaction.response.send_message(
+                "No guide is available in this category.",
+                ephemeral=True,
+            )
+            return
+        guide = await asyncio.to_thread(self.view.cog.store.get, int(self.values[0]))
+        if guide is None:
+            await interaction.response.send_message(
+                "That guide is no longer available. Refresh the guide browser.",
+                ephemeral=True,
+            )
+            return
+        await interaction.response.send_message(
+            embed=build_guide_embed(self.view.cog.bot, guide),
+            view=PublicGuideView(self.view.cog, guide),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+
+class GuideBrowserView(discord.ui.View):
+    def __init__(
+        self,
+        cog: "TeamGuides",
+        categories: list[tuple[str, str, int]],
+        guides: list[TeamGuide],
+    ) -> None:
+        super().__init__(timeout=10 * 60)
+        self.cog = cog
+        self.categories = categories[:GUIDE_BROWSER_CATEGORY_LIMIT]
+        self.guides = guides[:GUIDE_BROWSER_GUIDE_LIMIT]
+        self.category_key = ""
+        self.category_label = ""
+        self.rebuild()
+
+    @classmethod
+    async def create(cls, cog: "TeamGuides") -> "GuideBrowserView":
+        categories, guides = await asyncio.gather(
+            asyncio.to_thread(cog.store.list_categories, GUIDE_BROWSER_CATEGORY_LIMIT),
+            asyncio.to_thread(cog.store.list_guides, "", GUIDE_BROWSER_GUIDE_LIMIT),
+        )
+        return cls(cog, categories, guides)
+
+    def rebuild(self) -> None:
+        self.clear_items()
+        self.add_item(GuideCategorySelect(self))
+        self.add_item(GuideEntrySelect(self))
+
+    async def select_category(self, category_index: int) -> None:
+        if 0 <= category_index < len(self.categories):
+            self.category_label, self.category_key, _ = self.categories[category_index]
+            self.guides = await asyncio.to_thread(
+                self.cog.store.list_guides_by_category,
+                self.category_key,
+                GUIDE_BROWSER_GUIDE_LIMIT,
+            )
+        else:
+            self.category_key = ""
+            self.category_label = ""
+            self.guides = await asyncio.to_thread(
+                self.cog.store.list_guides,
+                "",
+                GUIDE_BROWSER_GUIDE_LIMIT,
+            )
+        self.rebuild()
+
+    def build_embed(self) -> discord.Embed:
+        embed = self.cog.list_embed(self.guides, query=self.category_label)
+        embed.set_footer(
+            text="Choose a category, then choose a guide. Guide details open privately."
+        )
+        return embed
+
+
 class PublicGuideView(discord.ui.View):
     def __init__(self, cog: "TeamGuides", guide: TeamGuide) -> None:
         super().__init__(timeout=300)
@@ -1154,6 +1369,14 @@ class TeamGuides(commands.Cog):
         if await self.is_bot_owner(user):
             return True
         return await asyncio.to_thread(self.store.is_expert, user.id)
+
+    async def send_browser(self, destination: discord.abc.Messageable) -> None:
+        view = await GuideBrowserView.create(self)
+        await destination.send(
+            embed=view.build_embed(),
+            view=view,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     async def send_guide(self, destination: discord.abc.Messageable, query: str) -> bool:
         guide = await asyncio.to_thread(self.store.find, query)
@@ -1230,8 +1453,8 @@ class TeamGuides(commands.Cog):
                 return
             await interaction.response.send_message(embed=self.list_embed(matches, query=query))
             return
-        guides = await asyncio.to_thread(self.store.list_guides, "", 15)
-        await interaction.response.send_message(embed=self.list_embed(guides))
+        view = await GuideBrowserView.create(self)
+        await interaction.response.send_message(embed=view.build_embed(), view=view)
 
     @team_guide.autocomplete("query")
     async def team_guide_autocomplete(
@@ -1292,8 +1515,7 @@ class TeamGuides(commands.Cog):
             )
             return
         if not argument:
-            guides = await asyncio.to_thread(self.store.list_guides, "", 15)
-            await message.channel.send(embed=self.list_embed(guides))
+            await self.send_browser(message.channel)
             return
         await self.send_guide(message.channel, argument)
 
