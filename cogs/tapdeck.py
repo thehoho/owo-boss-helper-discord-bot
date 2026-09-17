@@ -19,6 +19,9 @@ from .helper_prefix import get_guild_helper_prefix, parse_helper_command_argumen
 logger = logging.getLogger(__name__)
 
 TAPDECK_REPOSITORY_URL = "https://github.com/thehoho/TapDeck-Lite"
+TAPDECK_GOOGLE_PLAY_URL = (
+    "https://play.google.com/store/apps/details?id=app.tapdeck.keyboard.lite"
+)
 TAPDECK_LATEST_RELEASE_URL = f"{TAPDECK_REPOSITORY_URL}/releases/latest"
 TAPDECK_LATEST_RELEASE_API_URL = (
     "https://api.github.com/repos/thehoho/TapDeck-Lite/releases/latest"
@@ -176,6 +179,13 @@ class TapDeckReleaseResolver:
 class TapDeckLinks(discord.ui.View):
     def __init__(self, release: TapDeckRelease | None = None) -> None:
         super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="Get it on Google Play",
+                emoji="📲",
+                url=TAPDECK_GOOGLE_PLAY_URL,
+            )
+        )
         if release is not None:
             self.add_item(
                 discord.ui.Button(
@@ -216,16 +226,13 @@ class TapDeckLinks(discord.ui.View):
 
 
 def build_tapdeck_embed(release: TapDeckRelease | None = None) -> discord.Embed:
-    release_url = (
-        release.release_url if release is not None else TAPDECK_LATEST_RELEASE_URL
-    )
     embed = discord.Embed(
         title="📱 TapDeck Lite, one tap, one command",
-        url=release_url,
+        url=TAPDECK_GOOGLE_PLAY_URL,
         description=(
             "A compact Android shortcut keyboard for command-based Discord chats/bots. "
             "Configure up to 20 keys, then one manual tap inserts and sends the "
-            "selected command."
+            "selected command. Now available through Google Play."
         ),
         color=0x70E1B5,
     )
@@ -255,9 +262,9 @@ def build_tapdeck_embed(release: TapDeckRelease | None = None) -> discord.Embed:
             "OwO's staff team for review and confirmed as allowed under the rules at "
             "the time. Rules can change, so users remain responsible for following "
             "current OwO and Discord rules.\n\n"
-            "TapDeck Lite is distributed from GitHub rather than Google Play, so Android "
-            "will show normal unknown-source and third-party-keyboard warnings. Review the "
-            "public source and install only if you trust the developer."
+            "Install from **Google Play** for the standard Android installation flow. "
+            "The public GitHub release remains available as a transparent fallback; "
+            "Android shows its normal unknown-source warning when sideloading that APK."
         ),
         inline=False,
     )

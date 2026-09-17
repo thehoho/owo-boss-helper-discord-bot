@@ -17,6 +17,7 @@ from cogs.rng import (
 from cogs.tapdeck import (
     TAPDECK_LATEST_RELEASE_API_URL,
     TAPDECK_LATEST_RELEASE_URL,
+    TAPDECK_GOOGLE_PLAY_URL,
     TAPDECK_PREFIX_ALIASES,
     TAPDECK_REPOSITORY_URL,
     TapDeckInfo,
@@ -133,9 +134,11 @@ class TapDeckTests(unittest.TestCase):
         self.assertIn(self.release.apk_url, dynamic_urls)
         self.assertIn(self.release.release_url, dynamic_urls)
         self.assertIn(TAPDECK_REPOSITORY_URL, dynamic_urls)
+        self.assertIn(TAPDECK_GOOGLE_PLAY_URL, dynamic_urls)
 
         fallback_urls = {str(child.url) for child in TapDeckLinks().children}
         self.assertIn(TAPDECK_LATEST_RELEASE_URL, fallback_urls)
+        self.assertIn(TAPDECK_GOOGLE_PLAY_URL, fallback_urls)
         self.assertNotIn(self.release.apk_url, fallback_urls)
 
     def test_approved_public_copy_is_concise_and_factual(self) -> None:
@@ -149,12 +152,14 @@ class TapDeckTests(unittest.TestCase):
             embed.description,
             "A compact Android shortcut keyboard for command-based Discord chats/bots. "
             "Configure up to 20 keys, then one manual tap inserts and sends the "
-            "selected command.",
+            "selected command. Now available through Google Play.",
         )
         self.assertIn("one tap = one command", text.casefold())
         self.assertIn("zero android permissions", text.casefold())
         self.assertIn("no internet capability", text.casefold())
-        self.assertIn("only if you trust", text.casefold())
+        self.assertIn("google play", text.casefold())
+        self.assertIn("github release remains", text.casefold())
+        self.assertEqual(str(embed.url), TAPDECK_GOOGLE_PLAY_URL)
         self.assertIn("shared with owo's staff team", text.casefold())
         self.assertIn("confirmed as allowed under the rules at the time", text.casefold())
         self.assertNotIn("reviewed by an owo administrator", text.casefold())
@@ -190,7 +195,7 @@ class TapDeckTests(unittest.TestCase):
 
 class PublicSurfaceTests(unittest.TestCase):
     def test_version_and_help_include_the_whole_batch(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.15.3-beta")
+        self.assertEqual(BOT_VERSION, "0.15.4-beta")
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback
         embed = BossGenerator.build_help_embed(cog, "b", "o")

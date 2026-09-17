@@ -57,7 +57,8 @@ SPECIFIC_X2_TYPES = {
     "xp": "xp_x2",
 }
 PREFIX_ALIASES = {
-    "h boss notify", "h boss notification", "h boss notifications", "h boss ping",
+    "h boss notify", "hboss notify",
+    "h boss notification", "h boss notifications", "h boss ping",
 }
 
 
@@ -963,6 +964,7 @@ class BossNotifications(commands.Cog):
         helper_prefix: str = "h",
     ) -> discord.Embed:
         command = f"{helper_prefix} boss notify"
+        compact_command = f"{helper_prefix}boss notify"
         embed = discord.Embed(
             title="🔔 Boss Notification Guide",
             description=(
@@ -1018,8 +1020,9 @@ class BossNotifications(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="Slash command",
+            name="Command formats",
             value=(
+                f"Both `{command}` and `{compact_command}` work. "
                 "Use `/boss-notify` to choose the reward, minimum, recurring or "
                 "one-boss mode, and whether to enable or disable it."
             ),

@@ -2612,6 +2612,7 @@ class BossGenerator(commands.Cog):
         boss_cd = helper_command(helper_prefix, "boss cd")
         boss_report = helper_command(helper_prefix, "boss report")
         boss_notify = helper_command(helper_prefix, "boss notify")
+        compact_boss_notify = f"{helper_prefix}boss notify"
         boss_tickets = helper_command(helper_prefix, "boss t")
         boss_list = helper_command(helper_prefix, "boss list")
         boss_lookup = f"{helper_alias(helper_prefix, 'hbt')} <name/mention/ID>"
@@ -2654,7 +2655,8 @@ class BossGenerator(commands.Cog):
         embed.add_field(
             name="🔔 Personal boss notifications",
             value=(
-                f"Open `{boss_notify}` or `/boss-notify` for the opt-in DM guide. "
+                f"Open `{boss_notify}`, `{compact_boss_notify}`, or `/boss-notify` "
+                "for the opt-in DM guide. "
                 "Watch minimum `WS`, `WC`, `BWC`, or `XP`; any `X2` or one "
                 "specific reward's x2; and boss defeat/escape. Rules can repeat "
                 "or apply to the current/next boss only."
@@ -2739,8 +2741,9 @@ class BossGenerator(commands.Cog):
             name="📱 TapDeck Lite for Android",
             value=(
                 f"Use `{grind_command}`, `{helper_command(helper_prefix, 'tapdeck')}`, "
-                "or `/tapdeck` for the public source, privacy details, and latest GitHub APK "
-                "download. OwO's staff team reviewed the demonstrated one-tap/one-command "
+                "or `/tapdeck` for the Google Play download, public source, privacy "
+                "details, and GitHub APK fallback. OwO's staff team reviewed the "
+                "demonstrated one-tap/one-command "
                 "workflow and confirmed it was allowed under the rules at the time; "
                 "members remain responsible for current rules."
             ),

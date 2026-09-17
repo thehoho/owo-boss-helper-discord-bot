@@ -1,3 +1,9 @@
+## v0.15.4-beta notes
+
+Boss notification commands now accept both spaced and compact forms, such as `H boss notify` and `Hboss notify`, while continuing to respect each server’s configured helper prefix.
+
+TapDeck Lite’s `H Grind`, `H TapDeck`, and `/tapdeck` card now leads with its Google Play listing. The latest GitHub APK, release notes, public source, and privacy links remain available as fallbacks and transparency resources. See [command alias and Google Play notes](RELEASE_NOTES_v0.15.4-beta.md).
+
 ## v0.15.3-beta notes
 
 The battle-effect catalog now contains all 22 supplied current icons, including Exposed, Frostbite, Heavy Arrow, Pest, Sacred Ward, Sin, Spellskin, Stoneskin, Tether, and Virtue. They are portable application emojis available to guide variables, `/guide-emojis`, and owner replacement tools.
@@ -148,7 +154,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 
 ### Personal boss notifications
 
-- Use `/boss-notify` or `H boss notify` to view and manage private alerts in a server.
+- Use `/boss-notify`, `H boss notify`, or compact `Hboss notify` to view and manage private alerts in a server.
 - Set recurring minimums with `H boss notify ws 175`, `H boss notify wc 4`, `H boss notify bwc 3`, or `H boss notify xp 20k`.
 - Use `H boss notify x2` for any doubled reward; use `WS X2`, `WC X2`, `BWC X2`, or `XP X2` after `H boss notify` to target one doubled reward. Use `H boss notify end` for defeated-or-escaped alerts.
 - Add `current` for a one-boss rule, such as `H boss notify end current`; if no boss is active, it applies to the next boss.
@@ -184,9 +190,10 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 ### TapDeck Lite Android card
 
 - Opens with `H Grind`, `H TapDeck`, or `/tapdeck`, respecting each server's custom helper prefix.
-- Resolves the newest APK from GitHub's public latest-release API, caches it for up to 24 hours, and falls back safely to GitHub's permanent latest-release page.
+- Opens the app’s Google Play listing as the primary installation path.
+- Also resolves the newest APK from GitHub's public latest-release API, caches it for up to 24 hours, and falls back safely to GitHub's permanent latest-release page.
 - Describes the separate app's one-manual-tap/one-command boundary, offline design, zero-permission manifest, and local-only command storage.
-- Records that the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time, while keeping current-rules responsibility and normal Android sideload/third-party-keyboard warnings explicit.
+- Records that the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time, while keeping current-rules responsibility explicit; the unknown-source warning applies only to the optional GitHub APK.
 
 ### Public animal Dex catalog
 

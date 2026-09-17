@@ -1,3 +1,12 @@
+## v0.15.4-beta - Compact Boss Notifications and Google Play
+
+- Added the compact `<prefix>boss notify` form alongside the existing `<prefix> boss notify` form, including custom server prefixes and arguments.
+- Documented both notification forms in the notification guide and main `H help` card.
+- Added the TapDeck Lite Google Play listing as the primary button and title link in `H Grind`, `H TapDeck`, and `/tapdeck`.
+- Kept the latest GitHub APK, release notes, public source, and privacy links available as transparent fallbacks.
+- Updated installation wording for Google Play while retaining the sideload warning only for the optional GitHub APK.
+- Updated the public version to 0.15.4-beta; no database migration or additional Discord permission is required.
+
 ## v0.15.3-beta - Complete Effect Catalog and Guide Browser Interaction Fix
 
 - Added the 10 missing current battle effects: Exposed, Frostbite, Heavy Arrow, Pest, Sacred Ward, Sin, Spellskin, Stoneskin, Tether, and Virtue.
