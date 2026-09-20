@@ -1,3 +1,9 @@
+## v0.15.5-beta notes
+
+`H sticky` can now keep custom emojis from other servers visible. When the bot cannot use a source server's emoji directly, it downloads that Discord emoji and creates one deduplicated application-owned copy, which Discord lets the bot render anywhere. Usable emojis from the current server and all Unicode emojis remain unchanged.
+
+Each note may contain up to 20 unique external custom emojis. The bot reserves capacity for its core guide and UI assets, and a failed import never replaces the existing sticky. See [portable sticky emoji notes](RELEASE_NOTES_v0.15.5-beta.md).
+
 ## v0.15.4-beta notes
 
 Boss notification commands now accept both spaced and compact forms, such as `H boss notify` and `Hboss notify`, while continuing to respect each server’s configured helper prefix.

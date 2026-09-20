@@ -52,6 +52,7 @@ from .helper_prefix import (
     parse_helper_command_argument,
     set_guild_helper_prefix,
 )
+from .emoji_assets import CUSTOM_EMOJI_RE
 from .message_utils import safe_reply
 from .owo_prefix import (
     OWO_PREFIX_DEFAULT,
@@ -59,7 +60,7 @@ from .owo_prefix import (
     is_owo_prefixed_command,
     owo_command,
 )
-from .ui_emojis import ensure_ui_emojis, ui_emoji_text
+from .ui_emojis import ensure_ui_emojis, get_ui_emoji_manager, ui_emoji_text
 
 
 logger = logging.getLogger(__name__)
@@ -1809,6 +1810,20 @@ class BossGenerator(commands.Cog):
         notice = await self.set_boss_decision(guild.id, decision, message.author.id)
         await safe_reply(message, notice, mention_author=False, delete_after=20)
 
+    async def make_sticky_note_portable(
+        self,
+        note: str,
+        guild: discord.Guild,
+    ) -> str:
+        if CUSTOM_EMOJI_RE.search(note) is None:
+            return note
+        manager = get_ui_emoji_manager(self.bot)
+        if manager is None:
+            raise ValueError(
+                "The bot's portable emoji manager is not ready. Please try again shortly."
+            )
+        return await manager.make_custom_emojis_portable(note, guild)
+
     async def handle_boss_sticky_command(self, message: discord.Message, action: str) -> None:
         guild = message.guild
         if guild is None:
@@ -1898,6 +1913,16 @@ class BossGenerator(commands.Cog):
             return
         if len(note) > 1800:
             note = note[:1797].rstrip() + "..."
+        try:
+            note = await self.make_sticky_note_portable(note, guild)
+        except ValueError as exc:
+            await safe_reply(
+                message,
+                f"⚠️ {exc}\nThe existing sticky was not changed.",
+                mention_author=False,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
 
         config["sticky_custom_text"] = note
         config["boss_decision"] = "custom"
@@ -2623,6 +2648,8 @@ class BossGenerator(commands.Cog):
         dex_short = helper_alias(helper_prefix, "hwd")
         rng_short = helper_alias(helper_prefix, "hrng")
         grind_command = helper_command(helper_prefix, "grind")
+        sticky_command = helper_command(helper_prefix, "sticky")
+        sticky_clear = helper_command(helper_prefix, "sticky clear")
 
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
@@ -2649,6 +2676,17 @@ class BossGenerator(commands.Cog):
                 "`/boss-decision-role`, fighter pings with `/boss-fighter-role`, and "
                 "daily reset reports with `/boss-report-channel`. Repost the latest "
                 f"completed report with `{boss_report}`."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="📌 Boss sticky notes",
+            value=(
+                f"Reply to a note with `{sticky_command}` in the configured boss channel. "
+                "The bot converts otherwise-external custom emojis into portable app "
+                "emojis (up to 20 unique external emojis per note), so they keep rendering "
+                "when the sticky is reposted or mirrored. If an import fails, the existing "
+                f"sticky stays unchanged. Remove it with `{sticky_clear}`."
             ),
             inline=False,
         )

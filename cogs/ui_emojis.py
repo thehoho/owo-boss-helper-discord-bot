@@ -17,11 +17,21 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any
 
+import aiohttp
 import discord
 from discord.ext import commands
 from PIL import Image
 
-from .emoji_assets import EmojiOverrideStore, emoji_label, normalize_upload, override_name, versioned_name
+from .emoji_assets import (
+    CUSTOM_EMOJI_RE,
+    MAX_UPLOAD_BYTES,
+    EmojiOverrideStore,
+    custom_emoji_url,
+    emoji_label,
+    normalize_upload,
+    override_name,
+    versioned_name,
+)
 from .emoji_catalog import canonical_emoji_key, effective_override, emoji_key_group, is_catalog_emoji
 
 logger = logging.getLogger(__name__)
@@ -32,6 +42,10 @@ GAME_ASSET_DIR = PROJECT_ROOT / "assets" / "game_emojis"
 MAX_EMOJI_BYTES = 256 * 1024
 MAX_APPLICATION_EMOJIS = 2000
 MAX_EMOJI_NAME_LENGTH = 32
+MAX_PORTABLE_STICKY_EMOJIS = 500
+MAX_STICKY_EXTERNAL_EMOJIS = 20
+APPLICATION_EMOJI_RESERVE = 50
+PORTABLE_STICKY_PREFIX = "SK_"
 GAME_EMOJI_ASSET_REVISION = 3
 SUPPORTED_ASSET_SUFFIXES = frozenset({".gif", ".jpeg", ".jpg", ".png", ".webp"})
 DEX_ARTWORK: dict[str, tuple] = {}
@@ -54,6 +68,29 @@ GAME_EMOJI_CATEGORIES: dict[str, str] = {
     "rank": "ranks",
     "stat": "stats",
 }
+
+
+def portable_sticky_emoji_name(value: str) -> str:
+    """Map a source emoji ID to one stable application-emoji name."""
+    match = CUSTOM_EMOJI_RE.fullmatch(value.strip())
+    if match is None:
+        raise ValueError("The sticky contains invalid custom emoji markup.")
+    return f"{PORTABLE_STICKY_PREFIX}{match['id']}"
+
+
+async def download_portable_sticky_emoji(value: str) -> bytes:
+    """Download one Discord emoji from Discord's CDN with a strict size bound."""
+    url = custom_emoji_url(value)
+    async with aiohttp.ClientSession(timeout=aiohttp.ClientTimeout(total=15)) as session:
+        async with session.get(url, allow_redirects=False) as response:
+            if response.status != 200:
+                raise ValueError("Discord could not provide the emoji artwork.")
+            chunks = bytearray()
+            async for chunk in response.content.iter_chunked(65536):
+                chunks.extend(chunk)
+                if len(chunks) > MAX_UPLOAD_BYTES:
+                    raise ValueError("The source emoji exceeds the 2 MiB download limit.")
+            return bytes(chunks)
 
 
 def discover_emoji_assets() -> dict[str, Path]:
@@ -327,6 +364,116 @@ class UIEmojiManager(commands.Cog):
                     ASSET_DIR,
                     ", ".join(missing_assets),
                 )
+
+    async def make_custom_emojis_portable(
+        self,
+        content: str,
+        guild: discord.Guild | None = None,
+    ) -> str:
+        """Replace otherwise-external guild emojis with app-owned copies.
+
+        Guild-local usable emojis are kept as-is. Every external source ID maps to
+        one deterministic application emoji, so repeated stickies and servers
+        reuse the same upload instead of consuming additional application quota.
+        """
+        matches = list(CUSTOM_EMOJI_RE.finditer(content))
+        if not matches:
+            return content
+
+        local_ids: set[int] = set()
+        if guild is not None:
+            for emoji in getattr(guild, "emojis", ()):
+                try:
+                    usable = bool(emoji.is_usable())
+                except (AttributeError, TypeError):
+                    usable = bool(getattr(emoji, "available", True))
+                if usable and getattr(emoji, "id", None) is not None:
+                    local_ids.add(int(emoji.id))
+
+        external: dict[int, str] = {}
+        for match in matches:
+            source_id = int(match["id"])
+            if source_id not in local_ids:
+                external.setdefault(source_id, match.group(0))
+        if not external:
+            return content
+        if len(external) > MAX_STICKY_EXTERNAL_EMOJIS:
+            raise ValueError(
+                f"A sticky can contain at most {MAX_STICKY_EXTERNAL_EMOJIS} "
+                "external custom emojis."
+            )
+
+        replacements: dict[int, str] = {}
+        async with self._sync_lock:
+            try:
+                inventory = list(await self.bot.fetch_application_emojis())
+            except (discord.HTTPException, discord.Forbidden, discord.MissingApplicationID) as exc:
+                raise ValueError(
+                    "I could not read the bot's portable emoji collection right now."
+                ) from exc
+
+            by_id = {int(item.id): item for item in inventory}
+            by_name = {str(item.name): item for item in inventory}
+            portable_count = sum(
+                str(item.name).startswith(PORTABLE_STICKY_PREFIX)
+                for item in inventory
+            )
+
+            for source_id, markup in external.items():
+                match = CUSTOM_EMOJI_RE.fullmatch(markup)
+                assert match is not None
+                current = by_id.get(source_id)
+                remote_name = portable_sticky_emoji_name(markup)
+                if current is None:
+                    current = by_name.get(remote_name)
+                if current is None:
+                    if portable_count >= MAX_PORTABLE_STICKY_EMOJIS:
+                        raise ValueError(
+                            "The portable sticky-emoji cache has reached its safe limit."
+                        )
+                    if len(inventory) >= MAX_APPLICATION_EMOJIS - APPLICATION_EMOJI_RESERVE:
+                        raise ValueError(
+                            "The application emoji collection is too close to Discord's "
+                            "limit to import another sticky emoji safely."
+                        )
+                    try:
+                        raw = await download_portable_sticky_emoji(markup)
+                        image = await asyncio.to_thread(normalize_upload, raw)
+                        current = await self.bot.create_application_emoji(
+                            name=remote_name,
+                            image=image,
+                        )
+                    except ValueError as exc:
+                        raise ValueError(
+                            f"I could not import :{match['name']}: as a portable emoji: {exc}"
+                        ) from exc
+                    except (
+                        aiohttp.ClientError,
+                        asyncio.TimeoutError,
+                        discord.HTTPException,
+                        discord.Forbidden,
+                        discord.MissingApplicationID,
+                    ) as exc:
+                        raise ValueError(
+                            f"I could not import :{match['name']}: as a portable emoji."
+                        ) from exc
+                    inventory.append(current)
+                    by_id[int(current.id)] = current
+                    by_name[str(current.name)] = current
+                    portable_count += 1
+                    logger.info(
+                        "Imported external sticky emoji %s (%s) as application emoji %s (%s)",
+                        match["name"],
+                        source_id,
+                        current.name,
+                        current.id,
+                    )
+                replacements[source_id] = str(self._to_partial(current))
+
+        return CUSTOM_EMOJI_RE.sub(
+            lambda match: replacements.get(int(match["id"]), match.group(0)),
+            content,
+        )
 
     async def current_revision(self, key: str) -> str:
         return "|".join([await asyncio.to_thread(self.store.revision, alias, deployed_emoji_name(alias))

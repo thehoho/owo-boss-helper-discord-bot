@@ -1,3 +1,12 @@
+## v0.15.5-beta - Portable Emoji Stickies
+
+- Made `H sticky` preserve custom emojis from servers the bot cannot access by importing one deduplicated application-owned copy per source emoji ID.
+- Kept usable emojis from the current server unchanged and continued to preserve Unicode emojis and ordinary text exactly.
+- Added safe limits of 20 unique external emojis per note, 500 cached sticky emojis, and 50 reserved application-emoji slots for core bot assets.
+- Made sticky updates atomic from the user's perspective: if any required emoji cannot be downloaded or imported, the existing sticky remains unchanged and the helper explains the failure.
+- Documented the portable emoji behavior in `H help`.
+- Updated the public version to 0.15.5-beta; no database migration or additional Discord guild permission is required.
+
 ## v0.15.4-beta - Compact Boss Notifications and Google Play
 
 - Added the compact `<prefix>boss notify` form alongside the existing `<prefix> boss notify` form, including custom server prefixes and arguments.

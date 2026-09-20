@@ -31,7 +31,9 @@ def versioned_name(key: str, suffix: str) -> str:
         digest = hashlib.sha256(key.encode()).hexdigest()[:6]
         label = label[:32 - len(suffix) - len(digest) - 2] + "_" + digest
     return f"{label}_{suffix}"
-CUSTOM_EMOJI_RE = re.compile(r"<(?P<animated>a?):[A-Za-z0-9_]{2,32}:(?P<id>[0-9]{17,20})>")
+CUSTOM_EMOJI_RE = re.compile(
+    r"<(?P<animated>a?):(?P<name>[A-Za-z0-9_]{2,32}):(?P<id>[0-9]{17,20})>"
+)
 
 
 def custom_emoji_url(value: str) -> str:
