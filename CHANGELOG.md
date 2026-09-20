@@ -1,3 +1,12 @@
+## v0.15.6-beta - Existing Bot Emojis in Sticky Notes
+
+- Replaced v0.15.5's automatic external-emoji importer with the existing guide emoji-variable system, so `H sticky` never consumes new application-emoji slots.
+- Added sticky-note support for the bot's complete existing weapon, passive, effect, animal, rank, and stat variables, such as `{sword}`, `{crit}`, and `{taunt}`.
+- Kept Unicode, Markdown, ordinary text, and direct custom-emoji markup unchanged; Discord's normal access rules still apply to direct external emoji markup.
+- Preserved unknown brace variables as text and reported them in the save confirmation so helpers can correct typos without losing the sticky.
+- Added `/guide-emojis` instructions to `H help` as the searchable reference for every supported icon name and alias.
+- Updated the public version to 0.15.6-beta; no database migration, emoji upload, slash-command change, or additional Discord permission is required.
+
 ## v0.15.5-beta - Portable Emoji Stickies
 
 - Made `H sticky` preserve custom emojis from servers the bot cannot access by importing one deduplicated application-owned copy per source emoji ID.

@@ -1,4 +1,12 @@
+## v0.15.6-beta notes
+
+`H sticky` now uses the bot's existing emoji catalog instead of importing external server emojis. Put a supported name inside braces—such as `{sword}`, `{crit}`, `{taunt}`, `{dog}`, `{mythical}`, or `{hp_stat}`—then reply to the note with `H sticky`. The saved note renders the same portable application emojis already used by guides, without consuming another emoji slot.
+
+Use `/guide-emojis` to browse and search every available weapon, passive, effect, animal, rank, stat, exact key, and alias. Unknown variables remain readable text and are listed in the save confirmation. See [existing bot emojis in sticky notes](RELEASE_NOTES_v0.15.6-beta.md).
+
 ## v0.15.5-beta notes
+
+**Superseded by v0.15.6-beta:** automatic external-emoji imports were removed in favor of the bot's existing emoji variables.
 
 `H sticky` can now keep custom emojis from other servers visible. When the bot cannot use a source server's emoji directly, it downloads that Discord emoji and creates one deduplicated application-owned copy, which Discord lets the bot render anywhere. Usable emojis from the current server and all Unicode emojis remain unchanged.
 
