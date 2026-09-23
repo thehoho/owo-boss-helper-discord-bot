@@ -297,7 +297,7 @@ class GuideViewTests(unittest.IsolatedAsyncioTestCase):
             SimpleNamespace(bot=SimpleNamespace(ui_emoji_manager=None)),
             GuideDraft(editor_id=1),
         )
-        self.assertEqual(len(editor.children), 10)
+        self.assertEqual(len(editor.children), 12)
         self.assertLessEqual(max(item.row or 0 for item in editor.children), 3)
 
         help_embed = build_emoji_variable_help_embed(

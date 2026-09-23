@@ -29,9 +29,17 @@ from .game_catalog import (
     resolve_special_animal,
     resolve_weapon,
 )
+from .emoji_catalog import is_catalog_emoji
+from .emoji_dex import import_dex_record
 from .helper_prefix import get_guild_helper_prefix, parse_helper_command_argument
 from .team_templates import STANDARD_ANIMAL_NAMES, normalize_animal_emoji_alias
-from .ui_emojis import emoji_alias_keys, emoji_asset_keys, ui_emoji_text
+from .ui_emojis import (
+    DEX_ARTWORK,
+    MAX_APPLICATION_EMOJIS,
+    emoji_alias_keys,
+    emoji_asset_keys,
+    ui_emoji_text,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -47,6 +55,8 @@ MAX_GUIDE_CATEGORIES = 8
 FULL_GUIDE_PAGE_LENGTH = 3800
 GUIDE_BROWSER_CATEGORY_LIMIT = 24
 GUIDE_BROWSER_GUIDE_LIMIT = 25
+GUIDE_SPECIAL_EMOJI_LIMIT = 250
+GUIDE_APPLICATION_EMOJI_RESERVE = 500
 GUIDE_VARIABLE_RE = re.compile(r"\{([A-Za-z0-9_ -]{1,64})\}")
 GUIDE_STAT_ALIASES = {
     "hp": "hp",
@@ -89,7 +99,11 @@ GUIDE_PASSIVE_VARIABLE_ALIASES = {
 
 
 class GuideAliasConflict(ValueError):
-    pass
+    def __init__(self, alias: str, guide_id: int = 0, guide_name: str = "") -> None:
+        super().__init__(alias)
+        self.alias = alias
+        self.guide_id = guide_id
+        self.guide_name = guide_name
 
 
 @dataclass(frozen=True)
@@ -163,6 +177,85 @@ def clamp_rating(value: str, default: int = 3) -> int:
         return default
 
 
+def serialize_guide_draft(draft: GuideDraft) -> str:
+    payload = {
+        "guide_id": draft.guide_id,
+        "name": draft.name,
+        "aliases": draft.aliases,
+        "categories": draft.categories,
+        "authors": draft.authors,
+        "description": draft.description,
+        "full_guide": draft.full_guide,
+        "viability": draft.viability,
+        "ease": draft.ease,
+        "slots": [
+            {
+                "position": slot.position,
+                "animal": slot.animal,
+                "level": slot.level,
+                "animal_rank": slot.animal_rank,
+                "weapons": slot.weapons,
+                "notes": slot.notes,
+            }
+            for slot in sorted(draft.slots.values(), key=lambda item: item.position)
+        ],
+    }
+    return json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
+
+
+def deserialize_guide_draft(editor_id: int, payload_json: str) -> GuideDraft:
+    payload = json.loads(payload_json)
+    if not isinstance(payload, dict):
+        raise ValueError("Invalid guide draft.")
+    slots: dict[int, GuideSlot] = {}
+    for raw in payload.get("slots", []):
+        if not isinstance(raw, dict):
+            continue
+        try:
+            position = int(raw.get("position", 0))
+        except (TypeError, ValueError):
+            continue
+        if position not in {1, 2, 3}:
+            continue
+        level_raw = raw.get("level")
+        try:
+            level = int(level_raw) if level_raw is not None else None
+        except (TypeError, ValueError):
+            level = None
+        slots[position] = GuideSlot(
+            position=position,
+            animal=str(raw.get("animal", ""))[:100],
+            level=max(1, min(999, level)) if level is not None else None,
+            animal_rank=str(raw.get("animal_rank", ""))[:30],
+            weapons=str(raw.get("weapons", ""))[:500],
+            notes=str(raw.get("notes", ""))[:500],
+        )
+    guide_id_raw = payload.get("guide_id")
+    try:
+        guide_id = int(guide_id_raw) if guide_id_raw is not None else None
+    except (TypeError, ValueError):
+        guide_id = None
+    return GuideDraft(
+        editor_id=int(editor_id),
+        guide_id=guide_id,
+        name=str(payload.get("name", ""))[:MAX_GUIDE_NAME],
+        aliases=split_values(
+            ", ".join(str(item) for item in payload.get("aliases", [])),
+            MAX_GUIDE_ALIASES,
+        ),
+        categories=split_values(
+            ", ".join(str(item) for item in payload.get("categories", [])),
+            MAX_GUIDE_CATEGORIES,
+        ),
+        authors=str(payload.get("authors", ""))[:300],
+        description=str(payload.get("description", ""))[:MAX_GUIDE_DESCRIPTION],
+        full_guide=str(payload.get("full_guide", ""))[:MAX_FULL_GUIDE],
+        viability=clamp_rating(str(payload.get("viability", 3))),
+        ease=clamp_rating(str(payload.get("ease", 3))),
+        slots=slots,
+    )
+
+
 class TeamGuideStore:
     def __init__(self, path: Path = DATABASE_FILE) -> None:
         self.path = path
@@ -215,6 +308,11 @@ class TeamGuideStore:
                     weapons TEXT NOT NULL DEFAULT '',
                     notes TEXT NOT NULL DEFAULT '',
                     PRIMARY KEY (guide_id, position)
+                );
+                CREATE TABLE IF NOT EXISTS team_guide_drafts (
+                    editor_id INTEGER PRIMARY KEY,
+                    payload_json TEXT NOT NULL,
+                    updated_at INTEGER NOT NULL
                 );
                 CREATE INDEX IF NOT EXISTS idx_team_guides_name ON team_guides(name COLLATE NOCASE);
                 """
@@ -286,6 +384,50 @@ class TeamGuideStore:
             updated_at=int(row["updated_at"]),
         )
 
+    def save_draft(self, draft: GuideDraft) -> int:
+        updated_at = int(time.time())
+        payload = serialize_guide_draft(draft)
+        with self._connect() as connection:
+            connection.execute(
+                """
+                INSERT INTO team_guide_drafts(editor_id, payload_json, updated_at)
+                VALUES (?, ?, ?)
+                ON CONFLICT(editor_id) DO UPDATE SET
+                    payload_json=excluded.payload_json,
+                    updated_at=excluded.updated_at
+                """,
+                (int(draft.editor_id), payload, updated_at),
+            )
+        return updated_at
+
+    def load_draft(self, editor_id: int) -> tuple[GuideDraft, int] | None:
+        with self._connect() as connection:
+            row = connection.execute(
+                """
+                SELECT payload_json, updated_at
+                FROM team_guide_drafts
+                WHERE editor_id = ?
+                """,
+                (int(editor_id),),
+            ).fetchone()
+        if row is None:
+            return None
+        try:
+            draft = deserialize_guide_draft(editor_id, str(row["payload_json"]))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            logger.exception("Discarded invalid saved team-guide draft for editor %s", editor_id)
+            self.delete_draft(editor_id)
+            return None
+        return draft, int(row["updated_at"])
+
+    def delete_draft(self, editor_id: int) -> bool:
+        with self._connect() as connection:
+            cursor = connection.execute(
+                "DELETE FROM team_guide_drafts WHERE editor_id = ?",
+                (int(editor_id),),
+            )
+        return cursor.rowcount > 0
+
     def save(self, draft: GuideDraft, editor_id: int) -> TeamGuide:
         aliases = list(dict.fromkeys(
             normalize_guide_alias(item)
@@ -299,11 +441,20 @@ class TeamGuideStore:
         with self._connect() as connection:
             for alias in aliases:
                 row = connection.execute(
-                    "SELECT guide_id FROM team_guide_aliases WHERE alias = ?",
+                    """
+                    SELECT team_guide_aliases.guide_id, team_guides.name
+                    FROM team_guide_aliases
+                    JOIN team_guides USING(guide_id)
+                    WHERE team_guide_aliases.alias = ?
+                    """,
                     (alias,),
                 ).fetchone()
                 if row and int(row["guide_id"]) != int(draft.guide_id or 0):
-                    raise GuideAliasConflict(alias)
+                    raise GuideAliasConflict(
+                        alias,
+                        int(row["guide_id"]),
+                        str(row["name"]),
+                    )
 
             if draft.guide_id:
                 current = connection.execute(
@@ -526,7 +677,28 @@ def star_rating(value: int) -> str:
     return "⭐" * max(1, min(5, value)) + "☆" * (5 - max(1, min(5, value)))
 
 
+def dex_artwork_animal_emoji_key(value: str) -> str | None:
+    normalized = normalize_catalog_token(value)
+    compact = normalized.replace(" ", "")
+    for key, (_image, display_name, aliases_json, _source_url) in DEX_ARTWORK.items():
+        if not key.startswith("pet_"):
+            continue
+        try:
+            aliases = json.loads(str(aliases_json or "[]"))
+        except (TypeError, ValueError, json.JSONDecodeError):
+            aliases = []
+        candidates = (key.removeprefix("pet_"), display_name, *aliases)
+        for candidate in candidates:
+            token = normalize_catalog_token(str(candidate))
+            if token == normalized or token.replace(" ", "") == compact:
+                return key
+    return None
+
+
 def animal_emoji_key(animal: str) -> str:
+    saved_key = dex_artwork_animal_emoji_key(animal)
+    if saved_key:
+        return saved_key
     dex_key = "pet_" + normalize_catalog_token(animal).replace(" ", "_")
     if dex_key in emoji_asset_keys():
         return dex_key
@@ -554,12 +726,16 @@ def resolve_compact_catalog_entry(
 
 
 def guide_animal_variable_emoji_key(value: str) -> str | None:
+    saved_key = dex_artwork_animal_emoji_key(value)
+    if saved_key:
+        return saved_key
     dex_key = "pet_" + normalize_catalog_token(value).replace(" ", "_")
     if dex_key in emoji_asset_keys():
         return dex_key
     special = resolve_special_animal(value)
     if special:
-        return f"pet_{special.get('emoji_stem', '')}"
+        special_key = f"pet_{special.get('emoji_stem', '')}"
+        return special_key if special_key in emoji_asset_keys() else None
     animal = normalize_animal_emoji_alias(value)
     if animal in STANDARD_ANIMAL_NAMES:
         return animal_emoji_key(animal)
@@ -583,7 +759,9 @@ def guide_variable_emoji_key(value: str) -> str | None:
     # available as lwolf and snail_passive.
     special = resolve_special_animal(compact)
     if special:
-        return f"pet_{special.get('emoji_stem', '')}"
+        special_key = f"pet_{special.get('emoji_stem', '')}"
+        if special_key in emoji_asset_keys():
+            return special_key
     if compact in STANDARD_ANIMAL_NAMES:
         return animal_emoji_key(compact)
 
@@ -758,6 +936,8 @@ def build_emoji_variable_help_embed(bot: commands.Bot) -> discord.Embed:
         f"**Passives**\n{example('{strength}')}  {example('{lifesteal}')}  {example('{mana_mtap}')}\n"
         f"**Battle effects**\n{example('{taunt}')}  {example('{poison}')}  {example('{freeze}')}\n"
         f"**Animals**\n{example('{fish}')}  {example('{gfish}')}  {example('{beeday}')}\n"
+        "Special animals accept exact names and aliases from **/animal-dex**. Preview prepares "
+        "official OwO Dex artwork only for animals the draft actually uses.\n"
         f"**Base stats**\n{example('{hp_stat}')}  {example('{att_stat}')}  {example('{wp_stat}')}  {example('{mag_stat}')}\n"
         f"**Ranks**\n{example('{legendary}')}  {example('{fabled}')}\n\n"
         "-# Prefixes remain optional for disambiguation: w = weapon, fp = passive, "
@@ -765,6 +945,92 @@ def build_emoji_variable_help_embed(bot: commands.Bot) -> discord.Embed:
         "animal, while {lwolf} is Lone Wolf; {snail_passive} selects the passive."
     )
     return discord.Embed(title="💡 Team-guide emoji variables", description=description, color=0xFEE75C)
+
+
+def build_guide_system_help_embed(
+    bot: commands.Bot,
+    helper_prefix: str,
+) -> discord.Embed:
+    tick = chr(96)
+    guide_command = f"{helper_prefix} guide"
+    help_command = f"{helper_prefix} guide help"
+    embed = discord.Embed(
+        title="📚 How to create and use team guides",
+        description=(
+            f"Browse published guides with {tick}{guide_command}{tick} or "
+            f"{tick}/team-guide{tick}. Trusted battle experts create with "
+            f"{tick}/team-guide-create{tick} and edit an existing guide with "
+            f"{tick}/team-guide-edit{tick}.\n\n"
+            "The editor is private. Every submitted section is auto-saved, and "
+            f"**Save draft** or **Close** keeps it. Reopen "
+            f"{tick}/team-guide-create{tick} to resume after a refresh, timeout, "
+            "restart, or accidental close. **Discard draft** is the only editor "
+            "action that erases it."
+        ),
+        color=0x5865F2,
+    )
+    embed.add_field(
+        name="1️⃣ Basics and duplicate names",
+        value=(
+            "Set the display name, comma-separated search aliases, categories, "
+            "displayed authors, and summary. Aliases—including the normalized guide "
+            "name—must be unique. If one belongs to an existing guide, your draft "
+            "stays saved; edit the existing guide or choose a different alias."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="2️⃣ Composition slots",
+        value=(
+            f"Enter any exact animal name **or an alias shown by** "
+            f"{tick}/animal-dex{tick}. Weapon syntax is "
+            f"{tick}weapon + passive + passive @ rank{tick}; separate multiple "
+            "weapon options with semicolons. Example: "
+            f"{tick}pd + mtap + crit @ legendary; crune + res @ fabled{tick}."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="3️⃣ Markdown and emoji variables",
+        value=(
+            "The summary, full guide, and slot notes support Discord Markdown: "
+            f"{tick}**bold**{tick}, {tick}*italic*{tick}, lists, headings, links, "
+            "and code. Put a bot emoji name or alias in braces, such as "
+            f"{tick}{{sword}}{tick}, {tick}{{crit}}{tick}, "
+            f"{tick}{{taunt}}{tick}, {tick}{{gfish}}{tick}, or "
+            f"{tick}{{hp_stat}}{tick}. Use {tick}/guide-emojis{tick} for the "
+            "searchable catalog and exact variables. Unknown variables remain "
+            "visible as text."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="4️⃣ Special animals without bulk uploads",
+        value=(
+            f"Use the special animal's exact name or any alias from "
+            f"{tick}/animal-dex{tick} in a slot or braces. On **Preview** or "
+            "**Publish**, the bot imports that animal's official OwO Dex artwork "
+            "only if this guide actually uses it. If artwork is missing, run OwO "
+            "Dex for that animal and try again. The bot never bulk-uploads all "
+            f"specials: guide-only imports are capped at "
+            f"{GUIDE_SPECIAL_EMOJI_LIMIT}, and "
+            f"{GUIDE_APPLICATION_EMOJI_RESERVE} application-emoji slots stay "
+            "reserved."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="5️⃣ Preview and publish",
+        value=(
+            "Preview checks variables and prepares required special-animal artwork. "
+            "Publish requires basics plus all three slots, then clears the saved "
+            f"draft only after success. Reopen this tutorial with "
+            f"{tick}{help_command}{tick} or "
+            f"{tick}{helper_prefix} help guide{tick}."
+        ),
+        inline=False,
+    )
+    return embed
 
 
 def render_weapon_specs(bot: commands.Bot, value: str) -> str:
@@ -855,7 +1121,7 @@ def build_editor_embed(draft: GuideDraft) -> discord.Embed:
     )
     description = (
         "Use the buttons below to build a visual, versioned team guide. "
-        "Nothing is published until you press **Publish**.\n"
+        "Every submitted section is auto-saved; nothing is published until you press **Publish**.\n"
         "-# **Basics**, **Full guide**, and slot notes accept Discord Markdown. "
         "Optional direct emoji variables such as {sword}, {lifesteal}, and "
         "{fish} resolve through **Preview**. Open **Emoji variables** for examples.\n\n"
@@ -903,7 +1169,12 @@ class GuideBasicsModal(discord.ui.Modal, title="Team guide basics"):
         self.view.draft.categories = split_values(str(self.categories), MAX_GUIDE_CATEGORIES)
         self.view.draft.authors = str(self.authors).strip()
         self.view.draft.description = str(self.description).strip()
-        await interaction.response.edit_message(embed=build_editor_embed(self.view.draft), view=self.view)
+        await self.view.save_draft()
+        await interaction.response.edit_message(
+            content="💾 Draft auto-saved.",
+            embed=build_editor_embed(self.view.draft),
+            view=self.view,
+        )
 
 
 class GuideFullTextModal(discord.ui.Modal, title="Optional full team guide"):
@@ -922,7 +1193,9 @@ class GuideFullTextModal(discord.ui.Modal, title="Optional full team guide"):
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         self.view.draft.full_guide = str(self.full_guide).strip()
+        await self.view.save_draft()
         await interaction.response.edit_message(
+            content="💾 Draft auto-saved.",
             embed=build_editor_embed(self.view.draft),
             view=self.view,
         )
@@ -941,7 +1214,12 @@ class GuideRatingsModal(discord.ui.Modal, title="Team guide ratings"):
     async def on_submit(self, interaction: discord.Interaction) -> None:
         self.view.draft.viability = clamp_rating(str(self.viability), self.view.draft.viability)
         self.view.draft.ease = clamp_rating(str(self.ease), self.view.draft.ease)
-        await interaction.response.edit_message(embed=build_editor_embed(self.view.draft), view=self.view)
+        await self.view.save_draft()
+        await interaction.response.edit_message(
+            content="💾 Draft auto-saved.",
+            embed=build_editor_embed(self.view.draft),
+            view=self.view,
+        )
 
 
 class GuideSlotModal(discord.ui.Modal):
@@ -986,7 +1264,12 @@ class GuideSlotModal(discord.ui.Modal):
             weapons=str(self.weapons).strip(),
             notes=str(self.notes).strip(),
         )
-        await interaction.response.edit_message(embed=build_editor_embed(self.view.draft), view=self.view)
+        await self.view.save_draft()
+        await interaction.response.edit_message(
+            content="💾 Draft auto-saved.",
+            embed=build_editor_embed(self.view.draft),
+            view=self.view,
+        )
 
 
 class GuideEditorView(discord.ui.View):
@@ -994,6 +1277,9 @@ class GuideEditorView(discord.ui.View):
         super().__init__(timeout=EDITOR_TIMEOUT_SECONDS)
         self.cog = cog
         self.draft = draft
+
+    async def save_draft(self) -> int:
+        return await asyncio.to_thread(self.cog.store.save_draft, self.draft)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id != self.draft.editor_id:
@@ -1027,6 +1313,11 @@ class GuideEditorView(discord.ui.View):
 
     @discord.ui.button(label="Preview", emoji="👁️", style=discord.ButtonStyle.secondary, row=2)
     async def preview(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.save_draft()
+        await interaction.response.defer(ephemeral=True)
+        prepared, preparation_failures = (
+            await self.cog.ensure_draft_special_animal_emojis(self.draft)
+        )
         preview = TeamGuide(
             guide_id=self.draft.guide_id or 0,
             name=self.draft.name or "Untitled guide",
@@ -1056,45 +1347,89 @@ class GuideEditorView(discord.ui.View):
                 for variable in unresolved_guide_variables(source)
             )
         )
-        notice = None
+        notices: list[str] = ["💾 Draft saved."]
+        if prepared:
+            notices.append(
+                "✅ Prepared special-animal emoji: " + ", ".join(prepared)
+            )
+        if preparation_failures:
+            notices.append(
+                "⚠️ Special-animal artwork was not ready:\n"
+                + "\n".join(f"• {item}" for item in preparation_failures[:5])
+            )
         if unresolved:
-            notice = (
+            notices.append(
                 "⚠️ Unknown emoji variables stay as text until corrected: "
                 + ", ".join(f"{{{value}}}" for value in unresolved[:8])
             )
-        await interaction.response.send_message(
-            content=notice,
+        await interaction.followup.send(
+            content="\n".join(notices),
             embed=build_guide_embed(self.cog.bot, preview),
             view=PublicGuideView(self.cog, preview),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
-
     @discord.ui.button(label="Publish", emoji="✅", style=discord.ButtonStyle.success, row=2)
     async def publish(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.save_draft()
         if not all((self.draft.name, self.draft.aliases, self.draft.categories, self.draft.description)):
-            await interaction.response.send_message("Complete the basics, aliases, category, and description first.", ephemeral=True)
+            await interaction.response.send_message(
+                "Complete the basics, aliases, category, and description first. Your draft is saved.",
+                ephemeral=True,
+            )
             return
         if len([slot for slot in self.draft.slots.values() if slot.animal]) != 3:
-            await interaction.response.send_message("Complete all three composition slots first.", ephemeral=True)
+            await interaction.response.send_message(
+                "Complete all three composition slots first. Your draft is saved.",
+                ephemeral=True,
+            )
+            return
+
+        await interaction.response.defer(ephemeral=True)
+        _prepared, preparation_failures = (
+            await self.cog.ensure_draft_special_animal_emojis(self.draft)
+        )
+        if preparation_failures:
+            await interaction.followup.send(
+                "I kept the draft, but it cannot be published until these special "
+                "animals have official artwork. Run OwO Dex for each animal, then "
+                "press **Preview** or **Publish** again:\n"
+                + "\n".join(f"• {item}" for item in preparation_failures[:5]),
+                ephemeral=True,
+            )
             return
         try:
-            guide = await asyncio.to_thread(self.cog.store.save, self.draft, interaction.user.id)
+            guide = await asyncio.to_thread(
+                self.cog.store.save,
+                self.draft,
+                interaction.user.id,
+            )
         except GuideAliasConflict as exc:
-            await interaction.response.send_message(f"The alias `{exc}` already belongs to another guide.", ephemeral=True)
+            existing = (
+                f" **{exc.guide_name}**" if exc.guide_name else " another guide"
+            )
+            await interaction.followup.send(
+                f"The alias '{exc.alias}' already belongs to{existing}. "
+                "Open **Basics** and choose a unique alias, or use "
+                "/team-guide-edit to revise the existing guide. Your draft is saved.",
+                ephemeral=True,
+            )
             return
         except (ValueError, sqlite3.Error) as exc:
-            await interaction.response.send_message(f"The guide could not be published: {exc}", ephemeral=True)
+            await interaction.followup.send(
+                f"The guide could not be published: {exc}. Your draft is saved.",
+                ephemeral=True,
+            )
             return
+        await asyncio.to_thread(self.cog.store.delete_draft, interaction.user.id)
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(
-            content="✅ Guide published.",
+        await interaction.edit_original_response(
+            content="✅ Guide published. The saved draft was cleared.",
             embed=build_guide_embed(self.cog.bot, guide),
             view=PublicGuideView(self.cog, guide),
         )
         self.stop()
-
     @discord.ui.button(label="Emoji variables", emoji="💡", style=discord.ButtonStyle.secondary, row=3)
     async def emoji_variables(
         self,
@@ -1110,11 +1445,43 @@ class GuideEditorView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="Cancel", emoji="✖️", style=discord.ButtonStyle.danger, row=2)
+    @discord.ui.button(label="Save draft", emoji="💾", style=discord.ButtonStyle.secondary, row=3)
+    async def save_draft_button(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        await self.save_draft()
+        await interaction.response.edit_message(
+            content="💾 Draft saved. Reopen /team-guide-create to resume it.",
+            embed=build_editor_embed(self.draft),
+            view=self,
+        )
+
+    @discord.ui.button(label="Close", emoji="✖️", style=discord.ButtonStyle.secondary, row=2)
     async def cancel(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
+        await self.save_draft()
         for item in self.children:
             item.disabled = True
-        await interaction.response.edit_message(content="Guide editor closed without publishing.", view=self)
+        await interaction.response.edit_message(
+            content="💾 Editor closed; your draft is saved. Reopen /team-guide-create to resume.",
+            view=self,
+        )
+        self.stop()
+
+    @discord.ui.button(label="Discard draft", emoji="🗑️", style=discord.ButtonStyle.danger, row=3)
+    async def discard_draft(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        await asyncio.to_thread(self.cog.store.delete_draft, interaction.user.id)
+        for item in self.children:
+            item.disabled = True
+        await interaction.response.edit_message(
+            content="🗑️ Guide draft permanently discarded.",
+            view=self,
+        )
         self.stop()
 
 
@@ -1378,6 +1745,7 @@ class TeamGuides(commands.Cog):
             self.owner_id = int(os.getenv("BOT_OWNER_ID", "0") or 0)
         except ValueError:
             self.owner_id = 0
+        self._special_emoji_lock = asyncio.Lock()
 
     async def cog_load(self) -> None:
         await asyncio.to_thread(self.store.initialize)
@@ -1392,6 +1760,137 @@ class TeamGuides(commands.Cog):
         if await self.is_bot_owner(user):
             return True
         return await asyncio.to_thread(self.store.is_expert, user.id)
+
+    @staticmethod
+    def record_matches_animal_alias(record: object, query: str) -> bool:
+        target = normalize_catalog_token(query)
+        compact = target.replace(" ", "")
+        candidates = (
+            getattr(record, "animal_key", ""),
+            getattr(record, "display_name", ""),
+            *getattr(record, "aliases", ()),
+        )
+        return any(
+            (token := normalize_catalog_token(str(candidate))) == target
+            or token.replace(" ", "") == compact
+            for candidate in candidates
+            if str(candidate).strip()
+        )
+
+    @staticmethod
+    def draft_animal_queries(draft: GuideDraft) -> tuple[str, ...]:
+        sources = (
+            draft.description,
+            draft.full_guide,
+            *(slot.notes for slot in draft.slots.values()),
+        )
+        variables = (
+            match.group(1)
+            for source in sources
+            for match in GUIDE_VARIABLE_RE.finditer(source or "")
+        )
+        return tuple(
+            dict.fromkeys(
+                value.strip()
+                for value in (
+                    *(slot.animal for slot in draft.slots.values()),
+                    *variables,
+                )
+                if value.strip()
+            )
+        )
+
+    async def ensure_draft_special_animal_emojis(
+        self,
+        draft: GuideDraft,
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        lock = getattr(self, "_special_emoji_lock", None)
+        if lock is None:
+            lock = asyncio.Lock()
+            self._special_emoji_lock = lock
+        async with lock:
+            return await self._ensure_draft_special_animal_emojis_locked(draft)
+
+    async def _ensure_draft_special_animal_emojis_locked(
+        self,
+        draft: GuideDraft,
+    ) -> tuple[tuple[str, ...], tuple[str, ...]]:
+        dex_store = getattr(self.bot, "animal_dex_store", None)
+        manager = getattr(self.bot, "ui_emoji_manager", None)
+        if dex_store is None or manager is None:
+            return (), ("The Animal Dex or emoji service is not ready yet.",)
+
+        try:
+            await manager.ensure_synced()
+            inventory = await self.bot.fetch_application_emojis()
+        except (discord.HTTPException, discord.Forbidden, OSError, asyncio.TimeoutError) as exc:
+            logger.warning("Could not prepare guide animal emojis: %s", exc)
+            return (), ("The application emoji service is temporarily unavailable.",)
+        dynamic_keys = {
+            key
+            for key in DEX_ARTWORK
+            if key.startswith("pet_") and not is_catalog_emoji(key)
+        }
+        prepared: list[str] = []
+        failures: list[str] = []
+        handled_keys: set[str] = set()
+        for query in self.draft_animal_queries(draft):
+            record = await asyncio.to_thread(dex_store.find, query)
+            if (
+                record is None
+                or str(getattr(record, "rank", "")).casefold() != "special"
+                or not self.record_matches_animal_alias(record, query)
+            ):
+                continue
+            key = "pet_" + str(record.animal_key)
+            if key in handled_keys:
+                continue
+            handled_keys.add(key)
+            if key in manager.emojis:
+                continue
+            is_new_dynamic = key not in DEX_ARTWORK and not is_catalog_emoji(key)
+            if is_new_dynamic and len(dynamic_keys) >= GUIDE_SPECIAL_EMOJI_LIMIT:
+                failures.append(
+                    f"{query}: the guide-only special-animal limit "
+                    f"({GUIDE_SPECIAL_EMOJI_LIMIT}) has been reached"
+                )
+                continue
+            if len(inventory) >= MAX_APPLICATION_EMOJIS - GUIDE_APPLICATION_EMOJI_RESERVE:
+                failures.append(
+                    f"{query}: the bot is preserving "
+                    f"{GUIDE_APPLICATION_EMOJI_RESERVE} application-emoji slots"
+                )
+                continue
+            try:
+                await import_dex_record(
+                    self.bot,
+                    manager,
+                    record,
+                    inventory=inventory,
+                )
+            except (
+                ValueError,
+                discord.HTTPException,
+                discord.Forbidden,
+                OSError,
+                asyncio.TimeoutError,
+            ) as exc:
+                failures.append(f"{query}: {exc}")
+                continue
+            if is_new_dynamic:
+                dynamic_keys.add(key)
+            prepared.append(str(record.display_name or query))
+        return tuple(prepared), tuple(failures)
+
+    async def send_help(
+        self,
+        destination: discord.abc.Messageable,
+        helper_prefix: str,
+    ) -> None:
+        await destination.send(
+            embed=build_guide_system_help_embed(self.bot, helper_prefix),
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
 
     async def send_browser(self, destination: discord.abc.Messageable) -> None:
         view = await GuideBrowserView.create(self)
@@ -1459,6 +1958,19 @@ class TeamGuides(commands.Cog):
         state = "granted" if enabled else "revoked"
         await interaction.response.send_message(f"✅ Trusted guide access {state} for {member.mention}.", ephemeral=True)
 
+    @app_commands.command(
+        name="team-guide-help",
+        description="Learn how to create guides, use Markdown/emojis, and resume drafts.",
+    )
+    async def team_guide_help(self, interaction: discord.Interaction) -> None:
+        helper_prefix = await get_guild_helper_prefix(
+            interaction.guild.id if interaction.guild else None
+        )
+        await interaction.response.send_message(
+            embed=build_guide_system_help_embed(self.bot, helper_prefix),
+            ephemeral=True,
+        )
+
     @app_commands.command(name="team-guide", description="Search or browse battle-team guides.")
     @app_commands.describe(query="Name, alias, category, or author; leave empty to browse")
     async def team_guide(self, interaction: discord.Interaction, query: str | None = None) -> None:
@@ -1494,34 +2006,90 @@ class TeamGuides(commands.Cog):
             for guide in guides
         ]
 
-    @app_commands.command(name="team-guide-create", description="Trusted experts: create a visual battle-team guide.")
+    @app_commands.command(name="team-guide-create", description="Trusted experts: create or resume a guide draft.")
     async def team_guide_create(self, interaction: discord.Interaction) -> None:
         if not await self.is_expert(interaction.user):
-            await interaction.response.send_message("Only trusted guide experts can create public guides.", ephemeral=True)
+            await interaction.response.send_message(
+                "Only trusted guide experts can create public guides.",
+                ephemeral=True,
+            )
             return
-        draft = GuideDraft(editor_id=interaction.user.id, authors=interaction.user.display_name)
+        saved = await asyncio.to_thread(self.store.load_draft, interaction.user.id)
+        if saved is None:
+            draft = GuideDraft(
+                editor_id=interaction.user.id,
+                authors=interaction.user.display_name,
+            )
+            updated_at = await asyncio.to_thread(self.store.save_draft, draft)
+            notice = "💾 New draft created and saved."
+        else:
+            draft, updated_at = saved
+            notice = f"💾 Resumed your saved draft from <t:{updated_at}:R>."
         view = GuideEditorView(self, draft)
-        await interaction.response.send_message(embed=build_editor_embed(draft), view=view, ephemeral=True)
-
+        await interaction.response.send_message(
+            content=notice,
+            embed=build_editor_embed(draft),
+            view=view,
+            ephemeral=True,
+        )
     @app_commands.command(name="team-guide-edit", description="Trusted experts: revise and version an existing guide.")
     @app_commands.describe(query="Existing guide name or alias")
     async def team_guide_edit(self, interaction: discord.Interaction, query: str) -> None:
         if not await self.is_expert(interaction.user):
-            await interaction.response.send_message("Only trusted guide experts can revise guides.", ephemeral=True)
+            await interaction.response.send_message(
+                "Only trusted guide experts can revise guides.",
+                ephemeral=True,
+            )
             return
         guide = await asyncio.to_thread(self.store.find, query)
         if guide is None:
-            await interaction.response.send_message(f"No team guide matched `{query}`.", ephemeral=True)
+            await interaction.response.send_message(
+                f"No team guide matched '{query}'.",
+                ephemeral=True,
+            )
             return
-        draft = draft_from_guide(guide, interaction.user.id)
+        saved = await asyncio.to_thread(self.store.load_draft, interaction.user.id)
+        if saved is not None:
+            saved_draft, updated_at = saved
+            if saved_draft.guide_id != guide.guide_id:
+                await interaction.response.send_message(
+                    "You already have a different saved guide draft from "
+                    f"<t:{updated_at}:R>. Open /team-guide-create to resume it and "
+                    "use **Discard draft** before starting another edit.",
+                    ephemeral=True,
+                )
+                return
+            draft = saved_draft
+            notice = f"💾 Resumed your saved edit from <t:{updated_at}:R>."
+        else:
+            draft = draft_from_guide(guide, interaction.user.id)
+            await asyncio.to_thread(self.store.save_draft, draft)
+            notice = f"💾 Editing **{guide.name}**; the draft is saved."
         view = GuideEditorView(self, draft)
-        await interaction.response.send_message(embed=build_editor_embed(draft), view=view, ephemeral=True)
-
+        await interaction.response.send_message(
+            content=notice,
+            embed=build_editor_embed(draft),
+            view=view,
+            ephemeral=True,
+        )
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:
         if message.author.bot or message.guild is None:
             return
         helper_prefix = await get_guild_helper_prefix(message.guild.id)
+        help_argument = parse_helper_command_argument(
+            message.content or "",
+            helper_prefix,
+            {
+                "h guide help",
+                "hguide help",
+                "h help guide",
+                "hhelp guide",
+            },
+        )
+        if help_argument is not None and not help_argument.strip():
+            await self.send_help(message.channel, helper_prefix)
+            return
         argument = parse_helper_command_argument(
             message.content or "",
             helper_prefix,
@@ -1530,6 +2098,9 @@ class TeamGuides(commands.Cog):
         if argument is None:
             return
         lowered = argument.casefold().strip()
+        if lowered in {"help", "tutorial", "how", "how to"}:
+            await self.send_help(message.channel, helper_prefix)
+            return
         if lowered in {"create", "new", "edit", "update"}:
             command = "/team-guide-create" if lowered in {"create", "new"} else "/team-guide-edit"
             await message.reply(

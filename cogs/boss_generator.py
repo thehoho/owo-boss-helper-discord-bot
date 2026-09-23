@@ -2636,6 +2636,7 @@ class BossGenerator(commands.Cog):
         grind_command = helper_command(helper_prefix, "grind")
         sticky_command = helper_command(helper_prefix, "sticky")
         sticky_clear = helper_command(helper_prefix, "sticky clear")
+        guide_help = helper_command(helper_prefix, "guide help")
 
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
@@ -2723,8 +2724,11 @@ class BossGenerator(commands.Cog):
                 f"Browse with `{helper_command(helper_prefix, 'guide')}` or `/team-guide`; "
                 f"search by name, alias, category, or author with "
                 f"`{helper_command(helper_prefix, 'guide <query>')}`. "
-                "Trusted experts use `/team-guide-create` and `/team-guide-edit`. "
-                "Only the bot owner can grant expert access with `/guide-expert`."
+                f"Open `{guide_help}`, `{helper_command(helper_prefix, 'help guide')}`, "
+                "or `/team-guide-help` for the complete author tutorial, Markdown and "
+                "emoji-variable examples, special-animal aliases, and saved drafts. "
+                "Trusted experts use `/team-guide-create` and `/team-guide-edit`; "
+                "only the bot owner grants access with `/guide-expert`."
             ),
             inline=False,
         )

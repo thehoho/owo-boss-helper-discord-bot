@@ -33,6 +33,54 @@ def dex_source_url(record) -> str | None:
     return f"https://cdn.discordapp.com/emojis/{emoji_id}.{extension}?size=128&quality=lossless"
 
 
+async def download_dex_artwork(record, session: aiohttp.ClientSession) -> tuple[str, bytes]:
+    url = dex_source_url(record)
+    if not url:
+        raise ValueError("Run OwO Dex for this animal first so its official artwork is available.")
+    async with session.get(url, allow_redirects=False) as response:
+        if response.status != 200:
+            raise ValueError(f"Discord CDN returned status {response.status}.")
+        raw = bytearray()
+        async for chunk in response.content.iter_chunked(65536):
+            raw.extend(chunk)
+            if len(raw) > MAX_UPLOAD_BYTES:
+                raise ValueError("The official artwork exceeds 2 MiB.")
+    return url, bytes(raw)
+
+
+async def import_dex_record(
+    bot,
+    manager,
+    record,
+    *,
+    inventory: list | None = None,
+    session: aiohttp.ClientSession | None = None,
+) -> str:
+    key = "pet_" + record.animal_key
+    if not re.fullmatch(r"pet_[a-z0-9_]{1,59}", key):
+        raise ValueError("This animal name cannot be represented safely as a guide emoji.")
+
+    async def install(active_session: aiohttp.ClientSession) -> None:
+        url, raw = await download_dex_artwork(record, active_session)
+        await manager.install_dex_asset(
+            key,
+            raw,
+            record.display_name,
+            json.dumps(record.aliases, ensure_ascii=False),
+            url,
+            inventory,
+        )
+
+    if session is None:
+        async with aiohttp.ClientSession(
+            timeout=aiohttp.ClientTimeout(total=20)
+        ) as owned_session:
+            await install(owned_session)
+    else:
+        await install(session)
+    return key
+
+
 async def sync_dex_artwork(bot, manager) -> dict:
     await manager.ensure_synced()
     dex = getattr(bot, "animal_dex_store", None)
@@ -65,15 +113,13 @@ async def sync_dex_artwork(bot, manager) -> dict:
                 report["reused"] += 1
                 continue
             try:
-                async with session.get(url, allow_redirects=False) as response:
-                    if response.status != 200:
-                        raise ValueError(f"CDN status {response.status}")
-                    raw = bytearray()
-                    async for chunk in response.content.iter_chunked(65536):
-                        raw.extend(chunk)
-                        if len(raw) > MAX_UPLOAD_BYTES:
-                            raise ValueError("Source exceeds 2 MiB")
-                await manager.install_dex_asset(key, bytes(raw), record.display_name, json.dumps(record.aliases), url, inventory)
+                await import_dex_record(
+                    bot,
+                    manager,
+                    record,
+                    inventory=inventory,
+                    session=session,
+                )
                 report["imported"] += 1
                 from .emoji_tools import reference_entries
                 reference_entries.cache_clear()

@@ -1,3 +1,8 @@
+## v0.15.8-beta notes
+
+Guide authors now have a complete tutorial through `H guide help`, `H help guide`, and `/team-guide-help`, covering composition syntax, Markdown, emoji variables, Animal Dex aliases, previewing, and publication.
+
+The private editor now auto-saves durable SQLite drafts and can resume after refreshes, timeouts, restarts, accidental closes, and duplicate-alias errors. Special animals referenced by exact saved Dex names or aliases are prepared on demand from official OwO Dex artwork; the bot never bulk-uploads the animal library and preserves 500 application-emoji slots. See [durable guide authoring and on-demand special animals](RELEASE_NOTES_v0.15.8-beta.md).
 ## v0.15.7-beta notes
 
 Pacific-midnight ticket resets now update every active, opted-in nickname to `3/3`, even if another event normalized the database before the reset worker ran. The nickname pass runs before ticket-board refresh fan-out and isolates failures per server.

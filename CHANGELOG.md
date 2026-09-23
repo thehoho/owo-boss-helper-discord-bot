@@ -1,3 +1,13 @@
+## v0.15.8-beta - Durable Guide Authoring and On-Demand Special Animals
+
+- Added a complete guide-author tutorial through `H guide help`, `H help guide`, and `/team-guide-help` for composition syntax, Markdown, emoji variables, special animals, previews, and publishing.
+- Added auto-saved SQLite guide drafts that resume through `/team-guide-create` after refreshes, timeouts, bot restarts, accidental closes, and validation failures.
+- Added explicit **Save draft**, **Close**, and **Discard draft** controls; only publish success or explicit discard clears a saved draft.
+- Preserved drafts on duplicate aliases and now identifies the existing guide so an expert can edit it or choose a unique alias.
+- Resolved guide animals through exact names and aliases already stored by Animal Dex.
+- Prepared official OwO Dex artwork on demand only for special animals actually referenced by a draft, with no bulk animal import.
+- Capped guide-only special-animal imports at 250 and reserved 500 of Discord's 2,000 application-emoji slots for other bot assets.
+- Updated the public version to 0.15.8-beta; startup creates the `team_guide_drafts` table, adds one slash command, and requires no new Discord permission.
 ## v0.15.7-beta - Reliable Ticket Resets and Collaborative Neon Dexing
 
 - Fixed the Pacific-midnight race where a database read could refill ticket rows before the reset worker, leaving opted-in Discord nicknames on yesterday's ticket count.
