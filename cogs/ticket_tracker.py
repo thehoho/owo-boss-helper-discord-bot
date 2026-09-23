@@ -1117,6 +1117,22 @@ class TicketStore:
             ).fetchone()
         return bool(row and int(row["enabled"]))
 
+    async def list_nickname_enabled_guilds(self) -> list[int]:
+        async with self.lock:
+            return await asyncio.to_thread(self._list_nickname_enabled_guilds_sync)
+
+    def _list_nickname_enabled_guilds_sync(self) -> list[int]:
+        with self._connect() as connection:
+            rows = connection.execute(
+                """
+                SELECT guild_id
+                FROM ticket_nickname_config
+                WHERE enabled = 1
+                ORDER BY guild_id
+                """
+            ).fetchall()
+        return [int(row["guild_id"]) for row in rows]
+
     async def set_nickname_markers_enabled(
         self,
         guild_id: int,
@@ -4781,18 +4797,38 @@ class TicketTracker(commands.Cog):
                 await asyncio.sleep(max(1, reset_at - time.time() + 1))
                 changed_guilds = await self.store.reset_all_for_current_cycle()
                 removed_count = await self.cleanup_stale_once()
+                # A guild can be normalized by a read in the small window between
+                # Pacific midnight and this loop. In that case it is no longer in
+                # changed_guilds even though its members' Discord nicknames still
+                # show yesterday's ticket count. Sync every enabled nickname guild
+                # directly, before the slower board-refresh fan-out, so the reset
+                # cannot be lost behind that race or the generic background queue.
+                nickname_guilds = await self.store.list_nickname_enabled_guilds()
+                nickname_results = await asyncio.gather(
+                    *(self.sync_guild_nicknames(guild_id) for guild_id in nickname_guilds),
+                    return_exceptions=True,
+                )
+                nickname_failures = 0
+                for guild_id, result in zip(nickname_guilds, nickname_results):
+                    if isinstance(result, BaseException):
+                        nickname_failures += 1
+                        logger.error(
+                            "Pacific-midnight ticket nickname sync failed for guild %s",
+                            guild_id,
+                            exc_info=(type(result), result, result.__traceback__),
+                        )
                 configured = await self.store.list_configured_guilds()
                 for index, guild_id in enumerate(configured):
                     self.invalidate_board_cache(guild_id)
                     self.queue_board_refresh(guild_id)
                     if index + 1 < len(configured):
                         await asyncio.sleep(STARTUP_QUEUE_DELAY_SECONDS)
-                for guild_id in changed_guilds:
-                    if await self.store.nickname_markers_enabled(guild_id):
-                        self.queue_nickname_job(guild_id, "sync")
                 logger.info(
-                    "Replenished Pacific-midnight boss-ticket entries; %s guild(s) changed, %s stale entries removed",
+                    "Replenished Pacific-midnight boss-ticket entries; %s guild(s) changed, "
+                    "%s nickname guild(s) synced, %s nickname failure(s), %s stale entries removed",
                     len(changed_guilds),
+                    len(nickname_guilds) - nickname_failures,
+                    nickname_failures,
                     removed_count,
                 )
         except asyncio.CancelledError:

@@ -1727,7 +1727,9 @@ class NeonWeapons(commands.Cog):
             pending = self.find_pending_for_neon_reply(channel_id, reply_reference_id)
             confirmed_ids = {row.weapon_id for row in report.rows if row.exact}
             if pending is not None and pending.weapon_id in confirmed_ids:
-                await self.advance_dex_session_after_confirmation(channel_id, pending.user_id, pending.weapon_id)
+                await self.advance_matching_dex_sessions_after_confirmation(
+                    channel_id, pending.weapon_id
+                )
             logger.info(
                 "Scanned Neon max-quality report %s: %s rows, %s exact updates, %s needs-dex updates",
                 message_id,
@@ -1750,8 +1752,14 @@ class NeonWeapons(commands.Cog):
             weapon_type,
             passive_types,
         )
+        # A valid Neon blueprint confirms the command even when this weapon was
+        # already saved by another helper, so every active session waiting for the
+        # same weapon can move on. The person who pasted the command does not have
+        # to be the person who started the session.
+        await self.advance_matching_dex_sessions_after_confirmation(
+            channel_id, pending.weapon_id
+        )
         if updated_count:
-            await self.advance_dex_session_after_confirmation(channel_id, pending.user_id, pending.weapon_id)
             logger.info(
                 "Marked weapon %s dexed in %s owner queue(s) from Neon blueprint %s; runner user %s",
                 pending.weapon_id,
@@ -1759,6 +1767,34 @@ class NeonWeapons(commands.Cog):
                 blueprint,
                 pending.user_id,
             )
+
+    async def advance_matching_dex_sessions_after_confirmation(
+        self,
+        channel_id: int,
+        weapon_id: str,
+    ) -> int:
+        matching_runners = []
+        normalized_weapon_id = weapon_id.upper()
+        for (session_channel_id, runner_user_id), session in tuple(
+            self.active_dex_sessions.items()
+        ):
+            if session_channel_id != channel_id or session.index >= len(session.entries):
+                continue
+            current = session.entries[session.index]
+            if current.weapon_id.upper() == normalized_weapon_id:
+                matching_runners.append(runner_user_id)
+
+        if not matching_runners:
+            return 0
+        await asyncio.gather(
+            *(
+                self.advance_dex_session_after_confirmation(
+                    channel_id, runner_user_id, weapon_id
+                )
+                for runner_user_id in matching_runners
+            )
+        )
+        return len(matching_runners)
 
     def cleanup_pending_weapon_commands(self) -> None:
         now = time.monotonic()
@@ -1931,7 +1967,8 @@ class NeonWeapons(commands.Cog):
             description=(
                 "These are the next queued weapons.\n\n"
                 "• Select **Start dexing session** to begin.\n"
-                "• Copy each command from the session message and send it in this channel.\n"
+                "• Copy each command from the session message and send it in this channel; "
+                "the session owner or another helper may send it.\n"
                 "• The helper advances only "
                 "after OwO and Neon confirm that weapon.\n"
                 f"• Sessions alternate `ww` and `wuse`, support `{dex_short} 100` / "

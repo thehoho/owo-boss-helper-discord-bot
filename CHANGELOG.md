@@ -1,3 +1,12 @@
+## v0.15.7-beta - Reliable Ticket Resets and Collaborative Neon Dexing
+
+- Fixed the Pacific-midnight race where a database read could refill ticket rows before the reset worker, leaving opted-in Discord nicknames on yesterday's ticket count.
+- Synchronized every nickname-enabled guild directly after reset and before ticket-board fan-out; one guild failure is isolated and logged without blocking the rest.
+- Allowed any helper in the channel to send the exact `ww` / `wuse` command currently displayed by an active Neon dex session.
+- Advanced every matching channel session after OwO and Neon confirm the expected weapon, while keeping unrelated channels and weapon IDs isolated.
+- Let valid Neon confirmations advance already-saved weapons instead of leaving the session stuck on an item dexed by another helper.
+- Updated the public version to 0.15.7-beta; no database migration, new Discord permission, or slash-command change is required.
+
 ## v0.15.6-beta - Existing Bot Emojis in Sticky Notes
 
 - Replaced v0.15.5's automatic external-emoji importer with the existing guide emoji-variable system, so `H sticky` never consumes new application-emoji slots.

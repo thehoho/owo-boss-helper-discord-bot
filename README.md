@@ -1,3 +1,9 @@
+## v0.15.7-beta notes
+
+Pacific-midnight ticket resets now update every active, opted-in nickname to `3/3`, even if another event normalized the database before the reset worker ran. The nickname pass runs before ticket-board refresh fan-out and isolates failures per server.
+
+Guided Neon weapon dex sessions are now collaborative: another helper can paste the exact displayed `ww` / `wuse` command, and the original session advances after OwO and Neon confirm that weapon. Already-saved confirmations also move forward. See [reliable resets and collaborative dexing](RELEASE_NOTES_v0.15.7-beta.md).
+
 ## v0.15.6-beta notes
 
 `H sticky` now uses the bot's existing emoji catalog instead of importing external server emojis. Put a supported name inside braces—such as `{sword}`, `{crit}`, `{taunt}`, `{dog}`, `{mythical}`, or `{hp_stat}`—then reply to the note with `H sticky`. The saved note renders the same portable application emojis already used by guides, without consuming another emoji slot.
