@@ -168,10 +168,13 @@ class GuideHelpSurfaceTests(unittest.TestCase):
             "/guide-emojis",
             "Markdown",
             "auto-saved",
-            str(GUIDE_SPECIAL_EMOJI_LIMIT),
-            str(GUIDE_APPLICATION_EMOJI_RESERVE),
+            "weapon + passive @ rank",
+            "Review and publish",
         ):
             self.assertIn(expected, combined)
+        self.assertNotIn("application-emoji slots", combined)
+        self.assertNotIn("guide-only imports are capped", combined)
+        self.assertEqual(GUIDE_SPECIAL_EMOJI_LIMIT, 300)
 
     def test_both_text_help_forms_and_custom_prefix_are_accepted(self) -> None:
         aliases = {"h guide help", "hguide help", "h help guide", "hhelp guide"}
@@ -191,7 +194,7 @@ class GuideHelpSurfaceTests(unittest.TestCase):
         self.assertEqual(TeamGuides.team_guide_help.name, "team-guide-help")
 
     def test_public_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.15.8-beta")
+        self.assertEqual(BOT_VERSION, "0.15.9-beta")
 
 
 if __name__ == "__main__":

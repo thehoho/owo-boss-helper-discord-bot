@@ -1,3 +1,12 @@
+## v0.15.9-beta - Reliable Team Steps and Ticket Tracking
+
+- Recognized OwO's compact `Successfully changed the team!` response for guided team deletions and additions.
+- Accepted standard `w` and `owo` boss-ticket command aliases independently of a server's configured custom OwO prefix.
+- Preserved the existing automatic nickname-control reaction after a successfully paired OwO ticket response.
+- Applied a tracked member's first newly observed Top 10 battle-log UUID instead of discarding it as a baseline, with durable UUID deduplication.
+- Clarified the guide tutorial's usual one-passive composition syntax, retained advanced multi-passive support, and removed internal capacity details from public help.
+- Raised the internal guide-only special-animal allowance to 300.
+- Updated the public version to 0.15.9-beta; no database migration, slash-command change, or new Discord permission is required.
 ## v0.15.8-beta - Durable Guide Authoring and On-Demand Special Animals
 
 - Added a complete guide-author tutorial through `H guide help`, `H help guide`, and `/team-guide-help` for composition syntax, Markdown, emoji variables, special animals, previews, and publishing.

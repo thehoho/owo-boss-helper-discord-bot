@@ -55,7 +55,7 @@ MAX_GUIDE_CATEGORIES = 8
 FULL_GUIDE_PAGE_LENGTH = 3800
 GUIDE_BROWSER_CATEGORY_LIMIT = 24
 GUIDE_BROWSER_GUIDE_LIMIT = 25
-GUIDE_SPECIAL_EMOJI_LIMIT = 250
+GUIDE_SPECIAL_EMOJI_LIMIT = 300
 GUIDE_APPLICATION_EMOJI_RESERVE = 500
 GUIDE_VARIABLE_RE = re.compile(r"\{([A-Za-z0-9_ -]{1,64})\}")
 GUIDE_STAT_ALIASES = {
@@ -984,9 +984,10 @@ def build_guide_system_help_embed(
         value=(
             f"Enter any exact animal name **or an alias shown by** "
             f"{tick}/animal-dex{tick}. Weapon syntax is "
-            f"{tick}weapon + passive + passive @ rank{tick}; separate multiple "
+            f"{tick}weapon + passive @ rank{tick}; separate multiple "
             "weapon options with semicolons. Example: "
-            f"{tick}pd + mtap + crit @ legendary; crune + res @ fabled{tick}."
+            f"{tick}pd + crit @ legendary; crune + res @ fabled{tick}. "
+            "Boss weapons may include additional passives when needed."
         ),
         inline=False,
     )
@@ -1005,22 +1006,18 @@ def build_guide_system_help_embed(
         inline=False,
     )
     embed.add_field(
-        name="4️⃣ Special animals without bulk uploads",
+        name="4️⃣ Using special animals",
         value=(
             f"Use the special animal's exact name or any alias from "
             f"{tick}/animal-dex{tick} in a slot or braces. On **Preview** or "
             "**Publish**, the bot imports that animal's official OwO Dex artwork "
-            "only if this guide actually uses it. If artwork is missing, run OwO "
-            "Dex for that animal and try again. The bot never bulk-uploads all "
-            f"specials: guide-only imports are capped at "
-            f"{GUIDE_SPECIAL_EMOJI_LIMIT}, and "
-            f"{GUIDE_APPLICATION_EMOJI_RESERVE} application-emoji slots stay "
-            "reserved."
+            "for the guide. If artwork is missing, run OwO Dex for that animal "
+            "and try again."
         ),
         inline=False,
     )
     embed.add_field(
-        name="5️⃣ Preview and publish",
+        name="5️⃣ Review and publish",
         value=(
             "Preview checks variables and prepares required special-animal artwork. "
             "Publish requires basics plus all three slots, then clears the saved "

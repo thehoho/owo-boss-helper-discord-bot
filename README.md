@@ -1,3 +1,8 @@
+## v0.15.9-beta notes
+
+Smart Replace now accepts OwO's compact team-change confirmation, so successful delete/add steps advance without getting stuck. Standard `w` and `owo` boss-ticket aliases work regardless of a server's saved custom OwO prefix, preserving the existing automatic control reaction after a valid ticket response. A tracked member's first newly visible Top 10 battle-log UUID now updates their tickets immediately and remains UUID-deduplicated.
+
+The guide tutorial now presents the usual `weapon + passive @ rank` syntax, keeps advanced multi-passive setups available, and explains special animals without publishing internal capacity details. See [reliable team steps and ticket tracking](RELEASE_NOTES_v0.15.9-beta.md).
 ## v0.15.8-beta notes
 
 Guide authors now have a complete tutorial through `H guide help`, `H help guide`, and `/team-guide-help`, covering composition syntax, Markdown, emoji variables, Animal Dex aliases, previewing, and publication.

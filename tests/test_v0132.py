@@ -176,7 +176,7 @@ class SmartReplacePlannerTests(unittest.TestCase):
 
 class SmartReplaceCommandTests(unittest.TestCase):
     def test_release_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.15.8-beta")
+        self.assertEqual(BOT_VERSION, "0.15.9-beta")
 
     def test_team_display_commands_respect_configured_prefix(self) -> None:
         for command in (
@@ -202,6 +202,17 @@ class SmartReplaceCommandTests(unittest.TestCase):
         ):
             with self.subTest(command=command):
                 self.assertFalse(is_smart_team_display_command(command, "o"))
+
+    def test_compact_success_response_confirms_team_add_and_delete(self) -> None:
+        payload = """
+Hassaan - Successfully changed the team!
+Your team: [2] <:hdeer:100> [3] <:gcat:101>
+"""
+        self.assertEqual(classify_team_confirmation(payload, "wtm d 1"), "success")
+        self.assertEqual(
+            classify_team_confirmation(payload, "wtm a rabbit 1"),
+            "success",
+        )
 
     def test_selection_text_lists_both_numbered_team_aliases(self) -> None:
         session = SmartReplaceScanSession(
@@ -532,13 +543,8 @@ Current Streak: 0
         )
         cog.guided_sessions[key] = session
         payload = """
-Hassaan's team
-owo team remove {animal}
-[1] <:hsnake:100> Snake
-AAA111 <:weapon:101> 99%
-[3] <:customowo:104> 4millionowo
-CCC333 <:weapon:105> 97%
-Current Streak: 0
+Hassaan - Successfully changed the team!
+Your team: [1] <:hsnake:100> [3] <:customowo:104>
 """
         message = SimpleNamespace(
             id=88,

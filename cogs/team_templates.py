@@ -931,6 +931,7 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
         if any(
             phrase in lowered
             for phrase in (
+                "successfully changed the team",
                 "team has been updated",
                 "your team has been updated",
                 "no animal",
@@ -975,7 +976,14 @@ def classify_team_confirmation(text: str, command: str) -> str | None:
             )
         ):
             return "position_occupied"
-        if any(phrase in lowered for phrase in ("team has been updated", "your team has been updated")):
+        if any(
+            phrase in lowered
+            for phrase in (
+                "successfully changed the team",
+                "team has been updated",
+                "your team has been updated",
+            )
+        ):
             return "success"
         return None
     return None

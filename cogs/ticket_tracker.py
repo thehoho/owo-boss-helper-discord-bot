@@ -252,7 +252,11 @@ def normalize_ticket_command(content: str) -> str:
 
 
 def is_ticket_command(content: str, owo_prefix: str = OWO_PREFIX_DEFAULT) -> bool:
-    return is_owo_prefixed_command(content, owo_prefix, TICKET_COMMAND_SUFFIXES)
+    normalized = normalize_ticket_command(content)
+    return (
+        normalized in TICKET_COMMANDS
+        or is_owo_prefixed_command(content, owo_prefix, TICKET_COMMAND_SUFFIXES)
+    )
 
 
 def is_ticket_list_command(
@@ -1684,11 +1688,9 @@ class TicketStore:
                     if cursor.rowcount > 0:
                         new_by_user.setdefault(user_id, []).append(battle_uuid)
 
-            # The first snapshot for a message is a baseline. This prevents a restart
-            # in the middle of a boss from retroactively subtracting every visible hit.
-            if initialized:
-                return [], True, total_visible
-
+            # Observations and battle UUIDs are durable across restarts, so a UUID is
+            # safe to apply the first time this process sees the card. This also
+            # covers a fast first hit that lands before the zero-log card snapshot.
             updates: list[AutoTicketUpdate] = []
             stale_after = now + STALE_ENTRY_SECONDS
             for user_id, new_uuids in new_by_user.items():
@@ -1753,7 +1755,7 @@ class TicketStore:
                         hits_applied=len(new_uuids),
                     )
                 )
-            return updates, False, total_visible
+            return updates, initialized, total_visible
 
 
 class TicketBoardView(discord.ui.View):
@@ -2758,12 +2760,11 @@ class TicketTracker(commands.Cog):
         )
         if initialized:
             logger.info(
-                "Initialized guild-boss ticket baseline for guild %s message %s with %s visible log(s)",
+                "Initialized guild-boss ticket observation for guild %s message %s with %s visible log(s)",
                 guild_id,
                 message_id,
                 visible_logs,
             )
-            return
         if not updates:
             return
 
