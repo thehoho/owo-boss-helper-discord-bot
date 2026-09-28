@@ -194,7 +194,7 @@ class GuideHelpSurfaceTests(unittest.TestCase):
         self.assertEqual(TeamGuides.team_guide_help.name, "team-guide-help")
 
     def test_public_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.15.9-beta")
+        self.assertEqual(BOT_VERSION, "0.15.10-beta")
 
 
 if __name__ == "__main__":

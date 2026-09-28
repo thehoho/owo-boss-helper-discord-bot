@@ -1,3 +1,13 @@
+## v0.15.10-beta - Guide and Discord Request Reliability
+
+- Fixed the Full Guide button for one-page guides by omitting the optional view instead of passing `None` into Discord interaction handling.
+- Preserved private pagination for multi-page full guides.
+- Used complete gateway boss-card edits directly instead of refetching the same Discord message.
+- Coalesced duplicate REST fetches for identical edit versions while ensuring a newer edit version always receives fresh data.
+- Changed active-boss safety polling from 15 seconds to 60 seconds and spread restored watchers over startup; gateway-driven updates remain immediate.
+- Kept the independent one-minute exact-HP reconciliation fallback.
+- Updated the public version to 0.15.10-beta; no database migration, slash-command change, new permission, or dependency change is required.
+
 ## v0.15.9-beta - Reliable Team Steps and Ticket Tracking
 
 - Recognized OwO's compact `Successfully changed the team!` response for guided team deletions and additions.

@@ -98,7 +98,9 @@ BOSS_COOLDOWN_SECONDS = 5 * 60
 OUTCOME_DEDUP_SECONDS = 20
 OUTCOME_SETTLE_SECONDS = 1.25
 BOSS_OUTCOME_WINDOW_SKEW_SECONDS = 90
-BOSS_WATCH_INTERVAL_SECONDS = 15
+BOSS_WATCH_INTERVAL_SECONDS = 60
+BOSS_MESSAGE_FETCH_CACHE_SECONDS = 2.0
+BOSS_MESSAGE_FETCH_CACHE_LIMIT = 512
 BOSS_COMMAND_UNBOUND_MAX_AGE_SECONDS = 20 * 60
 BOSS_COMMAND_BOUND_MAX_AGE_SECONDS = 4 * 60 * 60
 BOSS_HP_RECONCILE_SECONDS = 60
@@ -1599,6 +1601,9 @@ class BossGenerator(commands.Cog):
         self.processed_outcome_messages: set[tuple[int, int]] = set()
         self.guild_boss_watch_tasks: dict[int, asyncio.Task] = {}
         self.guild_boss_fetch_locks: dict[int, asyncio.Lock] = {}
+        self.guild_boss_message_cache: dict[
+            tuple[int, int], tuple[float, str, dict[str, Any] | None]
+        ] = {}
         self.guild_boss_outcome_locks: dict[int, asyncio.Lock] = {}
         self.boss_hp_refresh_locks: dict[int, asyncio.Lock] = {}
         self.battle_log_hp_cache: dict[str, tuple[float, BattleLogHP | None]] = {}
@@ -2577,7 +2582,7 @@ class BossGenerator(commands.Cog):
             return
 
         # Refresh the tracked OwO message immediately so this command does not have
-        # to wait for the next 15-second watcher cycle after a defeat or escape.
+        # to wait for the next fallback watcher cycle after a defeat or escape.
         await self.refresh_tracked_guild_boss_status(guild.id)
         config = self.cooldown_config.get(str(guild.id), {})
 
@@ -3510,7 +3515,11 @@ class BossGenerator(commands.Cog):
             message_id, channel_id = max(candidates, key=lambda item: item[0])
             if not message_id or not channel_id:
                 continue
-            data = await fetch_raw_message(self.bot, channel_id, message_id)
+            data = await self.fetch_guild_boss_message(
+                guild_id,
+                channel_id,
+                message_id,
+            )
             if not data:
                 continue
             author_id = int((data.get("author") or {}).get("id", 0) or 0)
@@ -3573,7 +3582,82 @@ class BossGenerator(commands.Cog):
         return int(message_id or 0) in active_boss_message_ids(config)
 
     def get_guild_boss_fetch_lock(self, guild_id: int) -> asyncio.Lock:
-        return self.guild_boss_fetch_locks.setdefault(guild_id, asyncio.Lock())
+        locks = getattr(self, "guild_boss_fetch_locks", None)
+        if locks is None:
+            locks = {}
+            self.guild_boss_fetch_locks = locks
+        return locks.setdefault(guild_id, asyncio.Lock())
+
+    def remember_guild_boss_message(
+        self,
+        channel_id: int,
+        message_id: int,
+        data: dict[str, Any] | None,
+        *,
+        edit_version: str = "",
+    ) -> None:
+        """Keep one very short-lived raw payload to collapse Discord edit bursts."""
+        cache = getattr(self, "guild_boss_message_cache", None)
+        if cache is None:
+            cache = {}
+            self.guild_boss_message_cache = cache
+        if not edit_version and isinstance(data, dict):
+            edit_version = str(data.get("edited_timestamp") or "")
+        cache[(channel_id, message_id)] = (
+            time.monotonic(),
+            edit_version,
+            data,
+        )
+        overflow = len(cache) - BOSS_MESSAGE_FETCH_CACHE_LIMIT
+        if overflow > 0:
+            oldest = sorted(cache, key=lambda key: cache[key][0])[:overflow]
+            for key in oldest:
+                cache.pop(key, None)
+
+    async def fetch_guild_boss_message(
+        self,
+        guild_id: int,
+        channel_id: int,
+        message_id: int,
+        *,
+        max_age: float = BOSS_MESSAGE_FETCH_CACHE_SECONDS,
+        edit_version: str = "",
+    ) -> dict[str, Any] | None:
+        """Coalesce concurrent and bursty GETs for the same OwO boss card."""
+        cache = getattr(self, "guild_boss_message_cache", None)
+        if cache is None:
+            cache = {}
+            self.guild_boss_message_cache = cache
+        key = (channel_id, message_id)
+
+        def recent() -> tuple[bool, dict[str, Any] | None]:
+            cached = cache.get(key)
+            if cached is None:
+                return False, None
+            cached_at, cached_version, data = cached
+            version_matches = not edit_version or cached_version == edit_version
+            return (
+                version_matches and time.monotonic() - cached_at <= max_age,
+                data,
+            )
+
+        fresh, data = recent()
+        if fresh:
+            return data
+        async with self.get_guild_boss_fetch_lock(guild_id):
+            # Another raw edit, watcher, or reconciliation pass may have populated
+            # the cache while this coroutine waited for the per-guild lock.
+            fresh, data = recent()
+            if fresh:
+                return data
+            data = await fetch_raw_message(self.bot, channel_id, message_id)
+            self.remember_guild_boss_message(
+                channel_id,
+                message_id,
+                data,
+                edit_version=edit_version,
+            )
+            return data
 
     def get_guild_boss_outcome_lock(self, guild_id: int) -> asyncio.Lock:
         """Serialize defeat/escape handling so one boss emits one alert."""
@@ -3626,10 +3710,13 @@ class BossGenerator(commands.Cog):
             )
             return
 
-        # The watcher, H command, and slash command can fire close together. One
-        # per-guild lock prevents duplicate GETs for the same tracked message.
-        async with self.get_guild_boss_fetch_lock(guild_id):
-            data = await fetch_raw_message(self.bot, channel_id, message_id)
+        # The watcher, H command, slash command, and edit bursts can overlap. The
+        # short cache and per-guild lock collapse duplicate GETs safely.
+        data = await self.fetch_guild_boss_message(
+            guild_id,
+            channel_id,
+            message_id,
+        )
 
         if not data:
             if expiry and expiry <= now:
@@ -3826,19 +3913,22 @@ class BossGenerator(commands.Cog):
         try:
             # Restored guilds otherwise begin polling in the same millisecond. A
             # small deterministic stagger spreads those first requests out.
-            await asyncio.sleep((guild_id % 7) * 0.35)
+            await asyncio.sleep((guild_id % 30) * 0.5)
             while True:
                 config = self.cooldown_config.get(str(guild_id), {})
                 channel_id = int(config.get("active_boss_channel_id") or 0)
                 message_id = int(config.get("active_boss_message_id") or 0)
                 if not channel_id or not message_id:
                     return
-                async with self.get_guild_boss_fetch_lock(guild_id):
-                    data = await fetch_raw_message(self.bot, channel_id, message_id)
+                data = await self.fetch_guild_boss_message(
+                    guild_id,
+                    channel_id,
+                    message_id,
+                )
 
                 if not data:
                     # OwO status cards can be deleted or replaced. Do not keep
-                    # requesting a missing message every 15 seconds. Pause REST
+                    # requesting a missing message every fallback cycle. Pause REST
                     # polling while gateway events remain able to replace the
                     # tracked ID, and fall back to the stored escape timestamp.
                     logger.info(
@@ -4071,13 +4161,36 @@ class BossGenerator(commands.Cog):
                 if cooldown_gateway_needed
                 else False
             )
-            if known_active or generator_needed or command_refresh_needed:
-                async with self.get_guild_boss_fetch_lock(payload.guild_id):
-                    fetched = await fetch_raw_message(
-                        self.bot,
-                        payload.channel_id,
-                        payload.message_id,
+            author_id = int((partial_data.get("author") or {}).get("id", 0) or 0)
+            complete_gateway_payload = bool(
+                author_id == OWO_BOT_ID
+                and is_guild_boss_status(partial_data)
+                and (
+                    is_explicit_active_boss_status(partial_data)
+                    or detect_boss_outcome(
+                        extract_all_text_from_raw(partial_data)
                     )
+                    is not None
+                )
+            )
+            if complete_gateway_payload and not generator_needed:
+                self.remember_guild_boss_message(
+                    payload.channel_id,
+                    payload.message_id,
+                    partial_data,
+                    edit_version=str(
+                        partial_data.get("edited_timestamp") or ""
+                    ),
+                )
+            elif known_active or generator_needed or command_refresh_needed:
+                fetched = await self.fetch_guild_boss_message(
+                    payload.guild_id,
+                    payload.channel_id,
+                    payload.message_id,
+                    edit_version=str(
+                        partial_data.get("edited_timestamp") or ""
+                    ),
+                )
                 if not fetched:
                     return
                 data = fetched

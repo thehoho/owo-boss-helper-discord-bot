@@ -1,3 +1,7 @@
+## v0.15.10-beta notes
+
+The Full Guide button now opens one-page guides without passing an invalid empty view, while multi-page guides keep their private pager. Guild-boss reliability now prefers complete gateway edits, collapses duplicate fetches from the same edit burst, preserves distinct edit versions, and moves the safety poll from every 15 seconds to once per minute. Immediate gateway updates and the one-minute reconciliation fallback remain active. See [guide and Discord request reliability](RELEASE_NOTES_v0.15.10-beta.md).
+
 ## v0.15.9-beta notes
 
 Smart Replace now accepts OwO's compact team-change confirmation, so successful delete/add steps advance without getting stuck. Standard `w` and `owo` boss-ticket aliases work regardless of a server's saved custom OwO prefix, preserving the existing automatic control reaction after a valid ticket response. A tracked member's first newly visible Top 10 battle-log UUID now updates their tickets immediately and remains UUID-deduplicated.
@@ -167,7 +171,7 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 
 - Detects newly appeared guild bosses.
 - Tracks only the latest active guild-boss message.
-- Polls that one message every 15 seconds instead of fetching every OwO response.
+- Uses gateway edits immediately and polls the latest message once per minute as a bounded fallback.
 - Shows the active boss's escape time using Discord timestamps.
 - Reconciles stale active-boss state before responding to status checks, ignoring late OwO cards and marking unavailable tracked messages as unconfirmed.
 - Starts a five-minute cooldown only after a defeat.

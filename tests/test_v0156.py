@@ -86,7 +86,7 @@ class StickyBotEmojiVariableTests(unittest.IsolatedAsyncioTestCase):
 
 class StickyBotEmojiPublicSurfaceTests(unittest.TestCase):
     def test_version_and_help_explain_the_existing_emoji_catalog(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.15.9-beta")
+        self.assertEqual(BOT_VERSION, "0.15.10-beta")
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback
         embed = BossGenerator.build_help_embed(cog, "h", "o")

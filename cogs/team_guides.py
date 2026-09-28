@@ -1713,13 +1713,17 @@ class PublicGuideView(discord.ui.View):
                 ephemeral=True,
             )
             return
-        view = FullGuideView(pages, interaction.user.id) if len(pages) > 1 else None
-        await interaction.response.send_message(
-            embed=pages[0],
-            view=view,
-            ephemeral=True,
-            allowed_mentions=discord.AllowedMentions.none(),
-        )
+        kwargs: dict[str, Any] = {
+            "embed": pages[0],
+            "ephemeral": True,
+            "allowed_mentions": discord.AllowedMentions.none(),
+        }
+        # discord.py treats an explicit ``view=None`` differently from an omitted
+        # view in interaction responses. Only provide the keyword when pagination
+        # actually exists so a one-page guide cannot fail inside View handling.
+        if len(pages) > 1:
+            kwargs["view"] = FullGuideView(pages, interaction.user.id)
+        await interaction.response.send_message(**kwargs)
 
     @discord.ui.button(label="Related teams", emoji="🔍", style=discord.ButtonStyle.secondary)
     async def related(self, interaction: discord.Interaction, button: discord.ui.Button) -> None:
