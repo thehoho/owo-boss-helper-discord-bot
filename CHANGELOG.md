@@ -1,3 +1,13 @@
+## v0.16.1-beta - Streak-aware XP Forecasts
+
+- Replaced manual average-XP entry with an XP-per-battle estimate calculated from the current streak.
+- Corrected next-level forecasts to use the current-streak model, dynamic catch-up at every level, and optional fixed daily XP outside battle multipliers.
+- Reorganized team forecasts into three inline pet cards with level, XP remaining, multiplier, normal battles, and Knowledge battles.
+- Reused application-owned animal, calculator, weapon, reminder, and Knowledge emojis in the team XP panel and buttons, retaining Unicode fallbacks.
+- Updated `/xp-calc` to require the member's current streak and accept optional fixed XP per day; the team reaction reads streak automatically.
+- Added regression coverage for the supplied streak-1,265 example: 358.3 XP/battle, 4,128 battle-only rounds, or 3,741 with 200,000 fixed XP/day across 2,000 battles.
+- Updated the public version to 0.16.1-beta; the slash-command schema changes, with no database migration, permission, or dependency change.
+
 ## v0.16.0-beta - XP Switching and Reliability
 
 - Added a concise, prefix-aware Pet XP guide through `H XP`, `H EXP`, and their compact forms.

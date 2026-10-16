@@ -1,3 +1,7 @@
+## v0.16.1-beta notes
+
+XP forecasts now derive expected XP per battle directly from the current streak instead of asking members to understand or enter an average. Team results use a compact three-pet layout, recalculate catch-up as each level changes, support optional fixed daily XP separately from battle XP, and use the bot's existing pet, calculator, weapon, reminder, and Knowledge application emojis. See [streak-aware XP forecasts](RELEASE_NOTES_v0.16.1-beta.md).
+
 ## v0.16.0-beta notes
 
 Pet-XP tools now explain the verified level, streak, catch-up, and Knowledge formulas through `H XP` / `H EXP`; `/xp-calc` forecasts custom level ranges, activity, and milestone-switch benefits. The existing helper reaction under an OwO team page now opens a team-aware forecast, calculator, normal/Knowledge preset capture, and opt-in reminders for every 10, 50, 100, 500, or 1,000 wins. Reminder state survives restarts, ties keep Knowledge equipped, and a win or loss produces the normal restore commands.

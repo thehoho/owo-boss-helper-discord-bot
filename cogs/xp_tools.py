@@ -39,6 +39,8 @@ from .team_templates import (
     owo_weapon_command,
     parse_team_message_detailed,
 )
+from .team_guides import animal_emoji_key
+from .ui_emojis import ui_emoji_button, ui_emoji_text
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +198,52 @@ def winning_streak_total(streak: int) -> int:
 
 def average_winning_streak_xp(streak: int) -> float:
     return winning_streak_total(streak) / streak if streak > 0 else 200.0
+
+
+def current_streak_average_xp(streak: int) -> float:
+    """Return the public sustained-streak XP estimate shown by team forecasters."""
+    if streak <= 0:
+        return 200.0
+    if streak > MAX_VALIDATED_STREAK:
+        raise ValueError(
+            f"The validated streak model ends at {MAX_VALIDATED_STREAK:,}"
+        )
+    return 292.5 + 1.85 * math.sqrt(streak)
+
+
+def estimated_battles_needed(
+    start_level: int,
+    target_level: int,
+    current_xp: int,
+    highest_level: int,
+    average_battle_xp: float,
+    *,
+    knowledge_bonus: float = 0.0,
+    fixed_xp_per_battle: float = 0.0,
+) -> int:
+    """Forecast battles while recalculating catch-up at each level.
+
+    Battle XP receives catch-up and Knowledge. Fixed XP is spread across the
+    configured battles/day and remains outside those multipliers, matching the
+    public forecaster's treatment of fixed daily XP.
+    """
+    if average_battle_xp <= 0 or fixed_xp_per_battle < 0:
+        raise ValueError("XP rates cannot be negative or zero")
+    if not 0 <= knowledge_bonus <= 0.15:
+        raise ValueError("Knowledge must be between 0 and 0.15")
+    total_level_xp(start_level, target_level, current_xp)
+    battles = 0.0
+    for level in range(start_level, target_level):
+        needed = xp_for_next_level(level)
+        if level == start_level:
+            needed -= current_xp
+        per_battle = (
+            average_battle_xp
+            * (catchup_multiplier(level, highest_level) + knowledge_bonus)
+            + fixed_xp_per_battle
+        )
+        battles += needed / per_battle
+    return math.ceil(battles)
 
 
 def switch_benefit(
@@ -613,11 +661,11 @@ class TeamXPCalculatorModal(discord.ui.Modal, title="Team XP calculator"):
         min_length=1,
         max_length=3,
     )
-    average_xp = discord.ui.TextInput(
-        label="Average raw XP per battle",
-        placeholder="350",
+    fixed_xp_per_day = discord.ui.TextInput(
+        label="Fixed XP per day (optional)",
+        placeholder="0",
         min_length=1,
-        max_length=8,
+        max_length=10,
     )
     battles_per_day = discord.ui.TextInput(
         label="Battles per day",
@@ -639,10 +687,7 @@ class TeamXPCalculatorModal(discord.ui.Modal, title="Team XP calculator"):
         if snapshot.pets:
             self.pet_position.default = str(snapshot.pets[0].position)
             self.target_level.default = str(min(MAX_LEVEL, snapshot.pets[0].level + 1))
-        if 0 < snapshot.streak <= MAX_VALIDATED_STREAK:
-            self.average_xp.default = f"{average_winning_streak_xp(snapshot.streak):.1f}"
-        else:
-            self.average_xp.default = "350"
+        self.fixed_xp_per_day.default = "0"
         self.battles_per_day.default = "1000"
         self.knowledge_quality.default = "0.15"
 
@@ -651,13 +696,13 @@ class TeamXPCalculatorModal(discord.ui.Modal, title="Team XP calculator"):
             position = int(str(self.pet_position))
             pet = next(item for item in self.snapshot.pets if item.position == position)
             target = int(str(self.target_level))
-            average = float(str(self.average_xp))
+            fixed_per_day = int(str(self.fixed_xp_per_day).replace(",", ""))
             per_day = int(str(self.battles_per_day))
             knowledge = float(str(self.knowledge_quality))
             if target <= pet.level or target > MAX_LEVEL:
                 raise ValueError(f"Target level must be between {pet.level + 1} and {MAX_LEVEL}")
-            if not 50 <= average <= 10_000:
-                raise ValueError("Average XP must be between 50 and 10,000")
+            if not 0 <= fixed_per_day <= 2_000_000_000:
+                raise ValueError("Fixed XP per day must be between 0 and 2,000,000,000")
             if not 1 <= per_day <= 5_760:
                 raise ValueError("Battles per day must be between 1 and 5,760")
             if not 0 <= knowledge <= 0.15:
@@ -668,8 +713,8 @@ class TeamXPCalculatorModal(discord.ui.Modal, title="Team XP calculator"):
                 target_level=target,
                 highest_level=highest,
                 current_xp=pet.current_xp,
-                average_xp=average,
                 battles_per_day=per_day,
+                fixed_xp_per_day=fixed_per_day,
                 knowledge_quality=knowledge,
                 current_streak=min(self.snapshot.streak, MAX_VALIDATED_STREAK),
             )
@@ -695,6 +740,17 @@ class TeamXPToolsView(discord.ui.View):
         self.guild_id = guild_id
         self.snapshot = snapshot
         self.helper_prefix = helper_prefix
+        icon_keys = {
+            "XP forecast": ("neon_calculate", "📈"),
+            "XP calculator": ("stat_mag", "🧮"),
+            "Save normal": ("weapon_sword", "⚔️"),
+            "Save Knowledge": ("passive_kno", "🧠"),
+            "Reminders": ("ticket_available", "🔔"),
+        }
+        for item in self.children:
+            if isinstance(item, discord.ui.Button) and item.label in icon_keys:
+                key, fallback = icon_keys[item.label]
+                item.emoji = ui_emoji_button(self.cog.bot, key, fallback)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.owner_id:
@@ -954,57 +1010,83 @@ class XPTools(commands.Cog):
         return embed
 
     def build_team_tools_embed(self, snapshot: TeamXPSnapshot) -> discord.Embed:
-        pet_lines = []
-        for pet in snapshot.pets:
-            percent = 100 * pet.current_xp / pet.next_xp if pet.next_xp else 0
-            pet_lines.append(
-                f"**[{pet.position}] {pet.animal}** — L.{pet.level} • "
-                f"{pet.current_xp:,}/{pet.next_xp:,} XP ({percent:.1f}%)"
-            )
+        calculate_icon = ui_emoji_text(self.bot, "neon_calculate", "🧰")
+        average_text = "not available"
+        if snapshot.streak <= MAX_VALIDATED_STREAK:
+            average_text = f"{current_streak_average_xp(snapshot.streak):,.1f} XP/battle"
         embed = discord.Embed(
-            title="🧰 Team tools",
-            description="\n".join(pet_lines) if pet_lines else "The team is readable, but this OwO layout did not expose pet XP values.",
+            title=f"{calculate_icon} Team XP tools",
+            description=(
+                f"**Current streak:** {snapshot.streak:,}\n"
+                f"**Calculated average:** {average_text}"
+            ),
             color=0x5865F2,
         )
-        embed.add_field(name="Current streak", value=f"{snapshot.streak:,}", inline=True)
-        embed.add_field(name="Equipped weapons", value=str(sum(bool(member.weapon_id) for member in snapshot.members)), inline=True)
+        for pet in snapshot.pets:
+            percent = 100 * pet.current_xp / pet.next_xp if pet.next_xp else 0
+            pet_icon = ui_emoji_text(self.bot, animal_emoji_key(pet.animal), "🐾")
+            embed.add_field(
+                name=f"{pet_icon} [{pet.position}] {pet.animal}",
+                value=(
+                    f"**Level {pet.level}**\n"
+                    f"{pet.current_xp:,} / {pet.next_xp:,} XP\n"
+                    f"Progress: **{percent:.1f}%**"
+                ),
+                inline=True,
+            )
+        if not snapshot.pets:
+            embed.description = "The team is readable, but this OwO layout did not expose pet XP values."
         embed.set_footer(text="The panel belongs to the member who clicked the reaction and expires after five minutes.")
         return embed
 
     def build_team_forecast_embed(self, snapshot: TeamXPSnapshot) -> discord.Embed:
-        embed = discord.Embed(title="📈 Next-level XP forecast", color=0x3498DB)
+        calculate_icon = ui_emoji_text(self.bot, "neon_calculate", "📈")
+        knowledge_icon = ui_emoji_text(self.bot, "passive_kno", "🧠")
+        embed = discord.Embed(title=f"{calculate_icon} Next-level forecast", color=0x3498DB)
         if not snapshot.pets:
             embed.description = "This team layout did not expose readable level/XP values. Use `/xp-calc` instead."
             return embed
         if snapshot.streak > MAX_VALIDATED_STREAK:
             embed.description = (
                 f"This team's streak is {snapshot.streak:,}. The supplied public model changes above "
-                f"{MAX_VALIDATED_STREAK:,}, so I will not extrapolate it. Use `/xp-calc` with an "
-                "average XP value measured from your recent battles."
+                f"{MAX_VALIDATED_STREAK:,}, so I will not extrapolate it without a verified formula."
             )
             return embed
         highest = max(pet.level for pet in snapshot.pets)
-        average_xp = average_winning_streak_xp(snapshot.streak)
-        lines = []
+        average_xp = current_streak_average_xp(snapshot.streak)
+        embed.description = (
+            f"**Current streak:** {snapshot.streak:,} • "
+            f"**Calculated average:** {average_xp:,.1f} XP/battle\n"
+            "The current streak is read directly from this OwO team page."
+        )
         for pet in snapshot.pets:
             needed = max(0, pet.next_xp - pet.current_xp)
             multiplier = catchup_multiplier(pet.level, highest)
-            base_battles = math.ceil((needed / multiplier) / average_xp) if needed else 0
-            knowledge_battles = math.ceil((needed / (multiplier + 0.15)) / average_xp) if needed else 0
-            lines.append(
-                f"**[{pet.position}] {pet.animal} → L.{pet.level + 1}**\n"
-                f"{needed:,} pet XP • {multiplier:.2f}× catch-up • up to **{base_battles:,}** wins "
-                f"(**{knowledge_battles:,}** with 15% Knowledge always equipped)"
+            base_battles = estimated_battles_needed(
+                pet.level, pet.level + 1, pet.current_xp, highest, average_xp
+            ) if needed else 0
+            knowledge_battles = estimated_battles_needed(
+                pet.level,
+                pet.level + 1,
+                pet.current_xp,
+                highest,
+                average_xp,
+                knowledge_bonus=0.15,
+            ) if needed else 0
+            pet_icon = ui_emoji_text(self.bot, animal_emoji_key(pet.animal), "🐾")
+            embed.add_field(
+                name=f"{pet_icon} [{pet.position}] {pet.animal}",
+                value=(
+                    f"**L.{pet.level} → L.{pet.level + 1}**\n"
+                    f"Need: **{needed:,} XP**\n"
+                    f"Multiplier: **{multiplier:.2f}×**\n"
+                    f"Up to **{base_battles:,} battles**\n"
+                    f"{knowledge_icon} Max Knowledge: **{knowledge_battles:,}**"
+                ),
+                inline=True,
             )
-        embed.description = "\n\n".join(lines)
-        embed.add_field(
-            name="Model",
-            value=(
-                f"Current streak {snapshot.streak:,} gives an exact all-win run average of "
-                f"**{average_xp:,.1f} raw XP/battle**. This is an optimistic battle-only estimate; "
-                "ties, losses, enemy-level bonuses, hunts, and fixed daily XP change the result."
-            ),
-            inline=False,
+        embed.set_footer(
+            text="Battle-only upper estimate • Ties, losses, enemy bonuses, hunts, and fixed daily XP change the result"
         )
         return embed
 
@@ -1015,31 +1097,78 @@ class XPTools(commands.Cog):
         target_level: int,
         highest_level: int,
         current_xp: int,
-        average_xp: float,
         battles_per_day: int,
+        fixed_xp_per_day: int,
         knowledge_quality: float,
         current_streak: int,
     ) -> discord.Embed:
         actual_xp = total_level_xp(start_level, target_level, current_xp)
         base_raw = raw_battle_xp_needed(start_level, target_level, current_xp, highest_level, 0)
-        knowledge_raw = raw_battle_xp_needed(
-            start_level, target_level, current_xp, highest_level, knowledge_quality
+        average_xp = current_streak_average_xp(current_streak)
+        fixed_per_battle = fixed_xp_per_day / battles_per_day
+        base_battles = estimated_battles_needed(
+            start_level,
+            target_level,
+            current_xp,
+            highest_level,
+            average_xp,
+            fixed_xp_per_battle=fixed_per_battle,
         )
-        base_battles = math.ceil(base_raw / average_xp)
-        knowledge_battles = math.ceil(knowledge_raw / average_xp)
+        knowledge_battles = estimated_battles_needed(
+            start_level,
+            target_level,
+            current_xp,
+            highest_level,
+            average_xp,
+            knowledge_bonus=knowledge_quality,
+            fixed_xp_per_battle=fixed_per_battle,
+        )
+        calculate_icon = ui_emoji_text(self.bot, "neon_calculate", "📊")
+        knowledge_icon = ui_emoji_text(self.bot, "passive_kno", "🧠")
         embed = discord.Embed(
-            title=f"📊 L.{start_level} → L.{target_level} XP calculator",
-            description=(
-                f"**Pet XP remaining:** {actual_xp:,.0f}\n"
-                f"**Raw battle XP needed after dynamic catch-up:** {base_raw:,.0f}\n"
-                f"**Estimated battles:** {base_battles:,} without Knowledge • "
-                f"{knowledge_battles:,} with {knowledge_quality * 100:.0f}% Knowledge always equipped\n"
-                f"**Estimated days:** {base_battles / battles_per_day:,.1f} • "
-                f"{knowledge_battles / battles_per_day:,.1f} with Knowledge"
-            ),
+            title=f"{calculate_icon} L.{start_level} → L.{target_level} XP forecast",
+            description="Streak-derived battle XP is calculated automatically—no average-XP input needed.",
             color=0xF1C40F,
             url=XP_SOURCE_URL,
         )
+        embed.add_field(
+            name="📍 Level plan",
+            value=(
+                f"**Pet:** L.{start_level} → L.{target_level}\n"
+                f"**Highest teammate:** L.{highest_level}\n"
+                f"**Pet XP remaining:** {actual_xp:,.0f}\n"
+                f"**Raw battle XP required:** {base_raw:,.0f}"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name="⭐ XP model",
+            value=(
+                f"**Current streak:** {current_streak:,}\n"
+                f"**Calculated average:** {average_xp:,.1f}/battle\n"
+                f"**Battles/day:** {battles_per_day:,}\n"
+                f"**Fixed XP/day:** {fixed_xp_per_day:,}"
+            ),
+            inline=True,
+        )
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
+        embed.add_field(
+            name="⚔️ Normal setup",
+            value=(
+                f"Up to **{base_battles:,} battles**\n"
+                f"About **{base_battles / battles_per_day:,.1f} days**"
+            ),
+            inline=True,
+        )
+        embed.add_field(
+            name=f"{knowledge_icon} {knowledge_quality * 100:.0f}% Knowledge",
+            value=(
+                f"Up to **{knowledge_battles:,} battles**\n"
+                f"About **{knowledge_battles / battles_per_day:,.1f} days**"
+            ),
+            inline=True,
+        )
+        embed.add_field(name="\u200b", value="\u200b", inline=True)
         rows = []
         for interval in REMINDER_INTERVALS:
             count, extra = switch_benefit(
@@ -1055,8 +1184,8 @@ class XPTools(commands.Cog):
             name="Assumptions",
             value=(
                 f"Highest companion stays L.{highest_level}; catch-up is recalculated each level; "
-                f"average raw battle XP is {average_xp:,.1f}; {battles_per_day:,} battles/day; "
-                "no hunting, fixed daily XP, or higher-enemy-level bonus."
+                f"average battle XP is derived from streak {current_streak:,}; fixed daily XP is spread "
+                "across the configured battles; hunting and higher-enemy-level bonuses are excluded."
             ),
             inline=False,
         )
@@ -1298,10 +1427,10 @@ class XPTools(commands.Cog):
         target_level="Level to reach",
         highest_level="Level of the highest companion that stays on the team",
         current_xp="Pet's current XP progress inside its level",
-        average_xp="Expected raw XP per battle before catch-up/Knowledge",
+        current_streak="Current streak used to calculate XP per battle",
         battles_per_day="Expected battles per day",
+        fixed_xp_per_day="XP earned daily outside battles, such as hunts",
         knowledge_quality="Knowledge bonus from 0.05 to 0.15; use 0 for none",
-        current_streak="Current streak used for the 1,000-win switching comparison",
     )
     async def xp_calc(
         self,
@@ -1309,11 +1438,11 @@ class XPTools(commands.Cog):
         start_level: app_commands.Range[int, 1, MAX_LEVEL - 1],
         target_level: app_commands.Range[int, 2, MAX_LEVEL],
         highest_level: app_commands.Range[int, 1, MAX_LEVEL],
+        current_streak: app_commands.Range[int, 0, MAX_VALIDATED_STREAK],
         current_xp: app_commands.Range[int, 0, 2_000_000_000] = 0,
-        average_xp: app_commands.Range[float, 50.0, 10_000.0] = 350.0,
         battles_per_day: app_commands.Range[int, 1, 5760] = 1000,
+        fixed_xp_per_day: app_commands.Range[int, 0, 2_000_000_000] = 0,
         knowledge_quality: app_commands.Range[float, 0.0, 0.15] = 0.15,
-        current_streak: app_commands.Range[int, 0, MAX_VALIDATED_STREAK] = 0,
     ) -> None:
         try:
             embed = self.build_calculator_embed(
@@ -1321,8 +1450,8 @@ class XPTools(commands.Cog):
                 target_level=target_level,
                 highest_level=highest_level,
                 current_xp=current_xp,
-                average_xp=float(average_xp),
                 battles_per_day=battles_per_day,
+                fixed_xp_per_day=fixed_xp_per_day,
                 knowledge_quality=float(knowledge_quality),
                 current_streak=current_streak,
             )

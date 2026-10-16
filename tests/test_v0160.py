@@ -19,6 +19,8 @@ from cogs.xp_tools import (
     average_winning_streak_xp,
     catchup_multiplier,
     changed_positions,
+    current_streak_average_xp,
+    estimated_battles_needed,
     milestone_bonus,
     parse_battle_result,
     parse_team_xp_snapshot,
@@ -70,6 +72,25 @@ class XPFormulaTests(unittest.TestCase):
         self.assertEqual(round(average_winning_streak_xp(2000), 2), 349.89)
         self.assertEqual(round(average_winning_streak_xp(5000), 2), 381.24)
 
+    def test_forecast_uses_current_streak_point_estimate(self) -> None:
+        average = current_streak_average_xp(1265)
+        self.assertEqual(round(average, 1), 358.3)
+        self.assertEqual(
+            estimated_battles_needed(49, 50, 1_772_662, 56, average),
+            4128,
+        )
+        self.assertEqual(
+            estimated_battles_needed(
+                49,
+                50,
+                1_772_662,
+                56,
+                average,
+                fixed_xp_per_battle=100,
+            ),
+            3741,
+        )
+
     def test_switch_comparison_and_prompt_boundary(self) -> None:
         count_10, extra_10 = switch_benefit(10)
         count_100, extra_100 = switch_benefit(100)
@@ -89,6 +110,17 @@ class XPParsingTests(unittest.TestCase):
         self.assertEqual([pet.level for pet in snapshot.pets], [49, 49, 56])
         self.assertEqual(snapshot.pets[0].current_xp, 1_772_662)
         self.assertEqual(snapshot.pets[2].next_xp, 9_835_496)
+
+    def test_team_forecast_is_three_column_and_streak_derived(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        cog = XPTools.__new__(XPTools)
+        cog.bot = SimpleNamespace()
+        embed = cog.build_team_forecast_embed(snapshot)
+        self.assertIn("358.3 XP/battle", embed.description)
+        self.assertEqual(len(embed.fields), 3)
+        self.assertTrue(all(field.inline for field in embed.fields))
+        self.assertIn("4,128 battles", embed.fields[0].value)
 
     def test_battle_results_distinguish_ties(self) -> None:
         win = parse_battle_result("You won in 14 turns! | +200 xp | Streak: 1,363")
