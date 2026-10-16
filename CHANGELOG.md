@@ -1,3 +1,14 @@
+## v0.16.6-beta - Compact Team XP Controls
+
+- Kept XP Calculator labeled and changed the four supporting Team XP actions to icon-only buttons.
+- Placed all five Team XP controls on one compact row.
+- Preserved one-click normal-preset capture from the currently displayed OwO team.
+- Displayed each current normal weapon ID in the Knowledge form before accepting replacement Knowledge IDs.
+- Kept reminders private and changed the save icon's private help to explain the direct team-import command.
+- Updated reminder setup copy to identify the new icon-only normal and Knowledge controls.
+- Added regression coverage for button layout, icon identity, current-ID visibility, and one-click normal saving.
+- Updated the public version to 0.16.6-beta; no database migration, dependency, slash-command schema, or permission change is required.
+
 ## v0.16.5-beta - Forecast Layout Refinements
 
 - Replaced text/symbol level markers with Discord's native `🆙` and `⬛` emojis.

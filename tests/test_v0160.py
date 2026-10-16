@@ -16,6 +16,7 @@ from cogs.xp_tools import (
     KNOWLEDGE_SCENARIOS,
     ForecastActivityModal,
     ForecastSettings,
+    KnowledgePresetModal,
     XPReminderStore,
     XPTools,
     BattleResult,
@@ -157,13 +158,26 @@ class XPParsingTests(unittest.TestCase):
         cog = XPTools.__new__(XPTools)
         cog.bot = SimpleNamespace()
         view = TeamXPToolsView(cog, 1, 1, snapshot, "h")
-        emojis = {item.label: str(item.emoji) for item in view.children}
-        self.assertNotIn("XP forecast", emojis)
-        self.assertEqual(emojis["XP calculator"], "🧮")
-        self.assertEqual(emojis["Save normal"], "⚔️")
-        self.assertEqual(emojis["Save Knowledge"], "🧠")
-        self.assertEqual(emojis["Reminders"], "🔔")
-        self.assertEqual(emojis["Save-team help"], "💾")
+        calculator = next(item for item in view.children if item.label == "XP calculator")
+        icon_buttons = {
+            item.custom_id: item
+            for item in view.children
+            if item.label is None
+        }
+        self.assertEqual(str(calculator.emoji), "🧮")
+        self.assertEqual(str(icon_buttons["xp_tools:save_normal"].emoji), "⚔️")
+        self.assertEqual(str(icon_buttons["xp_tools:save_knowledge"].emoji), "🧠")
+        self.assertEqual(str(icon_buttons["xp_tools:reminders"].emoji), "🔔")
+        self.assertEqual(str(icon_buttons["xp_tools:save_team_help"].emoji), "💾")
+        self.assertTrue(all(item.row == 0 for item in view.children))
+
+        profile = SimpleNamespace(
+            normal=(TeamMember(1, "snake", "ABC123"),),
+            knowledge=(),
+        )
+        modal = KnowledgePresetModal(cog, 1, 1, profile)
+        self.assertIn("Current ABC123", modal.position_1.placeholder)
+        self.assertIn("snake", modal.position_1.placeholder)
 
     def test_neon_style_settings_match_reported_next_level_scale(self) -> None:
         text = (
@@ -315,6 +329,29 @@ class XPParsingTests(unittest.TestCase):
 
 
 class XPStoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_normal_icon_saves_current_weapons_in_one_click(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        saved = SimpleNamespace(normal=snapshot.members)
+        cog = XPTools.__new__(XPTools)
+        cog.bot = SimpleNamespace()
+        cog.store = SimpleNamespace(upsert=AsyncMock(return_value=saved))
+        view = TeamXPToolsView(cog, 42, 1, snapshot, "h")
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(send_message=AsyncMock())
+        )
+
+        await view.save_normal.callback(interaction)
+
+        cog.store.upsert.assert_awaited_once_with(
+            1,
+            42,
+            normal=snapshot.members,
+            enabled=False,
+            awaiting_restore=False,
+        )
+        self.assertTrue(interaction.response.send_message.await_args.kwargs["ephemeral"])
+
     async def test_team_reaction_reply_has_no_ping_or_auto_delete(self) -> None:
         cog = XPTools.__new__(XPTools)
         cog.bot = SimpleNamespace()

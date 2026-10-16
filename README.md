@@ -1,3 +1,7 @@
+## v0.16.6-beta notes
+
+The Team XP panel now keeps XP Calculator labeled while presenting normal preset, Knowledge preset, reminders, and save-team help as four compact icon-only controls on the same row. The normal icon captures the current weapon set immediately; the Knowledge form keeps current weapon IDs visible while accepting replacements; and the save icon privately explains the direct team-import command. See [compact Team XP controls](RELEASE_NOTES_v0.16.6-beta.md).
+
 ## v0.16.5-beta notes
 
 Forecast rows now use Discord's native `🆙` and `⬛` emojis with visible separators between all three pets. Every Settings input is optional, Maximum streak and Knowledge quality have independent fields, forecast line count is configurable again with a 20-line default, and each field displays its active value plus a helpful placeholder. See [forecast layout refinements](RELEASE_NOTES_v0.16.5-beta.md).

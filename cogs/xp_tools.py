@@ -999,14 +999,20 @@ class KnowledgePresetModal(discord.ui.Modal, title="Knowledge weapon IDs"):
         self.owner_id = owner_id
         self.profile = profile
         existing = {member.position: member.weapon_id for member in profile.knowledge}
-        normal = {member.position: member.weapon_id for member in profile.normal}
+        normal_members = {member.position: member for member in profile.normal}
         for position, item in (
             (1, self.position_1),
             (2, self.position_2),
             (3, self.position_3),
         ):
-            item.placeholder = f"Current: {normal.get(position, 'none')}"
-            if existing.get(position) and existing[position] != normal.get(position):
+            current = normal_members.get(position)
+            current_id = current.weapon_id if current else "none"
+            item.placeholder = (
+                f"Current {current_id} • enter Knowledge ID for {current.animal}"
+                if current
+                else "No current weapon saved"
+            )
+            if existing.get(position) and existing[position] != current_id:
                 item.default = existing[position]
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
@@ -1240,11 +1246,11 @@ class TeamXPToolsView(discord.ui.View):
         self.snapshot = snapshot
         self.helper_prefix = helper_prefix
         icon_keys = {
-            "Save Knowledge": ("passive_kno", "🧠"),
+            "xp_tools:save_knowledge": ("passive_kno", "🧠"),
         }
         for item in self.children:
-            if isinstance(item, discord.ui.Button) and item.label in icon_keys:
-                key, fallback = icon_keys[item.label]
+            if isinstance(item, discord.ui.Button) and item.custom_id in icon_keys:
+                key, fallback = icon_keys[item.custom_id]
                 item.emoji = ui_emoji_button(self.cog.bot, key, fallback)
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
@@ -1253,7 +1259,7 @@ class TeamXPToolsView(discord.ui.View):
         await interaction.response.send_message("Open the team tools from your own reaction.", ephemeral=True)
         return False
 
-    @discord.ui.button(label="XP calculator", emoji="🧮", style=discord.ButtonStyle.primary, row=1)
+    @discord.ui.button(label="XP calculator", emoji="🧮", style=discord.ButtonStyle.primary, row=0)
     async def calculator(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         if not self.snapshot.pets:
             await interaction.response.send_message(
@@ -1265,7 +1271,12 @@ class TeamXPToolsView(discord.ui.View):
         panel = TeamLevelForecastView(self.cog, self.owner_id, self.snapshot)
         await interaction.edit_original_response(embed=panel.build_embed(), view=panel)
 
-    @discord.ui.button(label="Save normal", emoji="⚔️", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(
+        emoji="⚔️",
+        style=discord.ButtonStyle.secondary,
+        custom_id="xp_tools:save_normal",
+        row=0,
+    )
     async def save_normal(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         profile = await self.cog.store.upsert(
             self.guild_id,
@@ -1275,16 +1286,22 @@ class TeamXPToolsView(discord.ui.View):
             awaiting_restore=False,
         )
         await interaction.response.send_message(
-            f"✅ Saved the normal weapon preset with {len(profile.normal)} equipped weapon(s). Reminder tracking stays off until you enable it.",
+            f"✅ Saved the current {len(profile.normal)} equipped weapon(s) as your normal preset. "
+            "Reminder tracking stays off until you enable it.",
             ephemeral=True,
         )
 
-    @discord.ui.button(label="Save Knowledge", emoji="🧠", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(
+        emoji="🧠",
+        style=discord.ButtonStyle.secondary,
+        custom_id="xp_tools:save_knowledge",
+        row=0,
+    )
     async def save_knowledge(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         profile = await self.cog.store.get(self.guild_id, self.owner_id)
         if not profile.normal:
             await interaction.response.send_message(
-                "Save the current normal weapons first, then enter the Knowledge weapon IDs.",
+                "Click ⚔️ first to save the currently equipped normal weapons, then open Knowledge again.",
                 ephemeral=True,
             )
             return
@@ -1292,7 +1309,12 @@ class TeamXPToolsView(discord.ui.View):
             KnowledgePresetModal(self.cog, self.guild_id, self.owner_id, profile)
         )
 
-    @discord.ui.button(label="Reminders", emoji="🔔", style=discord.ButtonStyle.success)
+    @discord.ui.button(
+        emoji="🔔",
+        style=discord.ButtonStyle.success,
+        custom_id="xp_tools:reminders",
+        row=0,
+    )
     async def reminders(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         profile = await self.cog.store.get(self.guild_id, self.owner_id)
         await interaction.response.send_message(
@@ -1301,10 +1323,16 @@ class TeamXPToolsView(discord.ui.View):
             ephemeral=True,
         )
 
-    @discord.ui.button(label="Save-team help", emoji="💾", style=discord.ButtonStyle.secondary)
+    @discord.ui.button(
+        emoji="💾",
+        style=discord.ButtonStyle.secondary,
+        custom_id="xp_tools:save_team_help",
+        row=0,
+    )
     async def save_team_help(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         await interaction.response.send_message(
-            f"Reply directly to the OwO team message with `{helper_alias(self.helper_prefix, 'ht')} C <name>` to save the team template.",
+            f"Reply directly to the OwO team message with "
+            f"`{helper_alias(self.helper_prefix, 'ht')} C <name>` to import and save it as a team.",
             ephemeral=True,
         )
 
@@ -1465,8 +1493,8 @@ class XPTools(commands.Cog):
         embed.add_field(
             name="Setup",
             value=(
-                "1. Show the correct OwO team with normal weapons and click the helper reaction → **Save normal**.\n"
-                "2. Click **Save Knowledge** and enter the six-character Knowledge weapon ID(s).\n"
+                "1. Show the correct OwO team with normal weapons, open the helper panel, and click **⚔️**.\n"
+                "2. Click the **Knowledge icon** and enter the replacement six-character weapon ID(s).\n"
                 "3. Choose an interval and enable reminders below."
             ),
             inline=False,
