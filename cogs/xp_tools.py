@@ -97,11 +97,12 @@ class TeamXPSnapshot:
 
 @dataclass(frozen=True)
 class ForecastSettings:
-    battles_per_day: int = 2000
-    fixed_xp_per_day: int = 200_000
-    average_xp_per_hunt: float = 21.0
-    tie_rate_percent: float = 0.82
-    maximum_streak: int = 2600
+    battles_per_day: int = 0
+    fixed_xp_per_day: int = 0
+    average_xp_per_hunt: float = 0.0
+    tie_rate_percent: float = 0.0
+    loss_rate_percent: float = 0.0
+    maximum_streak: int = 0
     knowledge_quality: float = 0.15
     max_lines: int = 48
 
@@ -178,6 +179,13 @@ def total_level_xp(start_level: int, target_level: int, current_xp: int = 0) -> 
 
 def catchup_multiplier(level: int, highest_level: int) -> float:
     return 2.0 + 0.1 * (highest_level - level) if level < highest_level else 1.0
+
+
+def knowledge_effect_text(base_multiplier: float, knowledge_quality: float) -> str:
+    """Explain Knowledge as an additive multiplier and its effective increase."""
+    selected = base_multiplier + knowledge_quality
+    relative = 100 * knowledge_quality / base_multiplier if base_multiplier else 0.0
+    return f"{base_multiplier:.2f}× → {selected:.2f}× (+{relative:.1f}%)"
 
 
 def raw_battle_xp_needed(
@@ -286,17 +294,23 @@ def estimated_battles_needed(
 
 
 def validate_forecast_settings(settings: ForecastSettings) -> None:
-    if not 1 <= settings.battles_per_day <= 5_760:
-        raise ValueError("Battles per day must be between 1 and 5,760")
+    if not 0 <= settings.battles_per_day <= 5_760:
+        raise ValueError("Battles per day must be between 0 and 5,760")
     if not 0 <= settings.fixed_xp_per_day <= 2_000_000_000:
         raise ValueError("Fixed XP per day must be between 0 and 2,000,000,000")
     if not 0 <= settings.average_xp_per_hunt <= 1_000_000:
         raise ValueError("Average XP per hunt must be between 0 and 1,000,000")
     if not 0 <= settings.tie_rate_percent < 100:
         raise ValueError("Tie rate must be at least 0 and below 100 percent")
-    if not 1 <= settings.maximum_streak <= MAX_VALIDATED_STREAK:
+    if not 0 <= settings.loss_rate_percent < 100:
+        raise ValueError("Loss rate must be at least 0 and below 100 percent")
+    if settings.tie_rate_percent + settings.loss_rate_percent >= 100:
+        raise ValueError("Tie rate and loss rate together must stay below 100 percent")
+    if settings.fixed_xp_per_day and settings.battles_per_day == 0:
+        raise ValueError("Set battles per day before adding fixed XP per day")
+    if not 0 <= settings.maximum_streak <= MAX_VALIDATED_STREAK:
         raise ValueError(
-            f"Maximum streak must be between 1 and {MAX_VALIDATED_STREAK:,}"
+            f"Maximum streak must be between 0 and {MAX_VALIDATED_STREAK:,}"
         )
     if not 0 <= settings.knowledge_quality <= 0.15:
         raise ValueError("Knowledge quality must be between 0 and 0.15")
@@ -326,12 +340,18 @@ def simulate_team_forecast(
         return (), {}
 
     limit = min(MAX_FORECAST_LINES, line_limit or settings.max_lines)
-    success_rate = 1.0 - settings.tie_rate_percent / 100.0
-    fixed_per_battle = settings.fixed_xp_per_day / settings.battles_per_day
+    tie_rate = settings.tie_rate_percent / 100.0
+    loss_rate = settings.loss_rate_percent / 100.0
+    fixed_per_battle = (
+        settings.fixed_xp_per_day / settings.battles_per_day
+        if settings.battles_per_day
+        else 0.0
+    )
     streak = max(0, snapshot.streak)
-    if streak > settings.maximum_streak:
+    if settings.maximum_streak and streak > settings.maximum_streak:
         streak %= settings.maximum_streak
-    win_accumulator = 0.0
+    tie_accumulator = 0.0
+    loss_accumulator = 0.0
     initial_levels = {pet.position: pet.level for pet in snapshot.pets}
     next_level_battles: dict[int, int] = {}
     levels = [pet.level for pet in snapshot.pets]
@@ -352,23 +372,32 @@ def simulate_team_forecast(
             pets=pets,
             battles=battles,
             streak=streak,
-            days=battles // settings.battles_per_day,
+            days=battles // settings.battles_per_day if settings.battles_per_day else 0,
         )
 
     lines: list[ForecastLine] = [make_line(0, set())]
     for battles in range(1, MAX_FORECAST_BATTLES + 1):
-        win_accumulator += success_rate
-        won = win_accumulator >= 1.0
-        if won:
-            win_accumulator -= 1.0
+        tie_accumulator += tie_rate
+        loss_accumulator += loss_rate
+        lost = loss_accumulator >= 1.0
+        tied = not lost and tie_accumulator >= 1.0
+        if lost:
+            loss_accumulator -= 1.0
+            streak = 0
+            raw_battle_xp = 50.0
+        elif tied:
+            tie_accumulator -= 1.0
+            raw_battle_xp = 100.0
+        else:
             streak += 1
-            if streak > settings.maximum_streak:
+            if settings.maximum_streak and streak > settings.maximum_streak:
                 streak = 1
-
-        raw_battle_xp = current_streak_average_xp(streak) * success_rate
+            raw_battle_xp = current_streak_average_xp(
+                min(streak, MAX_VALIDATED_STREAK)
+            )
         knowledge_active = use_knowledge and (
             knowledge_interval is None
-            or (won and streak > 0 and streak % knowledge_interval == 0)
+            or (not tied and not lost and streak > 0 and streak % knowledge_interval == 0)
         )
         highest_level = max(levels)
         leveled_positions: set[int] = set()
@@ -844,12 +873,22 @@ class XPReminderView(discord.ui.View):
         await self.refresh(interaction)
 
 
-class ForecastActivityModal(discord.ui.Modal, title="Forecast activity settings"):
-    battles_per_day = discord.ui.TextInput(label="Battles per day (1–5760)", max_length=5)
-    fixed_xp_per_day = discord.ui.TextInput(label="Fixed XP per day", max_length=10)
-    average_xp_per_hunt = discord.ui.TextInput(label="Average XP per hunt", max_length=10)
-    tie_rate_percent = discord.ui.TextInput(label="Tie rate percent", max_length=6)
-    maximum_streak = discord.ui.TextInput(label="Maximum streak", max_length=7)
+class ForecastActivityModal(discord.ui.Modal, title="Forecast settings"):
+    battles_per_day = discord.ui.TextInput(
+        label="Battles per day (0–5760)", placeholder="0", max_length=5
+    )
+    fixed_xp_per_day = discord.ui.TextInput(
+        label="Fixed XP/day (huntbot + bosses)", placeholder="0", max_length=10
+    )
+    average_xp_per_hunt = discord.ui.TextInput(
+        label="Average XP per hunt", placeholder="16 baseline • 21 with Patreon", max_length=10
+    )
+    rates = discord.ui.TextInput(
+        label="Tie %, loss %", placeholder="Example: 0.82, 0.10", max_length=20
+    )
+    streak_and_knowledge = discord.ui.TextInput(
+        label="Maximum streak, Knowledge quality", placeholder="Example: 2600, 0.15", max_length=24
+    )
 
     def __init__(self, panel: "TeamLevelForecastView") -> None:
         super().__init__()
@@ -858,47 +897,36 @@ class ForecastActivityModal(discord.ui.Modal, title="Forecast activity settings"
         self.battles_per_day.default = str(settings.battles_per_day)
         self.fixed_xp_per_day.default = str(settings.fixed_xp_per_day)
         self.average_xp_per_hunt.default = f"{settings.average_xp_per_hunt:g}"
-        self.tie_rate_percent.default = f"{settings.tie_rate_percent:g}"
-        self.maximum_streak.default = str(settings.maximum_streak)
+        self.rates.default = (
+            f"{settings.tie_rate_percent:g}, {settings.loss_rate_percent:g}"
+        )
+        self.streak_and_knowledge.default = (
+            f"{settings.maximum_streak}, {settings.knowledge_quality:g}"
+        )
+
+    @staticmethod
+    def _pair(value: str, label: str) -> tuple[str, str]:
+        parts = [part.strip() for part in re.split(r"[,;]", value, maxsplit=1)]
+        if len(parts) != 2 or not all(parts):
+            raise ValueError(f"Enter {label} as two values separated by a comma")
+        return parts[0], parts[1]
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         try:
+            tie_rate, loss_rate = self._pair(str(self.rates), "tie and loss rates")
+            maximum_streak, knowledge_quality = self._pair(
+                str(self.streak_and_knowledge),
+                "maximum streak and Knowledge quality",
+            )
             settings = replace(
                 self.panel.settings,
                 battles_per_day=int(str(self.battles_per_day).replace(",", "")),
                 fixed_xp_per_day=int(str(self.fixed_xp_per_day).replace(",", "")),
                 average_xp_per_hunt=float(str(self.average_xp_per_hunt).replace(",", "")),
-                tie_rate_percent=float(str(self.tie_rate_percent)),
-                maximum_streak=int(str(self.maximum_streak).replace(",", "")),
-            )
-            validate_forecast_settings(settings)
-        except ValueError as exc:
-            await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
-            return
-        self.panel.settings = settings
-        self.panel.page = 0
-        await interaction.response.defer()
-        await interaction.edit_original_response(embed=self.panel.build_embed(), view=self.panel)
-
-
-class ForecastKnowledgeModal(discord.ui.Modal, title="Knowledge and display settings"):
-    knowledge_quality = discord.ui.TextInput(
-        label="Knowledge quality (0–0.15)", max_length=4
-    )
-    max_lines = discord.ui.TextInput(label="Maximum forecast lines (1–99)", max_length=2)
-
-    def __init__(self, panel: "TeamLevelForecastView") -> None:
-        super().__init__()
-        self.panel = panel
-        self.knowledge_quality.default = f"{panel.settings.knowledge_quality:g}"
-        self.max_lines.default = str(panel.settings.max_lines)
-
-    async def on_submit(self, interaction: discord.Interaction) -> None:
-        try:
-            settings = replace(
-                self.panel.settings,
-                knowledge_quality=float(str(self.knowledge_quality)),
-                max_lines=int(str(self.max_lines)),
+                tie_rate_percent=float(tie_rate),
+                loss_rate_percent=float(loss_rate),
+                maximum_streak=int(maximum_streak.replace(",", "")),
+                knowledge_quality=float(knowledge_quality),
             )
             validate_forecast_settings(settings)
         except ValueError as exc:
@@ -979,6 +1007,8 @@ class TeamLevelForecastView(discord.ui.View):
         self.settings = ForecastSettings()
         self.scenario_index = 0
         self.page = 0
+        self.show_stats = False
+        self.show_streak = True
         self._cache_key: tuple[ForecastSettings, int] | None = None
         self._cache_lines: tuple[ForecastLine, ...] = ()
         self._cache_selected_counts: dict[int, int] = {}
@@ -1033,56 +1063,69 @@ class TeamLevelForecastView(discord.ui.View):
         self.page = min(self.page, page_count - 1)
         start = self.page * FORECAST_PAGE_LINES
         visible = lines[start : start + FORECAST_PAGE_LINES]
-        table_rows = ["Levels                  | Battles | Streak | Days"]
+        headings = ["Levels", "Battles"]
+        if self.show_streak:
+            headings.append("Streak")
+        headings.append("Days")
+        table_rows = [" | ".join(headings)]
         for line in visible:
             pet_cells = []
             for pet in line.pets:
-                percent = 100 * pet.current_xp / pet.next_xp if pet.next_xp else 0
-                marker = "UP" if pet.leveled else "--"
-                pet_cells.append(f"{marker}{pet.level:>3} {percent:>3.0f}%")
-            table_rows.append(
-                f"{' | '.join(pet_cells):<31} | {line.battles:>7} | {line.streak:>6} | {line.days:>4}"
-            )
+                marker = "UP" if pet.leveled else "■ "
+                pet_cells.append(f"{marker}{pet.level:>3}")
+            row = [" ".join(pet_cells), f"{line.battles:,}"]
+            if self.show_streak:
+                row.append(f"{line.streak:,}")
+            row.append(f"{line.days:,}" if self.settings.battles_per_day else "—")
+            table_rows.append(" | ".join(row))
 
         embed = discord.Embed(
             title=f"🔮 Level Forecaster — {self.snapshot.source_title}",
             description=(
-                f"**Knowledge plan:** {label} at {self.settings.knowledge_quality * 100:g}% quality\n"
-                f"**Activity:** {self.settings.battles_per_day:,} battles/day • "
-                f"+{self.settings.fixed_xp_per_day:,} fixed XP/day • "
-                f"{self.settings.average_xp_per_hunt:g} XP/hunt\n"
-                f"**Streak model:** {self.settings.tie_rate_percent:g}% ties • "
-                f"maximum {self.settings.maximum_streak:,}"
+                f"**Knowledge plan:** {label}\n"
+                "*Need tie/loss estimates? Run Neon Global in the Neon server.*"
             ),
             color=0x5865F2,
             url=XP_SOURCE_URL,
         )
-        for pet in self.snapshot.pets:
-            selected = selected_counts.get(pet.position, 0)
-            normal = normal_counts.get(pet.position, 0)
-            saved = max(0, normal - selected)
-            pet_icon = ui_emoji_text(self.cog.bot, animal_emoji_key(pet.animal), "🐾")
-            embed.add_field(
-                name=f"{pet_icon} [{pet.position}] {pet.animal}",
-                value=(
-                    f"Normal: **{normal:,}**\n"
-                    f"Selected: **{selected:,}**\n"
-                    f"Benefit: **{saved:,} battles**"
-                ),
-                inline=True,
-            )
+        if self.show_stats:
+            highest = max(pet.level for pet in self.snapshot.pets)
+            for pet in self.snapshot.pets:
+                selected = selected_counts.get(pet.position, 0)
+                normal = normal_counts.get(pet.position, 0)
+                saved = max(0, normal - selected)
+                multiplier = catchup_multiplier(pet.level, highest)
+                pet_icon = ui_emoji_text(self.cog.bot, animal_emoji_key(pet.animal), "🐾")
+                embed.add_field(
+                    name=f"{pet_icon} [{pet.position}] {pet.animal}",
+                    value=(
+                        f"Normal: **{normal:,}**\n"
+                        f"Selected: **{selected:,}**\n"
+                        f"Benefit: **{saved:,} battles**\n"
+                        f"Knowledge: `{knowledge_effect_text(multiplier, self.settings.knowledge_quality)}`"
+                    ),
+                    inline=True,
+                )
         embed.add_field(
-            name="Progress — `Levels | Battles | Streak | Days`",
+            name="Progress",
             value="```text\n" + "\n".join(table_rows) + "\n```",
             inline=False,
         )
+        maximum = f"{self.settings.maximum_streak:,}" if self.settings.maximum_streak else "none"
         embed.set_footer(
             text=(
-                f"Page {self.page + 1}/{page_count} • {len(lines)} lines • one hunt per battle • "
-                "ties use the documented approximation"
+                f"Page {self.page + 1}/{page_count} • {len(lines)} lines • "
+                f"{self.settings.battles_per_day:,} battles/day • "
+                f"+{self.settings.fixed_xp_per_day:,} XP/day • "
+                f"{self.settings.average_xp_per_hunt:g} XP/hunt • "
+                f"{self.settings.tie_rate_percent:g}% tie • "
+                f"{self.settings.loss_rate_percent:g}% loss • max streak: {maximum} • "
+                f"Knowledge: {self.settings.knowledge_quality * 100:g}%"
             )
         )
         self.scenario.label = f"Scenario: {label}"
+        self.stats.label = "Hide stats" if self.show_stats else "Show stats"
+        self.streak.label = "Hide streak" if self.show_streak else "Show streak"
         self.previous.disabled = self.page <= 0
         self.next.disabled = self.page >= page_count - 1
         self.page_number.label = f"Page {self.page + 1}/{page_count}"
@@ -1094,11 +1137,19 @@ class TeamLevelForecastView(discord.ui.View):
     ) -> None:
         await interaction.response.send_modal(ForecastActivityModal(self))
 
-    @discord.ui.button(label="Knowledge & lines", style=discord.ButtonStyle.secondary, row=0)
-    async def knowledge_settings(
+    @discord.ui.button(label="Show stats", style=discord.ButtonStyle.secondary, row=0)
+    async def stats(
         self, interaction: discord.Interaction, _button: discord.ui.Button
     ) -> None:
-        await interaction.response.send_modal(ForecastKnowledgeModal(self))
+        self.show_stats = not self.show_stats
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="Hide streak", style=discord.ButtonStyle.secondary, row=0)
+    async def streak(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        self.show_streak = not self.show_streak
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
     @discord.ui.button(label="Scenario", style=discord.ButtonStyle.primary, row=0)
     async def scenario(
@@ -1406,19 +1457,22 @@ class XPTools(commands.Cog):
                 f"**Model:** {settings.battles_per_day:,} battles/day • "
                 f"+{settings.fixed_xp_per_day:,} fixed XP/day • "
                 f"{settings.average_xp_per_hunt:g} XP/hunt • "
-                f"{settings.tie_rate_percent:g}% ties • max streak {settings.maximum_streak:,}"
+                f"{settings.tie_rate_percent:g}% ties • {settings.loss_rate_percent:g}% losses • "
+                f"max streak {'none' if not settings.maximum_streak else f'{settings.maximum_streak:,}'}"
             ),
             color=0x5865F2,
         )
         for pet in snapshot.pets:
-            percent = 100 * pet.current_xp / pet.next_xp if pet.next_xp else 0
+            multiplier = catchup_multiplier(
+                pet.level, max(item.level for item in snapshot.pets)
+            )
             pet_icon = ui_emoji_text(self.bot, animal_emoji_key(pet.animal), "🐾")
             embed.add_field(
                 name=f"{pet_icon} [{pet.position}] {pet.animal}",
                 value=(
-                    f"**L.{pet.level} → L.{pet.level + 1}** ({percent:.1f}%)\n"
+                    f"**L.{pet.level} → L.{pet.level + 1}**\n"
                     f"Need: **{max(0, pet.next_xp - pet.current_xp):,} XP**\n"
-                    f"Multiplier: **{catchup_multiplier(pet.level, max(item.level for item in snapshot.pets)):.2f}×**\n"
+                    f"Knowledge: `{knowledge_effect_text(multiplier, settings.knowledge_quality)}`\n"
                     f"Normal: up to **{normal.get(pet.position, 0):,} battles**\n"
                     f"Max Knowledge: **{knowledge.get(pet.position, 0):,}**"
                 ),

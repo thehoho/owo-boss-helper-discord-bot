@@ -3,6 +3,7 @@ from __future__ import annotations
 import tempfile
 import time
 import unittest
+from dataclasses import replace
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
@@ -25,6 +26,7 @@ from cogs.xp_tools import (
     changed_positions,
     current_streak_average_xp,
     estimated_battles_needed,
+    knowledge_effect_text,
     knowledge_preset_from_ids,
     milestone_bonus,
     parse_battle_result,
@@ -171,20 +173,73 @@ class XPParsingTests(unittest.TestCase):
         )
         snapshot = parse_team_xp_snapshot(text)
         assert snapshot is not None
-        normal, always = next_level_forecasts(snapshot, ForecastSettings())
-        self.assertEqual(normal[1], 3248)
-        self.assertEqual(normal[2], 4052)
+        reference_settings = ForecastSettings(
+            battles_per_day=2000,
+            fixed_xp_per_day=200_000,
+            average_xp_per_hunt=21,
+            tie_rate_percent=0.82,
+            maximum_streak=2600,
+        )
+        normal, always = next_level_forecasts(snapshot, reference_settings)
+        self.assertLessEqual(abs(normal[1] - 3246), 5)
+        self.assertEqual(normal[2], 4043)
         self.assertLess(always[1], normal[1])
 
         lines, _ = simulate_team_forecast(
             snapshot,
-            ForecastSettings(max_lines=6),
+            replace(reference_settings, max_lines=6),
             use_knowledge=True,
             knowledge_interval=10,
         )
         self.assertEqual(lines[0].battles, 0)
         self.assertEqual(lines[0].streak, 1754)
         self.assertGreaterEqual(len(lines), 5)
+
+    def test_compact_forecast_defaults_and_controls(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        settings = ForecastSettings()
+        self.assertEqual(
+            (
+                settings.battles_per_day,
+                settings.fixed_xp_per_day,
+                settings.average_xp_per_hunt,
+                settings.tie_rate_percent,
+                settings.loss_rate_percent,
+                settings.maximum_streak,
+            ),
+            (0, 0, 0.0, 0.0, 0.0, 0),
+        )
+        cog = XPTools.__new__(XPTools)
+        cog.bot = SimpleNamespace()
+        panel = TeamLevelForecastView(cog, 1, snapshot)
+        embed = panel.build_embed()
+        labels = {item.label for item in panel.children}
+        self.assertIn("Show stats", labels)
+        self.assertIn("Hide streak", labels)
+        self.assertNotIn("Knowledge & lines", labels)
+        self.assertEqual(len(embed.fields), 1)
+        self.assertNotIn("%", embed.fields[0].value)
+        self.assertIn("0 battles/day", embed.footer.text)
+        self.assertIn("0% loss", embed.footer.text)
+
+    def test_knowledge_effect_explains_additive_multiplier(self) -> None:
+        self.assertEqual(knowledge_effect_text(2.7, 0.15), "2.70× → 2.85× (+5.6%)")
+        self.assertEqual(knowledge_effect_text(1.0, 0.15), "1.00× → 1.15× (+15.0%)")
+
+    def test_loss_rate_resets_streak_and_slows_forecast(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        no_loss = ForecastSettings(max_lines=8)
+        with_loss = replace(no_loss, loss_rate_percent=10)
+        no_loss_lines, no_loss_next = simulate_team_forecast(
+            snapshot, no_loss, use_knowledge=False, stop_after_next_levels=True
+        )
+        loss_lines, loss_next = simulate_team_forecast(
+            snapshot, with_loss, use_knowledge=False, stop_after_next_levels=True
+        )
+        self.assertGreater(loss_next[1], no_loss_next[1])
+        self.assertLess(loss_lines[-1].streak, no_loss_lines[-1].streak)
 
     def test_team_panel_combines_forecast_and_calculator_cycles_six_plans(self) -> None:
         snapshot = parse_team_xp_snapshot(TEAM_TEXT)

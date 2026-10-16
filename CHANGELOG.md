@@ -1,3 +1,14 @@
+## v0.16.4-beta - Compact XP Forecasting
+
+- Rebuilt the full-team forecast as a compact level-event table without progress percentages.
+- Added optional Stats and Streak controls while preserving cached pagination and all six Knowledge scenarios.
+- Consolidated activity and Knowledge inputs into one Settings form and removed the separate Knowledge/line-count modal.
+- Added configurable loss-rate modeling: losses award loss XP, reset the projected streak, and affect future milestone timing.
+- Reset activity defaults to zero so forecasts never silently assume a member's daily grinding values.
+- Added clear placeholders for huntbot/boss fixed XP and baseline/Patreon hunt XP, plus a Neon Global hint for tie/loss estimates.
+- Explained Knowledge per pet as an additive multiplier and its effective percentage increase.
+- Updated the public version to 0.16.4-beta; no database migration, dependency, slash-command schema, or permission change is required.
+
 ## v0.16.3-beta - Interactive Team XP Forecasting
 
 - Combined the next-level forecast into the main Team XP tools response and removed the redundant forecast button.

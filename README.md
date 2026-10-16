@@ -1,3 +1,7 @@
+## v0.16.4-beta notes
+
+The team level forecaster now uses a compact, percentage-free progression table with optional pet statistics and streak columns. One Settings form controls activity, fixed and hunt XP, tie and loss rates, maximum streak, and Knowledge quality; initial activity values are zero so members enter their own assumptions. Losses reset projected streaks, the footer keeps every active assumption visible in one line, and each pet explains Knowledge's actual additive multiplier and effective benefit. See [compact XP forecasting](RELEASE_NOTES_v0.16.4-beta.md).
+
 ## v0.16.3-beta notes
 
 The OwO-team reaction now returns one persistent, non-mentioning Team XP panel containing the next-level forecast. Its calculator opens a paginated full-team level forecaster with editable activity, fixed XP, hunt XP, tie rate, maximum streak, Knowledge quality, and line count, plus six dynamically switchable Knowledge plans. Normal weapons are captured from the team card; Knowledge weapon IDs are entered directly. See [interactive team XP forecasting](RELEASE_NOTES_v0.16.3-beta.md).
