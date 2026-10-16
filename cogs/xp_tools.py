@@ -104,7 +104,7 @@ class ForecastSettings:
     loss_rate_percent: float = 0.0
     maximum_streak: int = 0
     knowledge_quality: float = 0.15
-    max_lines: int = 48
+    max_lines: int = 20
 
 
 @dataclass(frozen=True)
@@ -874,59 +874,102 @@ class XPReminderView(discord.ui.View):
 
 
 class ForecastActivityModal(discord.ui.Modal, title="Forecast settings"):
-    battles_per_day = discord.ui.TextInput(
-        label="Battles per day (0–5760)", placeholder="0", max_length=5
-    )
-    fixed_xp_per_day = discord.ui.TextInput(
-        label="Fixed XP/day (huntbot + bosses)", placeholder="0", max_length=10
-    )
-    average_xp_per_hunt = discord.ui.TextInput(
-        label="Average XP per hunt", placeholder="16 baseline • 21 with Patreon", max_length=10
+    activity = discord.ui.TextInput(
+        label="Battles/day, fixed XP/day, XP/hunt",
+        placeholder="Example: 2000, 200000, 21",
+        required=False,
+        max_length=40,
     )
     rates = discord.ui.TextInput(
-        label="Tie %, loss %", placeholder="Example: 0.82, 0.10", max_length=20
+        label="Tie %, loss %",
+        placeholder="Example: 0.82, 0.10 • Neon Global can estimate",
+        required=False,
+        max_length=40,
     )
-    streak_and_knowledge = discord.ui.TextInput(
-        label="Maximum streak, Knowledge quality", placeholder="Example: 2600, 0.15", max_length=24
+    maximum_streak = discord.ui.TextInput(
+        label="Maximum streak",
+        placeholder="0 means no forced reset",
+        required=False,
+        max_length=7,
+    )
+    knowledge_quality = discord.ui.TextInput(
+        label="Knowledge quality",
+        placeholder="0 to 0.15",
+        required=False,
+        max_length=4,
+    )
+    max_lines = discord.ui.TextInput(
+        label="Forecast lines",
+        placeholder="1 to 99 • default 20",
+        required=False,
+        max_length=2,
     )
 
     def __init__(self, panel: "TeamLevelForecastView") -> None:
         super().__init__()
         self.panel = panel
         settings = panel.settings
-        self.battles_per_day.default = str(settings.battles_per_day)
-        self.fixed_xp_per_day.default = str(settings.fixed_xp_per_day)
-        self.average_xp_per_hunt.default = f"{settings.average_xp_per_hunt:g}"
+        self.activity.default = (
+            f"{settings.battles_per_day}, {settings.fixed_xp_per_day}, "
+            f"{settings.average_xp_per_hunt:g}"
+        )
         self.rates.default = (
             f"{settings.tie_rate_percent:g}, {settings.loss_rate_percent:g}"
         )
-        self.streak_and_knowledge.default = (
-            f"{settings.maximum_streak}, {settings.knowledge_quality:g}"
-        )
+        self.maximum_streak.default = str(settings.maximum_streak)
+        self.knowledge_quality.default = f"{settings.knowledge_quality:g}"
+        self.max_lines.default = str(settings.max_lines)
 
     @staticmethod
-    def _pair(value: str, label: str) -> tuple[str, str]:
-        parts = [part.strip() for part in re.split(r"[,;]", value, maxsplit=1)]
-        if len(parts) != 2 or not all(parts):
-            raise ValueError(f"Enter {label} as two values separated by a comma")
-        return parts[0], parts[1]
+    def _values(value: str, count: int, label: str) -> tuple[str, ...] | None:
+        if not value.strip():
+            return None
+        parts = tuple(part.strip() for part in re.split(r"[,;]", value))
+        if len(parts) != count or not all(parts):
+            raise ValueError(
+                f"Enter {label} as {count} values separated by commas"
+            )
+        return parts
+
+    @staticmethod
+    def _optional_int(value: str, current: int) -> int:
+        return int(value.replace(",", "")) if value.strip() else current
+
+    @staticmethod
+    def _optional_float(value: str, current: float) -> float:
+        return float(value) if value.strip() else current
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         try:
-            tie_rate, loss_rate = self._pair(str(self.rates), "tie and loss rates")
-            maximum_streak, knowledge_quality = self._pair(
-                str(self.streak_and_knowledge),
-                "maximum streak and Knowledge quality",
+            current = self.panel.settings
+            activity = self._values(
+                str(self.activity), 3, "activity settings"
             )
+            rates = self._values(str(self.rates), 2, "tie and loss rates")
             settings = replace(
-                self.panel.settings,
-                battles_per_day=int(str(self.battles_per_day).replace(",", "")),
-                fixed_xp_per_day=int(str(self.fixed_xp_per_day).replace(",", "")),
-                average_xp_per_hunt=float(str(self.average_xp_per_hunt).replace(",", "")),
-                tie_rate_percent=float(tie_rate),
-                loss_rate_percent=float(loss_rate),
-                maximum_streak=int(maximum_streak.replace(",", "")),
-                knowledge_quality=float(knowledge_quality),
+                current,
+                battles_per_day=(
+                    int(activity[0]) if activity else current.battles_per_day
+                ),
+                fixed_xp_per_day=(
+                    int(activity[1]) if activity else current.fixed_xp_per_day
+                ),
+                average_xp_per_hunt=(
+                    float(activity[2]) if activity else current.average_xp_per_hunt
+                ),
+                tie_rate_percent=(
+                    float(rates[0]) if rates else current.tie_rate_percent
+                ),
+                loss_rate_percent=(
+                    float(rates[1]) if rates else current.loss_rate_percent
+                ),
+                maximum_streak=self._optional_int(
+                    str(self.maximum_streak), current.maximum_streak
+                ),
+                knowledge_quality=self._optional_float(
+                    str(self.knowledge_quality), current.knowledge_quality
+                ),
+                max_lines=self._optional_int(str(self.max_lines), current.max_lines),
             )
             validate_forecast_settings(settings)
         except ValueError as exc:
@@ -1071,9 +1114,9 @@ class TeamLevelForecastView(discord.ui.View):
         for line in visible:
             pet_cells = []
             for pet in line.pets:
-                marker = "UP" if pet.leveled else "■ "
-                pet_cells.append(f"{marker}{pet.level:>3}")
-            row = [" ".join(pet_cells), f"{line.battles:,}"]
+                marker = "🆙" if pet.leveled else "⬛"
+                pet_cells.append(f"{marker} {pet.level:>3}")
+            row = [*pet_cells, f"{line.battles:,}"]
             if self.show_streak:
                 row.append(f"{line.streak:,}")
             row.append(f"{line.days:,}" if self.settings.battles_per_day else "—")

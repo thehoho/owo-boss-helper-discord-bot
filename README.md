@@ -1,3 +1,7 @@
+## v0.16.5-beta notes
+
+Forecast rows now use Discord's native `🆙` and `⬛` emojis with visible separators between all three pets. Every Settings input is optional, Maximum streak and Knowledge quality have independent fields, forecast line count is configurable again with a 20-line default, and each field displays its active value plus a helpful placeholder. See [forecast layout refinements](RELEASE_NOTES_v0.16.5-beta.md).
+
 ## v0.16.4-beta notes
 
 The team level forecaster now uses a compact, percentage-free progression table with optional pet statistics and streak columns. One Settings form controls activity, fixed and hunt XP, tie and loss rates, maximum streak, and Knowledge quality; initial activity values are zero so members enter their own assumptions. Losses reset projected streaks, the footer keeps every active assumption visible in one line, and each pet explains Knowledge's actual additive multiplier and effective benefit. See [compact XP forecasting](RELEASE_NOTES_v0.16.4-beta.md).

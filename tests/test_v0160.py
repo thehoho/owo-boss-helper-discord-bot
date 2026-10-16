@@ -14,6 +14,7 @@ from discord.ext import commands
 from cogs.team_templates import TeamMember, extract_all_text, extract_message_text
 from cogs.xp_tools import (
     KNOWLEDGE_SCENARIOS,
+    ForecastActivityModal,
     ForecastSettings,
     XPReminderStore,
     XPTools,
@@ -218,10 +219,24 @@ class XPParsingTests(unittest.TestCase):
         self.assertIn("Show stats", labels)
         self.assertIn("Hide streak", labels)
         self.assertNotIn("Knowledge & lines", labels)
+        self.assertEqual(settings.max_lines, 20)
         self.assertEqual(len(embed.fields), 1)
         self.assertNotIn("%", embed.fields[0].value)
+        self.assertIn("⬛", embed.fields[0].value)
+        self.assertIn("🆙", embed.fields[0].value)
+        first_data_row = embed.fields[0].value.splitlines()[2]
+        self.assertEqual(first_data_row.count(" | "), 5)
         self.assertIn("0 battles/day", embed.footer.text)
         self.assertIn("0% loss", embed.footer.text)
+
+        modal = ForecastActivityModal(panel)
+        self.assertTrue(all(not item.required for item in modal.children))
+        self.assertEqual(modal.maximum_streak.default, "0")
+        self.assertEqual(modal.knowledge_quality.default, "0.15")
+        self.assertEqual(modal.max_lines.default, "20")
+        self.assertIsNone(ForecastActivityModal._values("", 2, "rates"))
+        self.assertEqual(ForecastActivityModal._optional_int("", 2600), 2600)
+        self.assertEqual(ForecastActivityModal._optional_float("", 0.15), 0.15)
 
     def test_knowledge_effect_explains_additive_multiplier(self) -> None:
         self.assertEqual(knowledge_effect_text(2.7, 0.15), "2.70× → 2.85× (+5.6%)")

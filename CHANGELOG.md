@@ -1,3 +1,13 @@
+## v0.16.5-beta - Forecast Layout Refinements
+
+- Replaced text/symbol level markers with Discord's native `🆙` and `⬛` emojis.
+- Added vertical separators between the three pet level columns and the forecast metrics.
+- Made all forecast Settings inputs optional while retaining their displayed current values.
+- Gave Maximum streak and Knowledge quality their own independent fields.
+- Restored adjustable forecast line count with a 20-line default.
+- Added focused regression coverage for native markers, column separation, optional fields, independent values, and pagination defaults.
+- Updated the public version to 0.16.5-beta; no database migration, dependency, slash-command schema, or permission change is required.
+
 ## v0.16.4-beta - Compact XP Forecasting
 
 - Rebuilt the full-team forecast as a compact level-event table without progress percentages.
