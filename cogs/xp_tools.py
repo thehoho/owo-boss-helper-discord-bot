@@ -741,11 +741,7 @@ class TeamXPToolsView(discord.ui.View):
         self.snapshot = snapshot
         self.helper_prefix = helper_prefix
         icon_keys = {
-            "XP forecast": ("neon_calculate", "📈"),
-            "XP calculator": ("stat_mag", "🧮"),
-            "Save normal": ("weapon_sword", "⚔️"),
             "Save Knowledge": ("passive_kno", "🧠"),
-            "Reminders": ("ticket_available", "🔔"),
         }
         for item in self.children:
             if isinstance(item, discord.ui.Button) and item.label in icon_keys:
@@ -758,7 +754,7 @@ class TeamXPToolsView(discord.ui.View):
         await interaction.response.send_message("Open the team tools from your own reaction.", ephemeral=True)
         return False
 
-    @discord.ui.button(label="XP forecast", emoji="📈", style=discord.ButtonStyle.primary)
+    @discord.ui.button(label="XP forecast", emoji="📊", style=discord.ButtonStyle.primary)
     async def forecast(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         await interaction.response.send_message(
             embed=self.cog.build_team_forecast_embed(self.snapshot),

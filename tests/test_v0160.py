@@ -10,12 +10,13 @@ from unittest.mock import AsyncMock, patch
 import discord
 from discord.ext import commands
 
-from cogs.team_templates import TeamMember
+from cogs.team_templates import TeamMember, extract_all_text, extract_message_text
 from cogs.xp_tools import (
     XPReminderStore,
     XPTools,
     BattleResult,
     PendingBattle,
+    TeamXPToolsView,
     average_winning_streak_xp,
     catchup_multiplier,
     changed_positions,
@@ -111,6 +112,25 @@ class XPParsingTests(unittest.TestCase):
         self.assertEqual(snapshot.pets[0].current_xp, 1_772_662)
         self.assertEqual(snapshot.pets[2].next_xp, 9_835_496)
 
+    def test_team_snapshot_reads_current_streak_from_embed_footer(self) -> None:
+        body = TEAM_TEXT.split("Current Streak:", 1)[0]
+        raw = {
+            "embeds": [
+                {
+                    "description": body,
+                    "footer": {"text": "Current Streak: 1,734 | Highest Streak: 3,395 ⭐"},
+                }
+            ]
+        }
+        extracted = extract_all_text(raw)
+        snapshot = parse_team_xp_snapshot(extracted)
+        assert snapshot is not None
+        self.assertEqual(snapshot.streak, 1734)
+
+        embed = discord.Embed.from_dict(raw["embeds"][0])
+        message = SimpleNamespace(content="", embeds=[embed], components=[])
+        self.assertIn("Current Streak: 1,734", extract_message_text(message))
+
     def test_team_forecast_is_three_column_and_streak_derived(self) -> None:
         snapshot = parse_team_xp_snapshot(TEAM_TEXT)
         assert snapshot is not None
@@ -121,6 +141,20 @@ class XPParsingTests(unittest.TestCase):
         self.assertEqual(len(embed.fields), 3)
         self.assertTrue(all(field.inline for field in embed.fields))
         self.assertIn("4,128 battles", embed.fields[0].value)
+
+    def test_team_tool_buttons_use_requested_icons(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        cog = XPTools.__new__(XPTools)
+        cog.bot = SimpleNamespace()
+        view = TeamXPToolsView(cog, 1, 1, snapshot, "h")
+        emojis = {item.label: str(item.emoji) for item in view.children}
+        self.assertEqual(emojis["XP forecast"], "📊")
+        self.assertEqual(emojis["XP calculator"], "🧮")
+        self.assertEqual(emojis["Save normal"], "⚔️")
+        self.assertEqual(emojis["Save Knowledge"], "🧠")
+        self.assertEqual(emojis["Reminders"], "🔔")
+        self.assertEqual(emojis["Save-team help"], "💾")
 
     def test_battle_results_distinguish_ties(self) -> None:
         win = parse_battle_result("You won in 14 turns! | +200 xp | Streak: 1,363")

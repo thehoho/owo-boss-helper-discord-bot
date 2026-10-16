@@ -1,3 +1,7 @@
+## v0.16.2-beta notes
+
+Team XP forecasts now read `Current Streak` from OwO's embed footer as well as its main content, preventing the accidental streak-0 fallback. The private team panel uses familiar Stats, Abacus, sword, Knowledge, bell, and save icons. See [OwO footer streak parsing](RELEASE_NOTES_v0.16.2-beta.md).
+
 ## v0.16.1-beta notes
 
 XP forecasts now derive expected XP per battle directly from the current streak instead of asking members to understand or enter an average. Team results use a compact three-pet layout, recalculate catch-up as each level changes, support optional fixed daily XP separately from battle XP, and use the bot's existing pet, calculator, weapon, reminder, and Knowledge application emojis. See [streak-aware XP forecasts](RELEASE_NOTES_v0.16.1-beta.md).

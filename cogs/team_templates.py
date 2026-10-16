@@ -359,7 +359,7 @@ def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
 
     if isinstance(value, dict):
         for key, child in value.items():
-            if key in {"content", "title", "description", "label", "value", "name"}:
+            if key in {"content", "title", "description", "label", "value", "name", "text"}:
                 if isinstance(child, str) and child.strip():
                     chunks.append(child)
             elif isinstance(child, (dict, list, tuple)):
@@ -379,6 +379,7 @@ def _walk_text(value: Any, chunks: list[str], seen: set[int]) -> None:
         "label",
         "value",
         "name",
+        "text",
         "components",
         "children",
         "accessory",
@@ -409,6 +410,8 @@ def extract_message_text(message: discord.Message) -> str:
             chunks.append(embed.description)
         if embed.author and embed.author.name:
             chunks.append(embed.author.name)
+        if embed.footer and embed.footer.text:
+            chunks.append(embed.footer.text)
         for field in embed.fields:
             chunks.extend((field.name, field.value))
     _walk_text(message.components, chunks, set())

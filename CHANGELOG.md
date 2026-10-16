@@ -1,3 +1,12 @@
+## v0.16.2-beta - OwO Footer Streak Parsing
+
+- Read visible embed-footer text from both raw Discord payloads and discord.py message objects.
+- Fixed team forecasts falling back to streak 0 and 200 XP/battle when OwO placed `Current Streak` in the footer.
+- Verified the reported streak-1,734 layout now produces 369.5 XP/battle.
+- Simplified the private team buttons to Stats, Abacus, sword, Knowledge, bell, and the existing save-team icon.
+- Added exact raw-footer and button-icon regression coverage.
+- Updated the public version to 0.16.2-beta; no database migration, slash-command change, dependency, or permission change is required.
+
 ## v0.16.1-beta - Streak-aware XP Forecasts
 
 - Replaced manual average-XP entry with an XP-per-battle estimate calculated from the current streak.
