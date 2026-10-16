@@ -1665,9 +1665,12 @@ class NeonWeapons(commands.Cog):
         if reaction_message is None:
             try:
                 channel = self.bot.get_channel(channel_id) or await self.bot.fetch_channel(channel_id)
-                fetch_message = getattr(channel, "fetch_message", None)
-                if callable(fetch_message):
-                    reaction_message = await fetch_message(message_id)
+                get_partial_message = getattr(channel, "get_partial_message", None)
+                if callable(get_partial_message):
+                    # A partial message can add the scanner reaction without a
+                    # GET. Neon edits interactive pages rapidly; fetching every
+                    # version was the largest source of Discord 429 pressure.
+                    reaction_message = get_partial_message(message_id)
             except (discord.Forbidden, discord.HTTPException, discord.NotFound, AttributeError):
                 reaction_message = None
         message_reference = data.get("message_reference") or {}

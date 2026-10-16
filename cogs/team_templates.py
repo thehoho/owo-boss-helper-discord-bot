@@ -1944,8 +1944,11 @@ class TemplateActionView(OwnedView):
     async def smart_replace(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
+        # Acknowledge before SQLite/Discord work so a busy gateway cannot let the
+        # three-second interaction token expire.
+        await interaction.response.defer(ephemeral=True)
         owo_prefix = await self.cog.store.get_guild_owo_prefix(interaction.guild_id or 0)
-        await interaction.response.send_message(
+        await interaction.followup.send(
             (
                 f"🧠 **Smart replace — #{self.template.slot} {self.template.name}**\n"
                 "Follow the new prompt in this channel, choose the current team, Team 1, "
@@ -1979,13 +1982,14 @@ class TemplateActionView(OwnedView):
     async def all_commands(
         self, interaction: discord.Interaction, _: discord.ui.Button
     ) -> None:
+        await interaction.response.defer(ephemeral=False)
         owo_prefix = await self.cog.store.get_guild_owo_prefix(interaction.guild_id or 0)
         commands = quick_replace_commands(self.template, owo_prefix)
         packet = format_plain_command_list(
             f"All commands — #{self.template.slot} {self.template.name}",
             commands,
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             packet,
             ephemeral=False,
             allowed_mentions=discord.AllowedMentions.none(),
@@ -2329,11 +2333,12 @@ class TemplateSelect(discord.ui.Select):
         )
 
     async def callback(self, interaction: discord.Interaction) -> None:
+        await interaction.response.defer(ephemeral=True)
         template = await self.cog.store.get(
             interaction.user.id, int(self.values[0])
         )
         if template is None:
-            await interaction.response.send_message(
+            await interaction.followup.send(
                 "That template no longer exists. Open your saved-team list again.", ephemeral=True
             )
             return
@@ -2349,7 +2354,7 @@ class TemplateSelect(discord.ui.Select):
             ),
             color=0x5865F2,
         )
-        await interaction.response.send_message(
+        await interaction.followup.send(
             embed=embed,
             view=TemplateActionView(
                 self.cog, interaction.user.id, template
@@ -4343,6 +4348,19 @@ class TeamTemplates(commands.Cog):
                 return
         if not isinstance(channel, discord.abc.Messageable):
             return
+
+        xp_tools = self.bot.get_cog("XPTools")
+        send_team_tools = getattr(xp_tools, "send_team_tools_from_reaction", None)
+        if callable(send_team_tools):
+            try:
+                if await send_team_tools(payload, raw, channel):
+                    return
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                return
+            except Exception:
+                logger.exception(
+                    "Could not open team XP tools for message %s", payload.message_id
+                )
 
         user = self.bot.get_user(payload.user_id)
         mention = user.mention if user else f"<@{payload.user_id}>"

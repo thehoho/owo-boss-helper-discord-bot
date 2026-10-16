@@ -36,9 +36,10 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "bot_stats.db"
 TEAM_DATABASE_FILE = PROJECT_ROOT / "team_templates.db"
 TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
+XP_DATABASE_FILE = PROJECT_ROOT / "xp_reminders.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.15.10-beta"
+BOT_VERSION = "0.16.0-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -111,6 +112,8 @@ def classify_message_usage(
         return "ticket_management"
     if compact == "habout":
         return "about_views"
+    if compact in {"hxp", "hexp", "hreminder", "hreminders", "hxpreminder", "hxpreminders"}:
+        return "xp_tools"
     if compact.startswith(("ht", "htm", "hteam")):
         return "team_helper_commands"
     return None
@@ -877,6 +880,7 @@ class BotInfo(commands.Cog):
             "ticket_lookups": "Ticket lookups",
             "help_views": "Help views",
             "about_views": "About views",
+            "xp_tools": "XP tools",
         }
         if metrics:
             metric_lines = []
@@ -1116,6 +1120,7 @@ class BotInfo(commands.Cog):
             "ticket_lookups": "Ticket lookups",
             "help_views": "Help views",
             "about_views": "About views",
+            "xp_tools": "XP tools",
         }
         metric_lines = []
         for metric, count in metrics[:10]:
@@ -1128,6 +1133,7 @@ class BotInfo(commands.Cog):
                 DATABASE_FILE,
                 TEAM_DATABASE_FILE,
                 TICKET_DATABASE_FILE,
+                XP_DATABASE_FILE,
                 LOG_FILE,
             )
         )
@@ -1263,6 +1269,7 @@ class BotInfo(commands.Cog):
             "ticket_lookups": "Ticket lookups",
             "help_views": "Help views",
             "about_views": "About views",
+            "xp_tools": "XP tools",
         }
         if metrics:
             metric_lines = []

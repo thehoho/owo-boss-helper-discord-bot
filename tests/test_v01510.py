@@ -178,11 +178,11 @@ class BossFetchReliabilityTests(unittest.IsolatedAsyncioTestCase):
             payload.data,
         )
 
-    def test_fallback_polling_is_one_minute(self) -> None:
-        self.assertEqual(BOSS_WATCH_INTERVAL_SECONDS, 60)
+    def test_fallback_polling_is_five_minutes(self) -> None:
+        self.assertEqual(BOSS_WATCH_INTERVAL_SECONDS, 5 * 60)
 
     def test_public_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.15.10-beta")
+        self.assertEqual(BOT_VERSION, "0.16.0-beta")
 
 
 if __name__ == "__main__":

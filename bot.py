@@ -113,6 +113,8 @@ async def main() -> None:
         logger.info("Opt-in boss reward and outcome notifications loaded")
         await bot.load_extension("cogs.team_templates")
         logger.info("Team template manager loaded")
+        await bot.load_extension("cogs.xp_tools")
+        logger.info("Pet XP calculator and Knowledge reminders loaded")
         await bot.load_extension("cogs.ticket_tracker")
         logger.info("Boss ticket tracker loaded")
         await bot.load_extension("cogs.neon_weapons")

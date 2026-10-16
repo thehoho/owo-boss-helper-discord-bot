@@ -1,3 +1,9 @@
+## v0.16.0-beta notes
+
+Pet-XP tools now explain the verified level, streak, catch-up, and Knowledge formulas through `H XP` / `H EXP`; `/xp-calc` forecasts custom level ranges, activity, and milestone-switch benefits. The existing helper reaction under an OwO team page now opens a team-aware forecast, calculator, normal/Knowledge preset capture, and opt-in reminders for every 10, 50, 100, 500, or 1,000 wins. Reminder state survives restarts, ties keep Knowledge equipped, and a win or loss produces the normal restore commands.
+
+The reliability pass removes an unnecessary Discord message fetch from rapid Neon edits, safely contains missing-channel-permission failures, fixes `/boss-notify` responses without a confirmation view, acknowledges heavier team interactions immediately, and reduces active-boss safety polling to five minutes while preserving immediate gateway updates. See [XP switching and reliability](RELEASE_NOTES_v0.16.0-beta.md).
+
 ## v0.15.10-beta notes
 
 The Full Guide button now opens one-page guides without passing an invalid empty view, while multi-page guides keep their private pager. Guild-boss reliability now prefers complete gateway edits, collapses duplicate fetches from the same edit burst, preserves distinct edit versions, and moves the safety poll from every 15 seconds to once per minute. Immediate gateway updates and the one-minute reconciliation fallback remain active. See [guide and Discord request reliability](RELEASE_NOTES_v0.15.10-beta.md).
@@ -780,12 +786,21 @@ bot_stats.db-wal
 neon_weapons.db
 neon_weapons.db-shm
 neon_weapons.db-wal
+emoji_overrides.db
+emoji_overrides.db-shm
+emoji_overrides.db-wal
+boss_notifications.db
+boss_notifications.db-shm
+boss_notifications.db-wal
+xp_reminders.db
+xp_reminders.db-shm
+xp_reminders.db-wal
 logs/
 ```
 
 These files are ignored by Git.
 
-When moving the bot to another computer or host, copy `.env`, `boss_cooldown_config.json`, and every database listed above. This preserves saved teams, learned public animal facts, trusted guide access and content, ticket data, Neon queues, personal preferences, developer statistics, board configuration, boss watcher state, daily boss counters, and report-channel configuration.
+When moving the bot to another computer or host, copy `.env`, `boss_cooldown_config.json`, and every database listed above. This preserves saved teams, learned public animal facts, trusted guide access and content, ticket data, Neon queues, emoji overrides, notification and XP-reminder preferences, developer statistics, board configuration, boss watcher state, daily boss counters, and report-channel configuration.
 
 ## Project structure
 
@@ -804,7 +819,8 @@ owo-boss-helper-discord-bot/
 │   ├── ticket_tracker.py
 │   ├── bot_info.py
 │   ├── message_utils.py
-│   └── neon_weapons.py
+│   ├── neon_weapons.py
+│   └── xp_tools.py
 ├── deploy/
 │   ├── backup.sh
 │   └── owo-boss-helper.service
@@ -832,6 +848,9 @@ team_guides.db
 boss_tickets.db
 bot_stats.db
 neon_weapons.db
+emoji_overrides.db
+boss_notifications.db
+xp_reminders.db
 ```
 
 ## Updating

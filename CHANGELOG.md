@@ -1,3 +1,17 @@
+## v0.16.0-beta - XP Switching and Reliability
+
+- Added a concise, prefix-aware Pet XP guide through `H XP`, `H EXP`, and their compact forms.
+- Added `/xp-calc` with level-range XP, dynamic per-level catch-up, configurable average XP and battles per day, optional Knowledge quality, and 10/50/100/500/1,000 milestone comparisons.
+- Expanded the existing OwO-team helper reaction into a private team-aware panel with next-level forecasts, an interactive calculator, normal/Knowledge preset capture, reminder settings, and the existing team-template guidance.
+- Added opt-in Knowledge-switch reminders through `H reminders` / `Hreminders` and `/xp-reminders`; only the member's paired battle command/result is tracked.
+- Prompted before selected milestones, retained the Knowledge preset through ties, restored normal weapons after wins or losses, and alternated `ww` / `wuse` for multi-weapon packets.
+- Persisted settings, presets, deduplication, and pending restore state in the new auto-created `xp_reminders.db`; added it to online backups and migration documentation.
+- Credited the public OwO Pet XP reference, community data sheets, and Heather/Hasse without extrapolating the supplied streak model above 122,500.
+- Removed the redundant message GET used only to react to rapid Neon edits, the largest observed source of Discord rate-limit pressure.
+- Contained reply/send permission failures, fixed `/boss-notify` paths with no confirmation view, and deferred heavier saved-team interactions before database work.
+- Changed both guild-boss safety polls from one minute to five minutes; complete gateway edits still update immediately.
+- Updated the public version to 0.16.0-beta; startup creates one SQLite database and registers two slash commands, with no new Discord permission or dependency.
+
 ## v0.15.10-beta - Guide and Discord Request Reliability
 
 - Fixed the Full Guide button for one-page guides by omitting the optional view instead of passing `None` into Discord interaction handling.

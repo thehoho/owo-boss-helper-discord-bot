@@ -1116,7 +1116,10 @@ class BossNotifications(commands.Cog):
             effective_minimum,
             mode.value if mode else "recurring",
         )
-        await interaction.response.send_message(text, view=view, ephemeral=True)
+        kwargs: dict[str, Any] = {"ephemeral": True}
+        if view is not None:
+            kwargs["view"] = view
+        await interaction.response.send_message(text, **kwargs)
 
     @commands.Cog.listener()
     async def on_message(self, message: discord.Message) -> None:

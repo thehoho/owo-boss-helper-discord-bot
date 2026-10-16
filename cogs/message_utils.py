@@ -20,7 +20,7 @@ async def safe_reply(
     message: discord.Message,
     content: str | None = None,
     **kwargs: Any,
-) -> discord.Message:
+) -> discord.Message | None:
     """Reply to ``message`` and fall back to a normal channel send on failure."""
     try:
         return await message.reply(content, **kwargs)
@@ -35,4 +35,15 @@ async def safe_reply(
             type(message.channel).__name__,
             exc,
         )
-        return await message.channel.send(content, **fallback_kwargs)
+        try:
+            return await message.channel.send(content, **fallback_kwargs)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException) as fallback_exc:
+            # A missing Send Messages permission makes both paths impossible. This
+            # is a channel configuration problem, not an unhandled bot failure.
+            logger.warning(
+                "Reply and fallback send both failed in guild %s channel %s: %s",
+                getattr(message.guild, "id", None),
+                message.channel.id,
+                fallback_exc,
+            )
+            return None

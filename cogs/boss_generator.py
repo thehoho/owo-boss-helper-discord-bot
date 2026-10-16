@@ -98,12 +98,12 @@ BOSS_COOLDOWN_SECONDS = 5 * 60
 OUTCOME_DEDUP_SECONDS = 20
 OUTCOME_SETTLE_SECONDS = 1.25
 BOSS_OUTCOME_WINDOW_SKEW_SECONDS = 90
-BOSS_WATCH_INTERVAL_SECONDS = 60
+BOSS_WATCH_INTERVAL_SECONDS = 5 * 60
 BOSS_MESSAGE_FETCH_CACHE_SECONDS = 2.0
 BOSS_MESSAGE_FETCH_CACHE_LIMIT = 512
 BOSS_COMMAND_UNBOUND_MAX_AGE_SECONDS = 20 * 60
 BOSS_COMMAND_BOUND_MAX_AGE_SECONDS = 4 * 60 * 60
-BOSS_HP_RECONCILE_SECONDS = 60
+BOSS_HP_RECONCILE_SECONDS = 5 * 60
 BATTLE_LOG_SUCCESS_CACHE_SECONDS = 6 * 60 * 60
 BATTLE_LOG_FAILURE_CACHE_SECONDS = 5
 BATTLE_LOG_MAX_LINKS = 40
@@ -2642,6 +2642,8 @@ class BossGenerator(commands.Cog):
         sticky_command = helper_command(helper_prefix, "sticky")
         sticky_clear = helper_command(helper_prefix, "sticky clear")
         guide_help = helper_command(helper_prefix, "guide help")
+        xp_help = helper_alias(helper_prefix, "hxp")
+        xp_reminders = helper_alias(helper_prefix, "hreminders")
 
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
@@ -2720,6 +2722,16 @@ class BossGenerator(commands.Cog):
                 "replace** button lets the member choose the active team, Team 1, or "
                 "Team 2, confirms the exact OwO page, then shows only required animal "
                 "or weapon changes."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🧠 Pet XP and Knowledge reminders",
+            value=(
+                f"Open `{xp_help}` or `{helper_alias(helper_prefix, 'hexp')}` for the short XP guide. "
+                f"Use `{xp_reminders}` or `/xp-reminders` to save normal and Knowledge weapon presets "
+                "and choose 10/50/100/500/1,000-win prompts. `/xp-calc` forecasts levels and switching benefits; "
+                "the helper reaction under an OwO team page opens its team-aware XP tools."
             ),
             inline=False,
         )
@@ -3533,7 +3545,12 @@ class BossGenerator(commands.Cog):
             )
 
     async def boss_hp_reconcile_loop(self) -> None:
-        """Poll active generated commands once a minute as an edit-event fallback."""
+        """Poll active generated commands every five minutes as an edit fallback.
+
+        Gateway message edits remain the immediate path. The slower poll exists
+        only to recover a missed event and avoids competing with normal Discord
+        traffic across every configured guild.
+        """
         while True:
             try:
                 await self.reconcile_generated_boss_commands_once()

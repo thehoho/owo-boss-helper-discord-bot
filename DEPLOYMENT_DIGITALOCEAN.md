@@ -107,7 +107,7 @@ scp "D:\owo-boss-helper-discord-bot-github-ready\owo-boss-helper-discord-bot	eam
 scp "D:\owo-boss-helper-discord-bot-github-ready\owo-boss-helper-discord-botoss_tickets.db" owohelper@YOUR_SERVER_IP:/opt/owo-boss-helper/
 ```
 
-For a complete current migration, preserve `.env`, `boss_cooldown_config.json`, and every runtime database that exists: `team_templates.db`, `animal_dex.db`, `team_guides.db`, `boss_tickets.db`, `bot_stats.db`, `neon_weapons.db`, `emoji_overrides.db`, and `boss_notifications.db`. Stop the service before copying live SQLite files, or use SQLite's online backup command as the bundled backup script does.
+For a complete current migration, preserve `.env`, `boss_cooldown_config.json`, and every runtime database that exists: `team_templates.db`, `animal_dex.db`, `team_guides.db`, `boss_tickets.db`, `bot_stats.db`, `neon_weapons.db`, `emoji_overrides.db`, `boss_notifications.db`, and `xp_reminders.db`. Stop the service before copying live SQLite files, or use SQLite's online backup command as the bundled backup script does.
 
 ## 6. Test manually
 
@@ -157,6 +157,8 @@ The bundled backup includes `.env`, `boss_cooldown_config.json`, and all runtime
 Emoji artwork overrides introduced in v0.14.12-beta are stored in `emoji_overrides.db`. Include it with the other runtime databases during migrations. The current bundled backup script includes both the normalized artwork and owner audit trail in that database; reinstall the backup helper when deploying this version.
 
 Opt-in reward rules, consent, short-lived reward snapshots, and DM deduplication state introduced in v0.15.0-beta are stored in `boss_notifications.db`. Its schema is created automatically on first startup, and the current backup helper includes it.
+
+Opt-in Knowledge-switch presets, reminder settings, and pending restore state introduced in v0.16.0-beta are stored in `xp_reminders.db`. Its schema is created automatically on first startup, and the current backup helper includes it.
 
 ## 9. Normal update workflow
 
