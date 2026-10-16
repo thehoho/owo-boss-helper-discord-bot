@@ -1,3 +1,12 @@
+## v0.16.7-beta - Persistent XP Model and Guide Attribution
+
+- Persisted each member's forecast settings after submitting the XP calculator form, including activity, tie/loss rates, maximum streak, Knowledge quality, and line count.
+- Loaded the saved model across restarts and servers, and applied it automatically when the member next opens Team XP or its full forecaster.
+- Kept the unchanged normal estimate beside a distinct modeled estimate and modeled maximum-Knowledge estimate for transparent comparison.
+- Added visible attribution to Heather's original Pet EXP guide at `owo.bwep.net/exp/` in `H XP` and Team XP tools without adding it to the calculator form.
+- Added an automatic SQLite table migration and regression coverage for persistence, loading, modeling, and attribution.
+- Updated the public version to 0.16.7-beta; no dependency, slash-command schema, or permission change is required.
+
 ## v0.16.6-beta - Compact Team XP Controls
 
 - Kept XP Calculator labeled and changed the four supporting Team XP actions to icon-only buttons.

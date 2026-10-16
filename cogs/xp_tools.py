@@ -47,6 +47,8 @@ logger = logging.getLogger(__name__)
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 DATABASE_FILE = PROJECT_ROOT / "xp_reminders.db"
 XP_SOURCE_URL = "https://owo.bwep.net/exp/"
+XP_CREDIT_MARKDOWN = f"Inspired by [Heather's Pet EXP guide]({XP_SOURCE_URL})."
+XP_CREDIT_FOOTER = "Inspired by Heather's Pet EXP guide • owo.bwep.net/exp/"
 STREAK_DATA_URL = "https://docs.google.com/spreadsheets/d/1qXl5N8VYT1C0yUyiYQ1QzdlNcPMo9iEFu8HMJ4zmuKc/edit"
 XP_DATA_URL = "https://docs.google.com/spreadsheets/d/1E_YSDmmX-WVfoX29dkpPcgCwY_9K7g_uM3pVZN2E_74/edit"
 REMINDER_INTERVALS = (10, 50, 100, 500, 1000)
@@ -663,6 +665,22 @@ class XPReminderStore:
                 )
                 """
             )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS xp_forecast_settings (
+                    user_id INTEGER NOT NULL PRIMARY KEY,
+                    battles_per_day INTEGER NOT NULL DEFAULT 0,
+                    fixed_xp_per_day INTEGER NOT NULL DEFAULT 0,
+                    average_xp_per_hunt REAL NOT NULL DEFAULT 0,
+                    tie_rate_percent REAL NOT NULL DEFAULT 0,
+                    loss_rate_percent REAL NOT NULL DEFAULT 0,
+                    maximum_streak INTEGER NOT NULL DEFAULT 0,
+                    knowledge_quality REAL NOT NULL DEFAULT 0.15,
+                    max_lines INTEGER NOT NULL DEFAULT 20,
+                    updated_at INTEGER NOT NULL DEFAULT 0
+                )
+                """
+            )
             connection.commit()
         finally:
             connection.close()
@@ -777,6 +795,85 @@ class XPReminderStore:
     async def upsert(self, guild_id: int, user_id: int, **kwargs: Any) -> XPReminderProfile:
         async with self.lock:
             return await asyncio.to_thread(self.upsert_sync, guild_id, user_id, **kwargs)
+
+    @staticmethod
+    def forecast_settings_from_row(row: sqlite3.Row | None) -> ForecastSettings:
+        if row is None:
+            return ForecastSettings()
+        return ForecastSettings(
+            battles_per_day=int(row["battles_per_day"]),
+            fixed_xp_per_day=int(row["fixed_xp_per_day"]),
+            average_xp_per_hunt=float(row["average_xp_per_hunt"]),
+            tie_rate_percent=float(row["tie_rate_percent"]),
+            loss_rate_percent=float(row["loss_rate_percent"]),
+            maximum_streak=int(row["maximum_streak"]),
+            knowledge_quality=float(row["knowledge_quality"]),
+            max_lines=int(row["max_lines"]),
+        )
+
+    def get_forecast_settings_sync(self, user_id: int) -> ForecastSettings:
+        connection = self.connect()
+        try:
+            row = connection.execute(
+                "SELECT * FROM xp_forecast_settings WHERE user_id = ?",
+                (user_id,),
+            ).fetchone()
+        finally:
+            connection.close()
+        return self.forecast_settings_from_row(row)
+
+    async def get_forecast_settings(self, user_id: int) -> ForecastSettings:
+        return await asyncio.to_thread(self.get_forecast_settings_sync, user_id)
+
+    def upsert_forecast_settings_sync(
+        self, user_id: int, settings: ForecastSettings
+    ) -> ForecastSettings:
+        validate_forecast_settings(settings)
+        connection = self.connect()
+        try:
+            connection.execute(
+                """
+                INSERT INTO xp_forecast_settings (
+                    user_id, battles_per_day, fixed_xp_per_day,
+                    average_xp_per_hunt, tie_rate_percent, loss_rate_percent,
+                    maximum_streak, knowledge_quality, max_lines, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
+                    battles_per_day = excluded.battles_per_day,
+                    fixed_xp_per_day = excluded.fixed_xp_per_day,
+                    average_xp_per_hunt = excluded.average_xp_per_hunt,
+                    tie_rate_percent = excluded.tie_rate_percent,
+                    loss_rate_percent = excluded.loss_rate_percent,
+                    maximum_streak = excluded.maximum_streak,
+                    knowledge_quality = excluded.knowledge_quality,
+                    max_lines = excluded.max_lines,
+                    updated_at = excluded.updated_at
+                """,
+                (
+                    user_id,
+                    settings.battles_per_day,
+                    settings.fixed_xp_per_day,
+                    settings.average_xp_per_hunt,
+                    settings.tie_rate_percent,
+                    settings.loss_rate_percent,
+                    settings.maximum_streak,
+                    settings.knowledge_quality,
+                    settings.max_lines,
+                    int(time.time()),
+                ),
+            )
+            connection.commit()
+        finally:
+            connection.close()
+        return self.get_forecast_settings_sync(user_id)
+
+    async def upsert_forecast_settings(
+        self, user_id: int, settings: ForecastSettings
+    ) -> ForecastSettings:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self.upsert_forecast_settings_sync, user_id, settings
+            )
 
 
 def identity_tokens(user: discord.abc.User) -> tuple[str, ...]:
@@ -975,10 +1072,29 @@ class ForecastActivityModal(discord.ui.Modal, title="Forecast settings"):
         except ValueError as exc:
             await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
             return
-        self.panel.settings = settings
+        self.panel.settings = await self.panel.cog.store.upsert_forecast_settings(
+            self.panel.owner_id, settings
+        )
         self.panel.page = 0
         await interaction.response.defer()
         await interaction.edit_original_response(embed=self.panel.build_embed(), view=self.panel)
+        if self.panel.team_tools_message is not None:
+            try:
+                await self.panel.team_tools_message.edit(
+                    embed=self.panel.cog.build_team_tools_embed(
+                        self.panel.snapshot, self.panel.settings
+                    ),
+                    view=TeamXPToolsView(
+                        self.panel.cog,
+                        self.panel.owner_id,
+                        self.panel.guild_id,
+                        self.panel.snapshot,
+                        self.panel.helper_prefix,
+                        self.panel.settings,
+                    ),
+                )
+            except (discord.HTTPException, discord.NotFound, discord.Forbidden):
+                logger.debug("Could not refresh the source Team XP panel", exc_info=True)
 
 
 class KnowledgePresetModal(discord.ui.Modal, title="Knowledge weapon IDs"):
@@ -1048,12 +1164,25 @@ class KnowledgePresetModal(discord.ui.Modal, title="Knowledge weapon IDs"):
 
 
 class TeamLevelForecastView(discord.ui.View):
-    def __init__(self, cog: "XPTools", owner_id: int, snapshot: TeamXPSnapshot) -> None:
+    def __init__(
+        self,
+        cog: "XPTools",
+        owner_id: int,
+        snapshot: TeamXPSnapshot,
+        settings: ForecastSettings | None = None,
+        *,
+        guild_id: int = 0,
+        helper_prefix: str = "h",
+        team_tools_message: discord.Message | None = None,
+    ) -> None:
         super().__init__(timeout=15 * 60)
         self.cog = cog
         self.owner_id = owner_id
         self.snapshot = snapshot
-        self.settings = ForecastSettings()
+        self.settings = settings or ForecastSettings()
+        self.guild_id = guild_id
+        self.helper_prefix = helper_prefix
+        self.team_tools_message = team_tools_message
         self.scenario_index = 0
         self.page = 0
         self.show_stats = False
@@ -1238,6 +1367,7 @@ class TeamXPToolsView(discord.ui.View):
         guild_id: int,
         snapshot: TeamXPSnapshot,
         helper_prefix: str,
+        settings: ForecastSettings | None = None,
     ) -> None:
         super().__init__(timeout=TEAM_TOOLS_SECONDS)
         self.cog = cog
@@ -1245,6 +1375,7 @@ class TeamXPToolsView(discord.ui.View):
         self.guild_id = guild_id
         self.snapshot = snapshot
         self.helper_prefix = helper_prefix
+        self.settings = settings or ForecastSettings()
         icon_keys = {
             "xp_tools:save_knowledge": ("passive_kno", "🧠"),
         }
@@ -1268,7 +1399,15 @@ class TeamXPToolsView(discord.ui.View):
             )
             return
         await interaction.response.defer(ephemeral=True, thinking=True)
-        panel = TeamLevelForecastView(self.cog, self.owner_id, self.snapshot)
+        panel = TeamLevelForecastView(
+            self.cog,
+            self.owner_id,
+            self.snapshot,
+            self.settings,
+            guild_id=self.guild_id,
+            helper_prefix=self.helper_prefix,
+            team_tools_message=getattr(interaction, "message", None),
+        )
         await interaction.edit_original_response(embed=panel.build_embed(), view=panel)
 
     @discord.ui.button(
@@ -1454,8 +1593,16 @@ class XPTools(commands.Cog):
             ),
             inline=False,
         )
+        embed.add_field(
+            name="Credits",
+            value=(
+                f"{XP_CREDIT_MARKDOWN} Community streak and XP sheets were also used "
+                "to validate the documented model."
+            ),
+            inline=False,
+        )
         embed.set_footer(
-            text="Formulas: owo.bwep.net • Community streak/XP sheets • Thanks to Heather / Hasse for the reference"
+            text="Original Pet EXP guide: Heather • Community streak/XP sheets"
         )
         return embed
 
@@ -1513,19 +1660,25 @@ class XPTools(commands.Cog):
         embed.set_footer(text="No reminder is enabled until you press Enable. Saving either preset turns tracking off for safety.")
         return embed
 
-    def build_team_tools_embed(self, snapshot: TeamXPSnapshot) -> discord.Embed:
-        settings = ForecastSettings()
+    def build_team_tools_embed(
+        self,
+        snapshot: TeamXPSnapshot,
+        settings: ForecastSettings | None = None,
+    ) -> discord.Embed:
+        settings = settings or ForecastSettings()
         average_text = "not available"
-        normal: dict[int, int] = {}
-        knowledge: dict[int, int] = {}
+        baseline: dict[int, int] = {}
+        modeled: dict[int, int] = {}
+        modeled_knowledge: dict[int, int] = {}
         if snapshot.streak <= MAX_VALIDATED_STREAK:
             average_text = f"{current_streak_average_xp(snapshot.streak):,.1f} XP/battle"
-            normal, knowledge = next_level_forecasts(snapshot, settings)
+            baseline, _ = next_level_forecasts(snapshot, ForecastSettings())
+            modeled, modeled_knowledge = next_level_forecasts(snapshot, settings)
         embed = discord.Embed(
             title="Team XP tools",
             description=(
                 f"**Current streak:** {snapshot.streak:,} • **Calculated average:** {average_text}\n"
-                f"**Model:** {settings.battles_per_day:,} battles/day • "
+                f"**Saved model:** {settings.battles_per_day:,} battles/day • "
                 f"+{settings.fixed_xp_per_day:,} fixed XP/day • "
                 f"{settings.average_xp_per_hunt:g} XP/hunt • "
                 f"{settings.tie_rate_percent:g}% ties • {settings.loss_rate_percent:g}% losses • "
@@ -1538,21 +1691,31 @@ class XPTools(commands.Cog):
                 pet.level, max(item.level for item in snapshot.pets)
             )
             pet_icon = ui_emoji_text(self.bot, animal_emoji_key(pet.animal), "🐾")
+            model_battles = modeled.get(pet.position, 0)
+            model_days = (
+                f" (~{model_battles / settings.battles_per_day:,.1f} days)"
+                if settings.battles_per_day and model_battles
+                else ""
+            )
             embed.add_field(
                 name=f"{pet_icon} [{pet.position}] {pet.animal}",
                 value=(
                     f"**L.{pet.level} → L.{pet.level + 1}**\n"
                     f"Need: **{max(0, pet.next_xp - pet.current_xp):,} XP**\n"
                     f"Knowledge: `{knowledge_effect_text(multiplier, settings.knowledge_quality)}`\n"
-                    f"Normal: up to **{normal.get(pet.position, 0):,} battles**\n"
-                    f"Max Knowledge: **{knowledge.get(pet.position, 0):,}**"
+                    f"Normal: up to **{baseline.get(pet.position, 0):,} battles**\n"
+                    f"Your model: up to **{model_battles:,} battles**{model_days}\n"
+                    f"Model + Max Knowledge: **{modeled_knowledge.get(pet.position, 0):,}**"
                 ),
                 inline=True,
             )
         if not snapshot.pets:
             embed.description = "The team is readable, but this OwO layout did not expose pet XP values."
         embed.set_footer(
-            text="XP calculator opens the adjustable full-team forecast and all six Knowledge plans"
+            text=(
+                f"{XP_CREDIT_FOOTER} • XP calculator opens the adjustable full-team "
+                "forecast and all six Knowledge plans"
+            )
         )
         return embed
 
@@ -1602,7 +1765,10 @@ class XPTools(commands.Cog):
                 inline=True,
             )
         embed.set_footer(
-            text="Battle-only upper estimate • Ties, losses, enemy bonuses, hunts, and fixed daily XP change the result"
+            text=(
+                "Battle-only upper estimate • Ties, losses, enemy bonuses, hunts, "
+                "and fixed daily XP change the result"
+            )
         )
         return embed
 
@@ -1717,9 +1883,17 @@ class XPTools(commands.Cog):
         if snapshot is None:
             return False
         helper_prefix = await get_guild_helper_prefix(payload.guild_id)
+        settings = await self.store.get_forecast_settings(payload.user_id)
         await channel.send(
-            embed=self.build_team_tools_embed(snapshot),
-            view=TeamXPToolsView(self, payload.user_id, payload.guild_id, snapshot, helper_prefix),
+            embed=self.build_team_tools_embed(snapshot, settings),
+            view=TeamXPToolsView(
+                self,
+                payload.user_id,
+                payload.guild_id,
+                snapshot,
+                helper_prefix,
+                settings,
+            ),
             reference=discord.MessageReference(
                 message_id=payload.message_id,
                 channel_id=payload.channel_id,

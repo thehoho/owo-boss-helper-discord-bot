@@ -275,18 +275,50 @@ class XPParsingTests(unittest.TestCase):
         assert snapshot is not None
         cog = XPTools.__new__(XPTools)
         cog.bot = SimpleNamespace()
-        team_embed = cog.build_team_tools_embed(snapshot)
+        saved_settings = ForecastSettings(
+            battles_per_day=500,
+            fixed_xp_per_day=200_000,
+            average_xp_per_hunt=21,
+            tie_rate_percent=0.82,
+            loss_rate_percent=0.1,
+            maximum_streak=2600,
+            knowledge_quality=0.12,
+            max_lines=24,
+        )
+        team_embed = cog.build_team_tools_embed(snapshot, saved_settings)
         self.assertEqual(team_embed.title, "Team XP tools")
         self.assertEqual(len(team_embed.fields), 3)
         self.assertIn("Normal: up to", team_embed.fields[0].value)
-        self.assertIn("Max Knowledge", team_embed.fields[0].value)
+        self.assertIn("Your model: up to", team_embed.fields[0].value)
+        self.assertIn("Model + Max Knowledge", team_embed.fields[0].value)
+        self.assertIn("500 battles/day", team_embed.description)
+        self.assertIn("21 XP/hunt", team_embed.description)
+        self.assertIn("0.82% ties", team_embed.description)
+        self.assertIn("0.1% losses", team_embed.description)
+        self.assertIn("max streak 2,600", team_embed.description)
+        self.assertIn("Heather", team_embed.footer.text)
+        self.assertIn("owo.bwep.net/exp/", team_embed.footer.text)
 
-        panel = TeamLevelForecastView(cog, 1, snapshot)
+        panel = TeamLevelForecastView(cog, 1, snapshot, saved_settings)
         forecast = panel.build_embed()
         self.assertEqual(len(KNOWLEDGE_SCENARIOS), 6)
         self.assertIn("Level Forecaster", forecast.title)
+        self.assertNotIn("Heather", forecast.description)
+        self.assertEqual(panel.settings, saved_settings)
         self.assertLessEqual(len(forecast.fields[-1].value), 1024)
         self.assertTrue(any(item.label.startswith("Scenario:") for item in panel.children))
+
+        calculator = cog.build_calculator_embed(
+            start_level=1,
+            target_level=2,
+            highest_level=2,
+            current_xp=0,
+            battles_per_day=100,
+            fixed_xp_per_day=0,
+            knowledge_quality=0.15,
+            current_streak=100,
+        )
+        self.assertNotIn("Heather", calculator.description)
 
     def test_knowledge_ids_replace_only_entered_positions(self) -> None:
         normal = (
@@ -355,7 +387,10 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
     async def test_team_reaction_reply_has_no_ping_or_auto_delete(self) -> None:
         cog = XPTools.__new__(XPTools)
         cog.bot = SimpleNamespace()
-        cog.store = SimpleNamespace()
+        settings = ForecastSettings(battles_per_day=500, average_xp_per_hunt=21)
+        cog.store = SimpleNamespace(
+            get_forecast_settings=AsyncMock(return_value=settings)
+        )
         cog.pending_by_channel = {}
         channel = SimpleNamespace(send=AsyncMock())
         payload = SimpleNamespace(user_id=42, guild_id=1, channel_id=5, message_id=9)
@@ -369,6 +404,8 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
         self.assertNotIn("delete_after", kwargs)
         self.assertIn("embed", kwargs)
         self.assertIn("view", kwargs)
+        self.assertEqual(kwargs["view"].settings, settings)
+        self.assertIn("500 battles/day", kwargs["embed"].description)
 
     async def test_profiles_persist_settings_presets_and_restore_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -396,6 +433,81 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
             self.assertFalse(profile.mention)
             self.assertTrue(profile.awaiting_restore)
             self.assertEqual(profile.knowledge[0].weapon_id, "KNO111")
+
+    async def test_forecast_settings_persist_per_user_across_restarts(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "xp.db"
+            store = XPReminderStore(path)
+            await store.initialize()
+            settings = ForecastSettings(
+                battles_per_day=500,
+                fixed_xp_per_day=200_000,
+                average_xp_per_hunt=21,
+                tie_rate_percent=0.82,
+                loss_rate_percent=0.1,
+                maximum_streak=2600,
+                knowledge_quality=0.12,
+                max_lines=24,
+            )
+            self.assertEqual(
+                await store.upsert_forecast_settings(42, settings), settings
+            )
+
+            reopened = XPReminderStore(path)
+            await reopened.initialize()
+            self.assertEqual(await reopened.get_forecast_settings(42), settings)
+            self.assertEqual(
+                await reopened.get_forecast_settings(99), ForecastSettings()
+            )
+
+    async def test_forecast_modal_submit_saves_the_user_model(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        saved = ForecastSettings(
+            battles_per_day=500,
+            fixed_xp_per_day=200_000,
+            average_xp_per_hunt=21,
+            tie_rate_percent=0.82,
+            loss_rate_percent=0.1,
+            maximum_streak=2600,
+            knowledge_quality=0.12,
+            max_lines=24,
+        )
+        cog = XPTools.__new__(XPTools)
+        cog.bot = SimpleNamespace()
+        cog.store = SimpleNamespace(
+            upsert_forecast_settings=AsyncMock(return_value=saved)
+        )
+        source_message = SimpleNamespace(edit=AsyncMock())
+        panel = TeamLevelForecastView(
+            cog,
+            42,
+            snapshot,
+            guild_id=1,
+            helper_prefix="h",
+            team_tools_message=source_message,
+        )
+        modal = ForecastActivityModal(panel)
+        modal.activity._value = "500, 200000, 21"
+        modal.rates._value = "0.82, 0.1"
+        modal.maximum_streak._value = "2600"
+        modal.knowledge_quality._value = "0.12"
+        modal.max_lines._value = "24"
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(defer=AsyncMock()),
+            edit_original_response=AsyncMock(),
+        )
+
+        await modal.on_submit(interaction)
+
+        cog.store.upsert_forecast_settings.assert_awaited_once_with(42, saved)
+        self.assertEqual(panel.settings, saved)
+        interaction.edit_original_response.assert_awaited_once()
+        source_message.edit.assert_awaited_once()
+        self.assertIn(
+            "500 battles/day",
+            source_message.edit.await_args.kwargs["embed"].description,
+        )
 
     async def test_prompt_tie_and_restore_workflow_persists(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
@@ -461,6 +573,9 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIsNotNone(bot.tree.get_command("xp-reminders"))
                 help_embed = bot.get_cog("XPTools").build_xp_help_embed("h")
                 self.assertIn("/xp-calc", "\n".join(field.value for field in help_embed.fields))
+                credits = next(field for field in help_embed.fields if field.name == "Credits")
+                self.assertIn("Heather", credits.value)
+                self.assertIn("https://owo.bwep.net/exp/", credits.value)
             finally:
                 module.DATABASE_FILE = original
                 await bot.close()

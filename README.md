@@ -1,3 +1,7 @@
+## v0.16.7-beta notes
+
+XP calculator settings now persist per user and automatically power a separate saved-model estimate in every future Team XP panel, while the unchanged baseline remains visible for comparison. `H XP` and Team XP also visibly credit Heather's original Pet EXP guide at `owo.bwep.net/exp/`. See [persistent XP model](RELEASE_NOTES_v0.16.7-beta.md).
+
 ## v0.16.6-beta notes
 
 The Team XP panel now keeps XP Calculator labeled while presenting normal preset, Knowledge preset, reminders, and save-team help as four compact icon-only controls on the same row. The normal icon captures the current weapon set immediately; the Knowledge form keeps current weapon IDs visible while accepting replacements; and the save icon privately explains the direct team-import command. See [compact Team XP controls](RELEASE_NOTES_v0.16.6-beta.md).
