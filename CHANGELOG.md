@@ -1,3 +1,15 @@
+## v0.16.3-beta - Interactive Team XP Forecasting
+
+- Combined the next-level forecast into the main Team XP tools response and removed the redundant forecast button.
+- Stopped mentioning the reacting member and stopped auto-deleting the Team XP tools response.
+- Matched the supplied forecast scale by modeling 2,000 battles/day, 200,000 fixed XP/day, 21 XP/hunt, 0.82% ties, and a 2,600 maximum streak as editable defaults.
+- Added a paginated full-team level progression forecast with adjustable activity, Knowledge quality, and up to 99 level-event lines.
+- Added a no-icon scenario control cycling Always equipped and every 10/50/100/500/1,000 milestone plans, with normal-versus-selected battle savings.
+- Changed Save Knowledge to accept one to three six-character weapon IDs directly while retaining unchanged normal weapon positions.
+- Cached generated forecast pages and deferred heavier recalculations so pagination is immediate and Discord interactions are acknowledged on time.
+- Added regression coverage for the reported team, six plans, persistent no-ping replies, direct Knowledge IDs, and Discord field-size limits.
+- Updated the public version to 0.16.3-beta; no database migration, dependency, slash-command schema, or permission change is required.
+
 ## v0.16.2-beta - OwO Footer Streak Parsing
 
 - Read visible embed-footer text from both raw Discord payloads and discord.py message objects.

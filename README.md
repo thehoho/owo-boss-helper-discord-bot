@@ -1,3 +1,7 @@
+## v0.16.3-beta notes
+
+The OwO-team reaction now returns one persistent, non-mentioning Team XP panel containing the next-level forecast. Its calculator opens a paginated full-team level forecaster with editable activity, fixed XP, hunt XP, tie rate, maximum streak, Knowledge quality, and line count, plus six dynamically switchable Knowledge plans. Normal weapons are captured from the team card; Knowledge weapon IDs are entered directly. See [interactive team XP forecasting](RELEASE_NOTES_v0.16.3-beta.md).
+
 ## v0.16.2-beta notes
 
 Team XP forecasts now read `Current Streak` from OwO's embed footer as well as its main content, preventing the accidental streak-0 fallback. The private team panel uses familiar Stats, Abacus, sword, Knowledge, bell, and save icons. See [OwO footer streak parsing](RELEASE_NOTES_v0.16.2-beta.md).

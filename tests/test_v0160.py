@@ -12,21 +12,27 @@ from discord.ext import commands
 
 from cogs.team_templates import TeamMember, extract_all_text, extract_message_text
 from cogs.xp_tools import (
+    KNOWLEDGE_SCENARIOS,
+    ForecastSettings,
     XPReminderStore,
     XPTools,
     BattleResult,
     PendingBattle,
     TeamXPToolsView,
+    TeamLevelForecastView,
     average_winning_streak_xp,
     catchup_multiplier,
     changed_positions,
     current_streak_average_xp,
     estimated_battles_needed,
+    knowledge_preset_from_ids,
     milestone_bonus,
     parse_battle_result,
     parse_team_xp_snapshot,
+    next_level_forecasts,
     raw_battle_xp_needed,
     should_prompt_switch,
+    simulate_team_forecast,
     switch_benefit,
     total_level_xp,
     weapon_switch_commands,
@@ -149,12 +155,68 @@ class XPParsingTests(unittest.TestCase):
         cog.bot = SimpleNamespace()
         view = TeamXPToolsView(cog, 1, 1, snapshot, "h")
         emojis = {item.label: str(item.emoji) for item in view.children}
-        self.assertEqual(emojis["XP forecast"], "📊")
+        self.assertNotIn("XP forecast", emojis)
         self.assertEqual(emojis["XP calculator"], "🧮")
         self.assertEqual(emojis["Save normal"], "⚔️")
         self.assertEqual(emojis["Save Knowledge"], "🧠")
         self.assertEqual(emojis["Reminders"], "🔔")
         self.assertEqual(emojis["Save-team help"], "💾")
+
+    def test_neon_style_settings_match_reported_next_level_scale(self) -> None:
+        text = (
+            TEAM_TEXT.replace("1,772,662", "2,246,348")
+            .replace("943,981", "1,417,667")
+            .replace("3,904,670", "4,129,306")
+            .replace("1,265", "1,754")
+        )
+        snapshot = parse_team_xp_snapshot(text)
+        assert snapshot is not None
+        normal, always = next_level_forecasts(snapshot, ForecastSettings())
+        self.assertEqual(normal[1], 3248)
+        self.assertEqual(normal[2], 4052)
+        self.assertLess(always[1], normal[1])
+
+        lines, _ = simulate_team_forecast(
+            snapshot,
+            ForecastSettings(max_lines=6),
+            use_knowledge=True,
+            knowledge_interval=10,
+        )
+        self.assertEqual(lines[0].battles, 0)
+        self.assertEqual(lines[0].streak, 1754)
+        self.assertGreaterEqual(len(lines), 5)
+
+    def test_team_panel_combines_forecast_and_calculator_cycles_six_plans(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        cog = XPTools.__new__(XPTools)
+        cog.bot = SimpleNamespace()
+        team_embed = cog.build_team_tools_embed(snapshot)
+        self.assertEqual(team_embed.title, "Team XP tools")
+        self.assertEqual(len(team_embed.fields), 3)
+        self.assertIn("Normal: up to", team_embed.fields[0].value)
+        self.assertIn("Max Knowledge", team_embed.fields[0].value)
+
+        panel = TeamLevelForecastView(cog, 1, snapshot)
+        forecast = panel.build_embed()
+        self.assertEqual(len(KNOWLEDGE_SCENARIOS), 6)
+        self.assertIn("Level Forecaster", forecast.title)
+        self.assertLessEqual(len(forecast.fields[-1].value), 1024)
+        self.assertTrue(any(item.label.startswith("Scenario:") for item in panel.children))
+
+    def test_knowledge_ids_replace_only_entered_positions(self) -> None:
+        normal = (
+            TeamMember(1, "snake", "AAA111"),
+            TeamMember(2, "lobbot", "BBB222"),
+            TeamMember(3, "owl", "CCC333"),
+        )
+        knowledge = knowledge_preset_from_ids(normal, {1: "kno111", 2: "", 3: "kno333"})
+        self.assertEqual(
+            tuple(member.weapon_id for member in knowledge),
+            ("KNO111", "BBB222", "KNO333"),
+        )
+        with self.assertRaises(ValueError):
+            knowledge_preset_from_ids(normal, {1: "bad"})
 
     def test_battle_results_distinguish_ties(self) -> None:
         win = parse_battle_result("You won in 14 turns! | +200 xp | Streak: 1,363")
@@ -183,6 +245,24 @@ class XPParsingTests(unittest.TestCase):
 
 
 class XPStoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_team_reaction_reply_has_no_ping_or_auto_delete(self) -> None:
+        cog = XPTools.__new__(XPTools)
+        cog.bot = SimpleNamespace()
+        cog.store = SimpleNamespace()
+        cog.pending_by_channel = {}
+        channel = SimpleNamespace(send=AsyncMock())
+        payload = SimpleNamespace(user_id=42, guild_id=1, channel_id=5, message_id=9)
+        with patch("cogs.xp_tools.get_guild_helper_prefix", AsyncMock(return_value="h")):
+            handled = await cog.send_team_tools_from_reaction(
+                payload, {"content": TEAM_TEXT}, channel
+            )
+        self.assertTrue(handled)
+        self.assertEqual(channel.send.await_args.args, ())
+        kwargs = channel.send.await_args.kwargs
+        self.assertNotIn("delete_after", kwargs)
+        self.assertIn("embed", kwargs)
+        self.assertIn("view", kwargs)
+
     async def test_profiles_persist_settings_presets_and_restore_state(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = XPReminderStore(Path(directory) / "xp.db")

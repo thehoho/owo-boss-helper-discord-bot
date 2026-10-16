@@ -93,7 +93,7 @@ class FirstSnapshotHitTests(unittest.IsolatedAsyncioTestCase):
             self.assertEqual(status.tickets, 3)
 
     def test_public_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.16.2-beta")
+        self.assertEqual(BOT_VERSION, "0.16.3-beta")
 
 
 if __name__ == "__main__":

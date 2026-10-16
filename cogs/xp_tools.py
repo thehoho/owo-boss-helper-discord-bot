@@ -14,7 +14,7 @@ import math
 import re
 import sqlite3
 import time
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path
 from typing import Any
 
@@ -52,9 +52,20 @@ XP_DATA_URL = "https://docs.google.com/spreadsheets/d/1E_YSDmmX-WVfoX29dkpPcgCwY
 REMINDER_INTERVALS = (10, 50, 100, 500, 1000)
 BATTLE_COMMAND_SUFFIXES = {"b", "battle"}
 PENDING_BATTLE_SECONDS = 45
-TEAM_TOOLS_SECONDS = 5 * 60
+TEAM_TOOLS_SECONDS = 15 * 60
+FORECAST_PAGE_LINES = 12
+MAX_FORECAST_LINES = 99
+MAX_FORECAST_BATTLES = 3_000_000
 MAX_LEVEL = 250
 MAX_VALIDATED_STREAK = 122_500
+KNOWLEDGE_SCENARIOS: tuple[tuple[str, int | None], ...] = (
+    ("Always equipped", None),
+    ("Every 10th battle", 10),
+    ("Every 50th battle", 50),
+    ("Every 100th battle", 100),
+    ("Every 500th battle", 500),
+    ("Every 1,000th battle", 1000),
+)
 
 XP_HELP_ALIASES = {"hxp", "h xp", "hexp", "h exp"}
 REMINDER_ALIASES = {
@@ -82,6 +93,34 @@ class TeamXPSnapshot:
     members: tuple[TeamMember, ...]
     pets: tuple[PetXPState, ...]
     streak: int
+
+
+@dataclass(frozen=True)
+class ForecastSettings:
+    battles_per_day: int = 2000
+    fixed_xp_per_day: int = 200_000
+    average_xp_per_hunt: float = 21.0
+    tie_rate_percent: float = 0.82
+    maximum_streak: int = 2600
+    knowledge_quality: float = 0.15
+    max_lines: int = 48
+
+
+@dataclass(frozen=True)
+class ForecastPetProgress:
+    position: int
+    level: int
+    current_xp: float
+    next_xp: int
+    leveled: bool = False
+
+
+@dataclass(frozen=True)
+class ForecastLine:
+    pets: tuple[ForecastPetProgress, ...]
+    battles: int
+    streak: int
+    days: int
 
 
 @dataclass(frozen=True)
@@ -246,6 +285,144 @@ def estimated_battles_needed(
     return math.ceil(battles)
 
 
+def validate_forecast_settings(settings: ForecastSettings) -> None:
+    if not 1 <= settings.battles_per_day <= 5_760:
+        raise ValueError("Battles per day must be between 1 and 5,760")
+    if not 0 <= settings.fixed_xp_per_day <= 2_000_000_000:
+        raise ValueError("Fixed XP per day must be between 0 and 2,000,000,000")
+    if not 0 <= settings.average_xp_per_hunt <= 1_000_000:
+        raise ValueError("Average XP per hunt must be between 0 and 1,000,000")
+    if not 0 <= settings.tie_rate_percent < 100:
+        raise ValueError("Tie rate must be at least 0 and below 100 percent")
+    if not 1 <= settings.maximum_streak <= MAX_VALIDATED_STREAK:
+        raise ValueError(
+            f"Maximum streak must be between 1 and {MAX_VALIDATED_STREAK:,}"
+        )
+    if not 0 <= settings.knowledge_quality <= 0.15:
+        raise ValueError("Knowledge quality must be between 0 and 0.15")
+    if not 1 <= settings.max_lines <= MAX_FORECAST_LINES:
+        raise ValueError(f"Maximum lines must be between 1 and {MAX_FORECAST_LINES}")
+
+
+def simulate_team_forecast(
+    snapshot: TeamXPSnapshot,
+    settings: ForecastSettings,
+    *,
+    use_knowledge: bool,
+    knowledge_interval: int | None = None,
+    line_limit: int | None = None,
+    stop_after_next_levels: bool = False,
+) -> tuple[tuple[ForecastLine, ...], dict[int, int]]:
+    """Run a deterministic team forecast using the documented approximation.
+
+    Tie rate reduces the streak-derived battle estimate, maximum streak wraps
+    the projected streak, and one hunt is paired with each configured battle.
+    Hunting and fixed daily XP remain outside catch-up and Knowledge.
+    """
+    validate_forecast_settings(settings)
+    if knowledge_interval is not None and knowledge_interval not in REMINDER_INTERVALS:
+        raise ValueError("Unsupported Knowledge interval")
+    if not snapshot.pets:
+        return (), {}
+
+    limit = min(MAX_FORECAST_LINES, line_limit or settings.max_lines)
+    success_rate = 1.0 - settings.tie_rate_percent / 100.0
+    fixed_per_battle = settings.fixed_xp_per_day / settings.battles_per_day
+    streak = max(0, snapshot.streak)
+    if streak > settings.maximum_streak:
+        streak %= settings.maximum_streak
+    win_accumulator = 0.0
+    initial_levels = {pet.position: pet.level for pet in snapshot.pets}
+    next_level_battles: dict[int, int] = {}
+    levels = [pet.level for pet in snapshot.pets]
+    progress = [float(pet.current_xp) for pet in snapshot.pets]
+
+    def make_line(battles: int, leveled_positions: set[int]) -> ForecastLine:
+        pets = tuple(
+            ForecastPetProgress(
+                position=pet.position,
+                level=levels[index],
+                current_xp=progress[index],
+                next_xp=xp_for_next_level(levels[index]),
+                leveled=pet.position in leveled_positions,
+            )
+            for index, pet in enumerate(snapshot.pets)
+        )
+        return ForecastLine(
+            pets=pets,
+            battles=battles,
+            streak=streak,
+            days=battles // settings.battles_per_day,
+        )
+
+    lines: list[ForecastLine] = [make_line(0, set())]
+    for battles in range(1, MAX_FORECAST_BATTLES + 1):
+        win_accumulator += success_rate
+        won = win_accumulator >= 1.0
+        if won:
+            win_accumulator -= 1.0
+            streak += 1
+            if streak > settings.maximum_streak:
+                streak = 1
+
+        raw_battle_xp = current_streak_average_xp(streak) * success_rate
+        knowledge_active = use_knowledge and (
+            knowledge_interval is None
+            or (won and streak > 0 and streak % knowledge_interval == 0)
+        )
+        highest_level = max(levels)
+        leveled_positions: set[int] = set()
+        for index, pet in enumerate(snapshot.pets):
+            if levels[index] >= MAX_LEVEL:
+                continue
+            bonus = settings.knowledge_quality if knowledge_active else 0.0
+            progress[index] += (
+                raw_battle_xp * (catchup_multiplier(levels[index], highest_level) + bonus)
+                + fixed_per_battle
+                + settings.average_xp_per_hunt
+            )
+            while levels[index] < MAX_LEVEL and progress[index] >= xp_for_next_level(levels[index]):
+                progress[index] -= xp_for_next_level(levels[index])
+                levels[index] += 1
+                leveled_positions.add(pet.position)
+                if (
+                    pet.position not in next_level_battles
+                    and levels[index] > initial_levels[pet.position]
+                ):
+                    next_level_battles[pet.position] = battles
+
+        if leveled_positions and len(lines) < limit:
+            lines.append(make_line(battles, leveled_positions))
+        if stop_after_next_levels and len(next_level_battles) == len(snapshot.pets):
+            break
+        if len(lines) >= limit and not stop_after_next_levels:
+            break
+
+    return tuple(lines), next_level_battles
+
+
+def next_level_forecasts(
+    snapshot: TeamXPSnapshot,
+    settings: ForecastSettings,
+) -> tuple[dict[int, int], dict[int, int]]:
+    _, normal = simulate_team_forecast(
+        snapshot,
+        settings,
+        use_knowledge=False,
+        line_limit=1,
+        stop_after_next_levels=True,
+    )
+    _, always = simulate_team_forecast(
+        snapshot,
+        settings,
+        use_knowledge=True,
+        knowledge_interval=None,
+        line_limit=1,
+        stop_after_next_levels=True,
+    )
+    return normal, always
+
+
 def switch_benefit(
     interval: int,
     *,
@@ -371,6 +548,25 @@ def changed_positions(
         if before.weapon_id.upper() != after.weapon_id.upper():
             changed.append(position)
     return tuple(changed)
+
+
+def knowledge_preset_from_ids(
+    normal: tuple[TeamMember, ...], entered: dict[int, str]
+) -> tuple[TeamMember, ...]:
+    normalized = {position: value.strip().upper() for position, value in entered.items()}
+    for weapon_id in normalized.values():
+        if weapon_id and re.fullmatch(r"[A-Z0-9]{6}", weapon_id) is None:
+            raise ValueError(
+                "Every entered weapon ID must contain exactly six letters or numbers"
+            )
+    return tuple(
+        TeamMember(
+            member.position,
+            member.animal,
+            normalized.get(member.position) or member.weapon_id,
+        )
+        for member in normal
+    )
 
 
 def presets_compatible(
@@ -648,81 +844,290 @@ class XPReminderView(discord.ui.View):
         await self.refresh(interaction)
 
 
-class TeamXPCalculatorModal(discord.ui.Modal, title="Team XP calculator"):
-    pet_position = discord.ui.TextInput(
-        label="Pet position (1, 2, or 3)",
-        placeholder="1",
-        min_length=1,
-        max_length=1,
-    )
-    target_level = discord.ui.TextInput(
-        label="Target level",
-        placeholder="50",
-        min_length=1,
-        max_length=3,
-    )
-    fixed_xp_per_day = discord.ui.TextInput(
-        label="Fixed XP per day (optional)",
-        placeholder="0",
-        min_length=1,
-        max_length=10,
-    )
-    battles_per_day = discord.ui.TextInput(
-        label="Battles per day",
-        placeholder="1000",
-        min_length=1,
-        max_length=5,
-    )
-    knowledge_quality = discord.ui.TextInput(
-        label="Knowledge bonus (0 to 0.15)",
-        placeholder="0.15",
-        min_length=1,
-        max_length=4,
-    )
+class ForecastActivityModal(discord.ui.Modal, title="Forecast activity settings"):
+    battles_per_day = discord.ui.TextInput(label="Battles per day (1–5760)", max_length=5)
+    fixed_xp_per_day = discord.ui.TextInput(label="Fixed XP per day", max_length=10)
+    average_xp_per_hunt = discord.ui.TextInput(label="Average XP per hunt", max_length=10)
+    tie_rate_percent = discord.ui.TextInput(label="Tie rate percent", max_length=6)
+    maximum_streak = discord.ui.TextInput(label="Maximum streak", max_length=7)
 
-    def __init__(self, cog: "XPTools", snapshot: TeamXPSnapshot) -> None:
+    def __init__(self, panel: "TeamLevelForecastView") -> None:
         super().__init__()
-        self.cog = cog
-        self.snapshot = snapshot
-        if snapshot.pets:
-            self.pet_position.default = str(snapshot.pets[0].position)
-            self.target_level.default = str(min(MAX_LEVEL, snapshot.pets[0].level + 1))
-        self.fixed_xp_per_day.default = "0"
-        self.battles_per_day.default = "1000"
-        self.knowledge_quality.default = "0.15"
+        self.panel = panel
+        settings = panel.settings
+        self.battles_per_day.default = str(settings.battles_per_day)
+        self.fixed_xp_per_day.default = str(settings.fixed_xp_per_day)
+        self.average_xp_per_hunt.default = f"{settings.average_xp_per_hunt:g}"
+        self.tie_rate_percent.default = f"{settings.tie_rate_percent:g}"
+        self.maximum_streak.default = str(settings.maximum_streak)
 
     async def on_submit(self, interaction: discord.Interaction) -> None:
         try:
-            position = int(str(self.pet_position))
-            pet = next(item for item in self.snapshot.pets if item.position == position)
-            target = int(str(self.target_level))
-            fixed_per_day = int(str(self.fixed_xp_per_day).replace(",", ""))
-            per_day = int(str(self.battles_per_day))
-            knowledge = float(str(self.knowledge_quality))
-            if target <= pet.level or target > MAX_LEVEL:
-                raise ValueError(f"Target level must be between {pet.level + 1} and {MAX_LEVEL}")
-            if not 0 <= fixed_per_day <= 2_000_000_000:
-                raise ValueError("Fixed XP per day must be between 0 and 2,000,000,000")
-            if not 1 <= per_day <= 5_760:
-                raise ValueError("Battles per day must be between 1 and 5,760")
-            if not 0 <= knowledge <= 0.15:
-                raise ValueError("Knowledge must be between 0 and 0.15")
-            highest = max(item.level for item in self.snapshot.pets)
-            embed = self.cog.build_calculator_embed(
-                start_level=pet.level,
-                target_level=target,
-                highest_level=highest,
-                current_xp=pet.current_xp,
-                battles_per_day=per_day,
-                fixed_xp_per_day=fixed_per_day,
-                knowledge_quality=knowledge,
-                current_streak=min(self.snapshot.streak, MAX_VALIDATED_STREAK),
+            settings = replace(
+                self.panel.settings,
+                battles_per_day=int(str(self.battles_per_day).replace(",", "")),
+                fixed_xp_per_day=int(str(self.fixed_xp_per_day).replace(",", "")),
+                average_xp_per_hunt=float(str(self.average_xp_per_hunt).replace(",", "")),
+                tie_rate_percent=float(str(self.tie_rate_percent)),
+                maximum_streak=int(str(self.maximum_streak).replace(",", "")),
             )
-        except (ValueError, StopIteration) as exc:
-            detail = str(exc) or "Choose a pet position shown on this team."
-            await interaction.response.send_message(f"❌ {detail}", ephemeral=True)
+            validate_forecast_settings(settings)
+        except ValueError as exc:
+            await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
             return
-        await interaction.response.send_message(embed=embed, ephemeral=True)
+        self.panel.settings = settings
+        self.panel.page = 0
+        await interaction.response.defer()
+        await interaction.edit_original_response(embed=self.panel.build_embed(), view=self.panel)
+
+
+class ForecastKnowledgeModal(discord.ui.Modal, title="Knowledge and display settings"):
+    knowledge_quality = discord.ui.TextInput(
+        label="Knowledge quality (0–0.15)", max_length=4
+    )
+    max_lines = discord.ui.TextInput(label="Maximum forecast lines (1–99)", max_length=2)
+
+    def __init__(self, panel: "TeamLevelForecastView") -> None:
+        super().__init__()
+        self.panel = panel
+        self.knowledge_quality.default = f"{panel.settings.knowledge_quality:g}"
+        self.max_lines.default = str(panel.settings.max_lines)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            settings = replace(
+                self.panel.settings,
+                knowledge_quality=float(str(self.knowledge_quality)),
+                max_lines=int(str(self.max_lines)),
+            )
+            validate_forecast_settings(settings)
+        except ValueError as exc:
+            await interaction.response.send_message(f"❌ {exc}", ephemeral=True)
+            return
+        self.panel.settings = settings
+        self.panel.page = 0
+        await interaction.response.defer()
+        await interaction.edit_original_response(embed=self.panel.build_embed(), view=self.panel)
+
+
+class KnowledgePresetModal(discord.ui.Modal, title="Knowledge weapon IDs"):
+    position_1 = discord.ui.TextInput(
+        label="Position 1 weapon ID", required=False, max_length=6
+    )
+    position_2 = discord.ui.TextInput(
+        label="Position 2 weapon ID", required=False, max_length=6
+    )
+    position_3 = discord.ui.TextInput(
+        label="Position 3 weapon ID", required=False, max_length=6
+    )
+
+    def __init__(self, cog: "XPTools", guild_id: int, owner_id: int, profile: XPReminderProfile) -> None:
+        super().__init__()
+        self.cog = cog
+        self.guild_id = guild_id
+        self.owner_id = owner_id
+        self.profile = profile
+        existing = {member.position: member.weapon_id for member in profile.knowledge}
+        normal = {member.position: member.weapon_id for member in profile.normal}
+        for position, item in (
+            (1, self.position_1),
+            (2, self.position_2),
+            (3, self.position_3),
+        ):
+            item.placeholder = f"Current: {normal.get(position, 'none')}"
+            if existing.get(position) and existing[position] != normal.get(position):
+                item.default = existing[position]
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        entered = {
+            1: str(self.position_1).strip().upper(),
+            2: str(self.position_2).strip().upper(),
+            3: str(self.position_3).strip().upper(),
+        }
+        try:
+            knowledge = knowledge_preset_from_ids(self.profile.normal, entered)
+        except ValueError as exc:
+            await interaction.response.send_message(f"❌ {exc}.", ephemeral=True)
+            return
+        if not changed_positions(self.profile.normal, knowledge):
+            await interaction.response.send_message(
+                "❌ Enter at least one Knowledge weapon ID that differs from the normal preset.",
+                ephemeral=True,
+            )
+            return
+        saved = await self.cog.store.upsert(
+            self.guild_id,
+            self.owner_id,
+            knowledge=knowledge,
+            enabled=False,
+            awaiting_restore=False,
+        )
+        changed = changed_positions(saved.normal, saved.knowledge)
+        await interaction.response.send_message(
+            f"✅ Saved Knowledge weapons for position(s) **{', '.join(map(str, changed))}**. "
+            "Reminder tracking stays off until you enable it.",
+            ephemeral=True,
+        )
+
+
+class TeamLevelForecastView(discord.ui.View):
+    def __init__(self, cog: "XPTools", owner_id: int, snapshot: TeamXPSnapshot) -> None:
+        super().__init__(timeout=15 * 60)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.snapshot = snapshot
+        self.settings = ForecastSettings()
+        self.scenario_index = 0
+        self.page = 0
+        self._cache_key: tuple[ForecastSettings, int] | None = None
+        self._cache_lines: tuple[ForecastLine, ...] = ()
+        self._cache_selected_counts: dict[int, int] = {}
+        self._cache_normal_counts: dict[int, int] = {}
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.owner_id:
+            return True
+        await interaction.response.send_message(
+            "Open the calculator from your own team panel.", ephemeral=True
+        )
+        return False
+
+    def _scenario(self) -> tuple[str, int | None]:
+        return KNOWLEDGE_SCENARIOS[self.scenario_index]
+
+    def _forecast_data(
+        self,
+    ) -> tuple[tuple[ForecastLine, ...], dict[int, int], dict[int, int]]:
+        label, interval = self._scenario()
+        key = (self.settings, self.scenario_index)
+        if key == self._cache_key:
+            return self._cache_lines, self._cache_selected_counts, self._cache_normal_counts
+        self._cache_lines, _ = simulate_team_forecast(
+            self.snapshot,
+            self.settings,
+            use_knowledge=True,
+            knowledge_interval=interval,
+        )
+        _, self._cache_selected_counts = simulate_team_forecast(
+            self.snapshot,
+            self.settings,
+            use_knowledge=True,
+            knowledge_interval=interval,
+            line_limit=1,
+            stop_after_next_levels=True,
+        )
+        _, self._cache_normal_counts = simulate_team_forecast(
+            self.snapshot,
+            self.settings,
+            use_knowledge=False,
+            line_limit=1,
+            stop_after_next_levels=True,
+        )
+        self._cache_key = key
+        return self._cache_lines, self._cache_selected_counts, self._cache_normal_counts
+
+    def build_embed(self) -> discord.Embed:
+        label, _interval = self._scenario()
+        lines, selected_counts, normal_counts = self._forecast_data()
+        page_count = max(1, math.ceil(len(lines) / FORECAST_PAGE_LINES))
+        self.page = min(self.page, page_count - 1)
+        start = self.page * FORECAST_PAGE_LINES
+        visible = lines[start : start + FORECAST_PAGE_LINES]
+        table_rows = ["Levels                  | Battles | Streak | Days"]
+        for line in visible:
+            pet_cells = []
+            for pet in line.pets:
+                percent = 100 * pet.current_xp / pet.next_xp if pet.next_xp else 0
+                marker = "UP" if pet.leveled else "--"
+                pet_cells.append(f"{marker}{pet.level:>3} {percent:>3.0f}%")
+            table_rows.append(
+                f"{' | '.join(pet_cells):<31} | {line.battles:>7} | {line.streak:>6} | {line.days:>4}"
+            )
+
+        embed = discord.Embed(
+            title=f"🔮 Level Forecaster — {self.snapshot.source_title}",
+            description=(
+                f"**Knowledge plan:** {label} at {self.settings.knowledge_quality * 100:g}% quality\n"
+                f"**Activity:** {self.settings.battles_per_day:,} battles/day • "
+                f"+{self.settings.fixed_xp_per_day:,} fixed XP/day • "
+                f"{self.settings.average_xp_per_hunt:g} XP/hunt\n"
+                f"**Streak model:** {self.settings.tie_rate_percent:g}% ties • "
+                f"maximum {self.settings.maximum_streak:,}"
+            ),
+            color=0x5865F2,
+            url=XP_SOURCE_URL,
+        )
+        for pet in self.snapshot.pets:
+            selected = selected_counts.get(pet.position, 0)
+            normal = normal_counts.get(pet.position, 0)
+            saved = max(0, normal - selected)
+            pet_icon = ui_emoji_text(self.cog.bot, animal_emoji_key(pet.animal), "🐾")
+            embed.add_field(
+                name=f"{pet_icon} [{pet.position}] {pet.animal}",
+                value=(
+                    f"Normal: **{normal:,}**\n"
+                    f"Selected: **{selected:,}**\n"
+                    f"Benefit: **{saved:,} battles**"
+                ),
+                inline=True,
+            )
+        embed.add_field(
+            name="Progress — `Levels | Battles | Streak | Days`",
+            value="```text\n" + "\n".join(table_rows) + "\n```",
+            inline=False,
+        )
+        embed.set_footer(
+            text=(
+                f"Page {self.page + 1}/{page_count} • {len(lines)} lines • one hunt per battle • "
+                "ties use the documented approximation"
+            )
+        )
+        self.scenario.label = f"Scenario: {label}"
+        self.previous.disabled = self.page <= 0
+        self.next.disabled = self.page >= page_count - 1
+        self.page_number.label = f"Page {self.page + 1}/{page_count}"
+        return embed
+
+    @discord.ui.button(label="Settings", style=discord.ButtonStyle.secondary, row=0)
+    async def settings_button(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        await interaction.response.send_modal(ForecastActivityModal(self))
+
+    @discord.ui.button(label="Knowledge & lines", style=discord.ButtonStyle.secondary, row=0)
+    async def knowledge_settings(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        await interaction.response.send_modal(ForecastKnowledgeModal(self))
+
+    @discord.ui.button(label="Scenario", style=discord.ButtonStyle.primary, row=0)
+    async def scenario(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        self.scenario_index = (self.scenario_index + 1) % len(KNOWLEDGE_SCENARIOS)
+        self.page = 0
+        await interaction.response.defer()
+        await interaction.edit_original_response(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="Previous", style=discord.ButtonStyle.secondary, row=1)
+    async def previous(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        self.page = max(0, self.page - 1)
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
+
+    @discord.ui.button(label="Page", style=discord.ButtonStyle.secondary, disabled=True, row=1)
+    async def page_number(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        return
+
+    @discord.ui.button(label="Next", style=discord.ButtonStyle.secondary, row=1)
+    async def next(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        self.page += 1
+        await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
 
 class TeamXPToolsView(discord.ui.View):
@@ -754,13 +1159,6 @@ class TeamXPToolsView(discord.ui.View):
         await interaction.response.send_message("Open the team tools from your own reaction.", ephemeral=True)
         return False
 
-    @discord.ui.button(label="XP forecast", emoji="📊", style=discord.ButtonStyle.primary)
-    async def forecast(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
-        await interaction.response.send_message(
-            embed=self.cog.build_team_forecast_embed(self.snapshot),
-            ephemeral=True,
-        )
-
     @discord.ui.button(label="XP calculator", emoji="🧮", style=discord.ButtonStyle.primary, row=1)
     async def calculator(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         if not self.snapshot.pets:
@@ -769,7 +1167,9 @@ class TeamXPToolsView(discord.ui.View):
                 ephemeral=True,
             )
             return
-        await interaction.response.send_modal(TeamXPCalculatorModal(self.cog, self.snapshot))
+        await interaction.response.defer(ephemeral=True, thinking=True)
+        panel = TeamLevelForecastView(self.cog, self.owner_id, self.snapshot)
+        await interaction.edit_original_response(embed=panel.build_embed(), view=panel)
 
     @discord.ui.button(label="Save normal", emoji="⚔️", style=discord.ButtonStyle.secondary)
     async def save_normal(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
@@ -787,29 +1187,15 @@ class TeamXPToolsView(discord.ui.View):
 
     @discord.ui.button(label="Save Knowledge", emoji="🧠", style=discord.ButtonStyle.secondary)
     async def save_knowledge(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
-        current = await self.cog.store.get(self.guild_id, self.owner_id)
-        if current.normal and not presets_compatible(current.normal, self.snapshot.members):
+        profile = await self.cog.store.get(self.guild_id, self.owner_id)
+        if not profile.normal:
             await interaction.response.send_message(
-                "This team has different animals or positions from your normal preset. Save the matching normal team first.",
+                "Save the current normal weapons first, then enter the Knowledge weapon IDs.",
                 ephemeral=True,
             )
             return
-        profile = await self.cog.store.upsert(
-            self.guild_id,
-            self.owner_id,
-            knowledge=self.snapshot.members,
-            enabled=False,
-            awaiting_restore=False,
-        )
-        changed = changed_positions(profile.normal, profile.knowledge)
-        note = (
-            f"Positions with a Knowledge switch: **{', '.join(map(str, changed))}**."
-            if changed
-            else "No weapon differs from the normal preset yet."
-        )
-        await interaction.response.send_message(
-            f"✅ Saved the Knowledge preset. {note} Reminder tracking stays off until you enable it.",
-            ephemeral=True,
+        await interaction.response.send_modal(
+            KnowledgePresetModal(self.cog, self.guild_id, self.owner_id, profile)
         )
 
     @discord.ui.button(label="Reminders", emoji="🔔", style=discord.ButtonStyle.success)
@@ -986,7 +1372,7 @@ class XPTools(commands.Cog):
             name="Setup",
             value=(
                 "1. Show the correct OwO team with normal weapons and click the helper reaction → **Save normal**.\n"
-                "2. Equip the Knowledge weapon(s), show the same team again, and click → **Save Knowledge**.\n"
+                "2. Click **Save Knowledge** and enter the six-character Knowledge weapon ID(s).\n"
                 "3. Choose an interval and enable reminders below."
             ),
             inline=False,
@@ -1006,15 +1392,21 @@ class XPTools(commands.Cog):
         return embed
 
     def build_team_tools_embed(self, snapshot: TeamXPSnapshot) -> discord.Embed:
-        calculate_icon = ui_emoji_text(self.bot, "neon_calculate", "🧰")
+        settings = ForecastSettings()
         average_text = "not available"
+        normal: dict[int, int] = {}
+        knowledge: dict[int, int] = {}
         if snapshot.streak <= MAX_VALIDATED_STREAK:
             average_text = f"{current_streak_average_xp(snapshot.streak):,.1f} XP/battle"
+            normal, knowledge = next_level_forecasts(snapshot, settings)
         embed = discord.Embed(
-            title=f"{calculate_icon} Team XP tools",
+            title="Team XP tools",
             description=(
-                f"**Current streak:** {snapshot.streak:,}\n"
-                f"**Calculated average:** {average_text}"
+                f"**Current streak:** {snapshot.streak:,} • **Calculated average:** {average_text}\n"
+                f"**Model:** {settings.battles_per_day:,} battles/day • "
+                f"+{settings.fixed_xp_per_day:,} fixed XP/day • "
+                f"{settings.average_xp_per_hunt:g} XP/hunt • "
+                f"{settings.tie_rate_percent:g}% ties • max streak {settings.maximum_streak:,}"
             ),
             color=0x5865F2,
         )
@@ -1024,15 +1416,19 @@ class XPTools(commands.Cog):
             embed.add_field(
                 name=f"{pet_icon} [{pet.position}] {pet.animal}",
                 value=(
-                    f"**Level {pet.level}**\n"
-                    f"{pet.current_xp:,} / {pet.next_xp:,} XP\n"
-                    f"Progress: **{percent:.1f}%**"
+                    f"**L.{pet.level} → L.{pet.level + 1}** ({percent:.1f}%)\n"
+                    f"Need: **{max(0, pet.next_xp - pet.current_xp):,} XP**\n"
+                    f"Multiplier: **{catchup_multiplier(pet.level, max(item.level for item in snapshot.pets)):.2f}×**\n"
+                    f"Normal: up to **{normal.get(pet.position, 0):,} battles**\n"
+                    f"Max Knowledge: **{knowledge.get(pet.position, 0):,}**"
                 ),
                 inline=True,
             )
         if not snapshot.pets:
             embed.description = "The team is readable, but this OwO layout did not expose pet XP values."
-        embed.set_footer(text="The panel belongs to the member who clicked the reaction and expires after five minutes.")
+        embed.set_footer(
+            text="XP calculator opens the adjustable full-team forecast and all six Knowledge plans"
+        )
         return embed
 
     def build_team_forecast_embed(self, snapshot: TeamXPSnapshot) -> discord.Embed:
@@ -1052,8 +1448,7 @@ class XPTools(commands.Cog):
         average_xp = current_streak_average_xp(snapshot.streak)
         embed.description = (
             f"**Current streak:** {snapshot.streak:,} • "
-            f"**Calculated average:** {average_xp:,.1f} XP/battle\n"
-            "The current streak is read directly from this OwO team page."
+            f"**Calculated average:** {average_xp:,.1f} XP/battle"
         )
         for pet in snapshot.pets:
             needed = max(0, pet.next_xp - pet.current_xp)
@@ -1197,10 +1592,7 @@ class XPTools(commands.Cog):
         if snapshot is None:
             return False
         helper_prefix = await get_guild_helper_prefix(payload.guild_id)
-        user = self.bot.get_user(payload.user_id)
-        mention = user.mention if user else f"<@{payload.user_id}>"
         await channel.send(
-            mention,
             embed=self.build_team_tools_embed(snapshot),
             view=TeamXPToolsView(self, payload.user_id, payload.guild_id, snapshot, helper_prefix),
             reference=discord.MessageReference(
@@ -1209,8 +1601,7 @@ class XPTools(commands.Cog):
                 guild_id=payload.guild_id,
             ),
             mention_author=False,
-            delete_after=TEAM_TOOLS_SECONDS,
-            allowed_mentions=discord.AllowedMentions(users=True, replied_user=False),
+            allowed_mentions=discord.AllowedMentions.none(),
         )
         return True
 
