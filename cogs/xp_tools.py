@@ -1564,7 +1564,7 @@ class XPTools(commands.Cog):
             value=(
                 "A lower-level pet gets a catch-up multiplier of `2 + 0.1 × level difference`. "
                 "Knowledge adds `0.05–0.15` to the same multiplier; it does not multiply the "
-                "catch-up value. These bonuses do not apply to hunting or fixed daily XP."
+                "catch-up value. This multiplier applies only to battle XP on the primary team."
             ),
             inline=False,
         )

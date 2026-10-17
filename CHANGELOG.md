@@ -1,3 +1,12 @@
+## v0.16.10-beta - XP Scope and Current TapDeck Card
+
+- Replaced the long `H XP` exclusion list with the direct rule that its multiplier applies only to battle XP on the primary team.
+- Updated the TapDeck Lite card for 40 saved command keys, appearance customization, global or per-key delays and cooldowns, guarded slash-command sending, and optional 24-hour clipboard history.
+- Updated the privacy copy to reflect Google Play's no-data-collected-or-shared declaration and the app's offline, permission-free local-storage design.
+- Made Google Play the only installation link and removed the GitHub APK, release-note, source, and privacy buttons from the public card.
+- Removed the runtime GitHub release lookup, making `H Grind`, `H TapDeck`, and `/tapdeck` immediate and independent of GitHub API availability.
+- Updated the public version to 0.16.10-beta; no database migration, slash-command schema, dependency, or permission change is required.
+
 ## v0.16.9-beta - Clearer H XP Guide
 
 - Rewrote `H XP` in concise B2-level English without changing any XP formulas or totals.

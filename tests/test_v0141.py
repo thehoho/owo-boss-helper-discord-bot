@@ -15,17 +15,11 @@ from cogs.rng import (
     roll_inclusive,
 )
 from cogs.tapdeck import (
-    TAPDECK_LATEST_RELEASE_API_URL,
-    TAPDECK_LATEST_RELEASE_URL,
     TAPDECK_GOOGLE_PLAY_URL,
     TAPDECK_PREFIX_ALIASES,
-    TAPDECK_REPOSITORY_URL,
     TapDeckInfo,
     TapDeckLinks,
-    TapDeckRelease,
-    TapDeckReleaseError,
     build_tapdeck_embed,
-    parse_latest_release_payload,
 )
 from cogs.team_templates import parse_team_helper_command
 
@@ -71,78 +65,12 @@ class RngTests(unittest.TestCase):
 
 
 class TapDeckTests(unittest.TestCase):
-    def setUp(self) -> None:
-        self.release = TapDeckRelease(
-            tag_name="v9.8.7",
-            release_url=(
-                "https://github.com/thehoho/TapDeck-Lite/releases/tag/v9.8.7"
-            ),
-            apk_url=(
-                "https://github.com/thehoho/TapDeck-Lite/releases/download/"
-                "v9.8.7/TapDeck-Lite-9.8.7.apk"
-            ),
-        )
-
-    def test_latest_release_payload_selects_the_trusted_apk(self) -> None:
-        payload = {
-            "tag_name": self.release.tag_name,
-            "html_url": self.release.release_url,
-            "assets": [
-                {
-                    "name": "SHA256SUMS.txt",
-                    "browser_download_url": (
-                        "https://github.com/thehoho/TapDeck-Lite/releases/download/"
-                        "v9.8.7/SHA256SUMS.txt"
-                    ),
-                },
-                {
-                    "name": "TapDeck-Lite-9.8.7.apk",
-                    "browser_download_url": self.release.apk_url,
-                },
-            ],
-        }
-        self.assertEqual(parse_latest_release_payload(payload), self.release)
-        self.assertTrue(TAPDECK_LATEST_RELEASE_API_URL.endswith("/releases/latest"))
-
-    def test_release_payload_rejects_untrusted_or_missing_apk_urls(self) -> None:
-        with self.assertRaises(TapDeckReleaseError):
-            parse_latest_release_payload(
-                {
-                    "tag_name": "v1.0.0",
-                    "html_url": "https://example.com/fake-release",
-                    "assets": [],
-                }
-            )
-        with self.assertRaises(TapDeckReleaseError):
-            parse_latest_release_payload(
-                {
-                    "tag_name": "v1.0.0",
-                    "html_url": (
-                        "https://github.com/thehoho/TapDeck-Lite/releases/tag/v1.0.0"
-                    ),
-                    "assets": [
-                        {
-                            "name": "TapDeck-Lite-1.0.0.apk",
-                            "browser_download_url": "https://example.com/fake.apk",
-                        }
-                    ],
-                }
-            )
-
-    def test_dynamic_and_fallback_links_are_safe_and_current(self) -> None:
-        dynamic_urls = {str(child.url) for child in TapDeckLinks(self.release).children}
-        self.assertIn(self.release.apk_url, dynamic_urls)
-        self.assertIn(self.release.release_url, dynamic_urls)
-        self.assertIn(TAPDECK_REPOSITORY_URL, dynamic_urls)
-        self.assertIn(TAPDECK_GOOGLE_PLAY_URL, dynamic_urls)
-
-        fallback_urls = {str(child.url) for child in TapDeckLinks().children}
-        self.assertIn(TAPDECK_LATEST_RELEASE_URL, fallback_urls)
-        self.assertIn(TAPDECK_GOOGLE_PLAY_URL, fallback_urls)
-        self.assertNotIn(self.release.apk_url, fallback_urls)
+    def test_google_play_is_the_only_public_install_link(self) -> None:
+        urls = {str(child.url) for child in TapDeckLinks().children}
+        self.assertEqual(urls, {TAPDECK_GOOGLE_PLAY_URL})
 
     def test_approved_public_copy_is_concise_and_factual(self) -> None:
-        embed = build_tapdeck_embed(self.release)
+        embed = build_tapdeck_embed()
         text = "\n".join(
             [embed.title or "", embed.description or ""]
             + [field.value for field in embed.fields]
@@ -150,15 +78,19 @@ class TapDeckTests(unittest.TestCase):
         self.assertEqual(embed.title, "📱 TapDeck Lite, one tap, one command")
         self.assertEqual(
             embed.description,
-            "A compact Android shortcut keyboard for command-based Discord chats/bots. "
-            "Configure up to 20 keys, then one manual tap inserts and sends the "
-            "selected command. Now available through Google Play.",
+            "An offline Android shortcut keyboard for command-based chats and bots. "
+            "Build a customizable deck of up to 40 keys, then insert or send a "
+            "saved command with one tap.",
         )
         self.assertIn("one tap = one command", text.casefold())
-        self.assertIn("zero android permissions", text.casefold())
-        self.assertIn("no internet capability", text.casefold())
+        self.assertIn("no data collected or shared", text.casefold())
+        self.assertIn("requests no android permissions", text.casefold())
         self.assertIn("google play", text.casefold())
-        self.assertIn("github release remains", text.casefold())
+        self.assertIn("40 commands", text.casefold())
+        self.assertIn("send delays and cooldowns", text.casefold())
+        self.assertIn("slash-command", text.casefold())
+        self.assertIn("colors", text.casefold())
+        self.assertNotIn("github", text.casefold())
         self.assertEqual(str(embed.url), TAPDECK_GOOGLE_PLAY_URL)
         self.assertIn("shared with owo's staff team", text.casefold())
         self.assertIn("confirmed as allowed under the rules at the time", text.casefold())
@@ -195,7 +127,7 @@ class TapDeckTests(unittest.TestCase):
 
 class PublicSurfaceTests(unittest.TestCase):
     def test_version_and_help_include_the_whole_batch(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.16.9-beta")
+        self.assertEqual(BOT_VERSION, "0.16.10-beta")
         cog = BossGenerator.__new__(BossGenerator)
         cog.ui_emoji = lambda _name, fallback: fallback
         embed = BossGenerator.build_help_embed(cog, "b", "o")

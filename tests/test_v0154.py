@@ -55,7 +55,7 @@ class GooglePlaySurfaceTests(unittest.TestCase):
         self.assertIn("`b boss notify`", text)
         self.assertIn("`bboss notify`", text)
         self.assertIn("Google Play", text)
-        self.assertIn("GitHub APK fallback", text)
+        self.assertNotIn("GitHub APK fallback", text)
 
 
 if __name__ == "__main__":

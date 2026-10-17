@@ -2787,8 +2787,8 @@ class BossGenerator(commands.Cog):
             name="📱 TapDeck Lite for Android",
             value=(
                 f"Use `{grind_command}`, `{helper_command(helper_prefix, 'tapdeck')}`, "
-                "or `/tapdeck` for the Google Play download, public source, privacy "
-                "details, and GitHub APK fallback. OwO's staff team reviewed the "
+                "or `/tapdeck` for the Google Play download, current features, and "
+                "privacy details. OwO's staff team reviewed the "
                 "demonstrated one-tap/one-command "
                 "workflow and confirmed it was allowed under the rules at the time; "
                 "members remain responsible for current rules."

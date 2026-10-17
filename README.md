@@ -1,3 +1,7 @@
+## v0.16.10-beta notes
+
+`H XP` now states the positive scope rule directly: its multiplier applies only to battle XP on the primary team. `H Grind`, `H TapDeck`, and `/tapdeck` now describe TapDeck Lite's current 40-key customization, timing controls, guarded slash-command support, and optional clipboard history. The card now uses Google Play as its only installation path and no longer performs a GitHub release lookup. See [XP scope and TapDeck update](RELEASE_NOTES_v0.16.10-beta.md).
+
 ## v0.16.9-beta notes
 
 `H XP` now uses shorter, natural B2-level wording and presents the 1K/10K Knowledge results in a compact aligned table. The table explicitly describes direct extra XP for one Knowledge-equipped pet and identifies the values in parentheses as switch counts. Calculation logic is unchanged. See [clearer H XP guide](RELEASE_NOTES_v0.16.9-beta.md).
@@ -266,10 +270,10 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 ### TapDeck Lite Android card
 
 - Opens with `H Grind`, `H TapDeck`, or `/tapdeck`, respecting each server's custom helper prefix.
-- Opens the app’s Google Play listing as the primary installation path.
-- Also resolves the newest APK from GitHub's public latest-release API, caches it for up to 24 hours, and falls back safely to GitHub's permanent latest-release page.
-- Describes the separate app's one-manual-tap/one-command boundary, offline design, zero-permission manifest, and local-only command storage.
-- Records that the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time, while keeping current-rules responsibility explicit; the unknown-source warning applies only to the optional GitHub APK.
+- Uses the app’s Google Play listing as the only installation path, with no runtime GitHub release lookup.
+- Describes the current 40-key deck, appearance customization, global and per-key timing controls, guarded slash-command support, and optional 24-hour clipboard history.
+- States Google Play's no-data-collected-or-shared declaration, the app's offline design, zero-permission manifest, and private local storage.
+- Records that the demonstrated one-tap/one-command workflow was shared with OwO's staff team and confirmed as allowed under the rules at the time, while keeping current-rules responsibility explicit.
 
 ### Public animal Dex catalog
 

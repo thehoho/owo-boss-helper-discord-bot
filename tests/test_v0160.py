@@ -617,6 +617,16 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("+45,694", comparison.value)
                 self.assertIn("number of switches", comparison.value)
                 self.assertNotIn("chance of losing", help_embed.fields[1].value)
+                scope = next(
+                    field
+                    for field in help_embed.fields
+                    if field.name == "Catch-up and Knowledge"
+                )
+                self.assertIn(
+                    "only to battle XP on the primary team",
+                    scope.value,
+                )
+                self.assertNotIn("hunting or fixed daily XP", scope.value)
                 self.assertNotIn("multiplied from", comparison.value)
                 self.assertLessEqual(len(comparison.value), 1024)
                 credits = next(field for field in help_embed.fields if field.name == "Credits")
