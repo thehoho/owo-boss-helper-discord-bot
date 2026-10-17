@@ -111,6 +111,14 @@ class XPFormulaTests(unittest.TestCase):
         self.assertTrue(should_prompt_switch(99, 100))
         self.assertFalse(should_prompt_switch(100, 100))
 
+    def test_ten_thousand_switch_simulation_is_nonlinear_and_per_pet(self) -> None:
+        first_count, first_extra = switch_benefit(1000, battles=1_000)
+        full_count, full_extra = switch_benefit(1000, battles=10_000)
+        self.assertEqual((first_count, full_count), (1, 10))
+        self.assertEqual(round(first_extra), 3_091)
+        self.assertEqual(round(full_extra), 45_694)
+        self.assertGreater(full_extra, first_extra * 10)
+
 
 class XPParsingTests(unittest.TestCase):
     def test_team_snapshot_reads_levels_progress_and_streak(self) -> None:
@@ -317,8 +325,28 @@ class XPParsingTests(unittest.TestCase):
             fixed_xp_per_day=0,
             knowledge_quality=0.15,
             current_streak=100,
+            maximum_streak=5_000,
         )
         self.assertNotIn("Heather", calculator.description)
+        comparison = next(
+            field for field in calculator.fields if field.name.startswith("Milestone switching")
+        )
+        self.assertIn("streak 0 → 5,000", comparison.name)
+        self.assertIn("extra XP per pet", comparison.value)
+        self.assertIn("held fixed", calculator.fields[0].value)
+
+        with self.assertRaisesRegex(ValueError, "at least the current streak"):
+            cog.build_calculator_embed(
+                start_level=1,
+                target_level=2,
+                highest_level=2,
+                current_xp=0,
+                battles_per_day=100,
+                fixed_xp_per_day=0,
+                knowledge_quality=0.15,
+                current_streak=5_001,
+                maximum_streak=5_000,
+            )
 
     def test_knowledge_ids_replace_only_entered_positions(self) -> None:
         normal = (
@@ -569,10 +597,24 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
             bot = commands.Bot(command_prefix="!", intents=discord.Intents.none())
             try:
                 await bot.add_cog(module.XPTools(bot))
-                self.assertIsNotNone(bot.tree.get_command("xp-calc"))
+                calculator_command = bot.tree.get_command("xp-calc")
+                self.assertIsNotNone(calculator_command)
+                assert calculator_command is not None
+                self.assertIn(
+                    "maximum_streak",
+                    {parameter.name for parameter in calculator_command.parameters},
+                )
                 self.assertIsNotNone(bot.tree.get_command("xp-reminders"))
                 help_embed = bot.get_cog("XPTools").build_xp_help_embed("h")
                 self.assertIn("/xp-calc", "\n".join(field.value for field in help_embed.fields))
+                comparison = next(
+                    field
+                    for field in help_embed.fields
+                    if "extra XP per pet" in field.name
+                )
+                self.assertIn("at 1K", comparison.value)
+                self.assertIn("at 10K", comparison.value)
+                self.assertIn("+45,694", comparison.value)
                 credits = next(field for field in help_embed.fields if field.name == "Credits")
                 self.assertIn("Heather", credits.value)
                 self.assertIn("https://owo.bwep.net/exp/", credits.value)

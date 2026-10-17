@@ -39,7 +39,7 @@ TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 XP_DATABASE_FILE = PROJECT_ROOT / "xp_reminders.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.16.7-beta"
+BOT_VERSION = "0.16.8-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (

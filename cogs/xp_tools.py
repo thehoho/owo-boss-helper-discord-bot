@@ -1578,12 +1578,20 @@ class XPTools(commands.Cog):
         )
         rows = []
         for interval in REMINDER_INTERVALS:
-            qualifying, extra = switch_benefit(interval)
+            _first_count, first_extra = switch_benefit(interval, battles=1_000)
+            qualifying, extra = switch_benefit(interval, battles=10_000)
             rows.append(
-                f"**Every {interval:,}:** {qualifying:,} switch battle(s) in 1,000 wins • "
-                f"about **{extra:,.0f}** extra XP per pet at 15% Knowledge"
+                f"**Every {interval:,}:** +{first_extra:,.0f} at 1K • "
+                f"+{extra:,.0f} at 10K ({qualifying:,} switches)"
             )
-        embed.add_field(name="1,000-win comparison", value="\n".join(rows), inline=False)
+        embed.add_field(
+            name="15% Knowledge — extra XP per pet from streak 0",
+            value=(
+                "The bonus grows with the streak, so the 10K result is calculated milestone "
+                "by milestone—not multiplied from the first 1K.\n" + "\n".join(rows)
+            ),
+            inline=False,
+        )
         embed.add_field(
             name="Use the tools",
             value=(
@@ -1783,7 +1791,10 @@ class XPTools(commands.Cog):
         fixed_xp_per_day: int,
         knowledge_quality: float,
         current_streak: int,
+        maximum_streak: int,
     ) -> discord.Embed:
+        if maximum_streak < current_streak:
+            raise ValueError("Maximum streak must be at least the current streak")
         actual_xp = total_level_xp(start_level, target_level, current_xp)
         base_raw = raw_battle_xp_needed(start_level, target_level, current_xp, highest_level, 0)
         average_xp = current_streak_average_xp(current_streak)
@@ -1817,7 +1828,7 @@ class XPTools(commands.Cog):
             name="📍 Level plan",
             value=(
                 f"**Pet:** L.{start_level} → L.{target_level}\n"
-                f"**Highest teammate:** L.{highest_level}\n"
+                f"**Highest teammate:** L.{highest_level} (held fixed)\n"
                 f"**Pet XP remaining:** {actual_xp:,.0f}\n"
                 f"**Raw battle XP required:** {base_raw:,.0f}"
             ),
@@ -1827,6 +1838,7 @@ class XPTools(commands.Cog):
             name="⭐ XP model",
             value=(
                 f"**Current streak:** {current_streak:,}\n"
+                f"**Maximum streak:** {maximum_streak:,}\n"
                 f"**Calculated average:** {average_xp:,.1f}/battle\n"
                 f"**Battles/day:** {battles_per_day:,}\n"
                 f"**Fixed XP/day:** {fixed_xp_per_day:,}"
@@ -1855,19 +1867,26 @@ class XPTools(commands.Cog):
         for interval in REMINDER_INTERVALS:
             count, extra = switch_benefit(
                 interval,
-                start_streak=current_streak,
+                start_streak=0,
+                battles=maximum_streak,
                 knowledge_bonus=knowledge_quality,
             )
             rows.append(
-                f"**{interval:,}:** {count} switch(es), +{extra:,.0f} XP/pet over the next 1,000 wins"
+                f"**Every {interval:,}:** {count:,} switch(es) • "
+                f"+{extra:,.0f} extra XP per pet"
             )
-        embed.add_field(name="Milestone-switch comparison", value="\n".join(rows), inline=False)
+        embed.add_field(
+            name=f"Milestone switching — streak 0 → {maximum_streak:,}",
+            value="\n".join(rows),
+            inline=False,
+        )
         embed.add_field(
             name="Assumptions",
             value=(
                 f"Highest companion stays L.{highest_level}; catch-up is recalculated each level; "
                 f"average battle XP is derived from streak {current_streak:,}; fixed daily XP is spread "
-                "across the configured battles; hunting and higher-enemy-level bonuses are excluded."
+                "across the configured battles; hunting and higher-enemy-level bonuses are excluded. "
+                "For three pets leveling together, use the Team XP full forecaster."
             ),
             inline=False,
         )
@@ -2114,6 +2133,7 @@ class XPTools(commands.Cog):
         highest_level="Level of the highest companion that stays on the team",
         current_xp="Pet's current XP progress inside its level",
         current_streak="Current streak used to calculate XP per battle",
+        maximum_streak="Streak horizon for the milestone-switch simulation",
         battles_per_day="Expected battles per day",
         fixed_xp_per_day="XP earned daily outside battles, such as hunts",
         knowledge_quality="Knowledge bonus from 0.05 to 0.15; use 0 for none",
@@ -2125,6 +2145,7 @@ class XPTools(commands.Cog):
         target_level: app_commands.Range[int, 2, MAX_LEVEL],
         highest_level: app_commands.Range[int, 1, MAX_LEVEL],
         current_streak: app_commands.Range[int, 0, MAX_VALIDATED_STREAK],
+        maximum_streak: app_commands.Range[int, 10, MAX_VALIDATED_STREAK] = 10_000,
         current_xp: app_commands.Range[int, 0, 2_000_000_000] = 0,
         battles_per_day: app_commands.Range[int, 1, 5760] = 1000,
         fixed_xp_per_day: app_commands.Range[int, 0, 2_000_000_000] = 0,
@@ -2140,6 +2161,7 @@ class XPTools(commands.Cog):
                 fixed_xp_per_day=fixed_xp_per_day,
                 knowledge_quality=float(knowledge_quality),
                 current_streak=current_streak,
+                maximum_streak=maximum_streak,
             )
         except ValueError as exc:
             await interaction.response.send_message(f"❌ {exc}", ephemeral=True)

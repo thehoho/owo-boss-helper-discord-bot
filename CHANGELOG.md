@@ -1,3 +1,13 @@
+## v0.16.8-beta - Extended Knowledge-Switch Simulations
+
+- Expanded `H XP` from a single 1,000-win comparison to side-by-side 1,000- and 10,000-streak totals.
+- Labeled every comparison as extra XP per pet and included the number of weapon-switch battles through 10,000.
+- Calculated the 10,000 results milestone by milestone using the documented square-root formulas instead of scaling the 1,000 result.
+- Added a `/xp-calc` maximum-streak option, defaulting to 10,000, for custom 10/50/100/500/1,000 switching horizons.
+- Kept current streak responsible for the calculator's average battle XP and maximum streak responsible for its switching comparison.
+- Clarified that `/xp-calc` holds the highest teammate level fixed, while Team XP's full forecaster levels all three pets together.
+- Updated the public version to 0.16.8-beta; no database migration, dependency, or permission change is required.
+
 ## v0.16.7-beta - Persistent XP Model and Guide Attribution
 
 - Persisted each member's forecast settings after submitting the XP calculator form, including activity, tie/loss rates, maximum streak, Knowledge quality, and line count.

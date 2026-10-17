@@ -1,3 +1,7 @@
+## v0.16.8-beta notes
+
+`H XP` now shows the nonlinear 15% Knowledge-switch benefit per pet at both 1,000 and 10,000 streak, with explicit units and switch counts. `/xp-calc` adds a maximum-streak horizon (default 10,000), keeps current streak responsible for the battle-XP average, and calculates each 10/50/100/500/1,000 switching plan from streak zero through that horizon. See [extended XP simulations](RELEASE_NOTES_v0.16.8-beta.md).
+
 ## v0.16.7-beta notes
 
 XP calculator settings now persist per user and automatically power a separate saved-model estimate in every future Team XP panel, while the unchanged baseline remains visible for comparison. `H XP` and Team XP also visibly credit Heather's original Pet EXP guide at `owo.bwep.net/exp/`. See [persistent XP model](RELEASE_NOTES_v0.16.7-beta.md).

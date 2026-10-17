@@ -132,7 +132,7 @@ class SharedDexSessionTests(unittest.IsolatedAsyncioTestCase):
 
 class ReleaseSurfaceTests(unittest.TestCase):
     def test_public_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.16.7-beta")
+        self.assertEqual(BOT_VERSION, "0.16.8-beta")
 
 
 if __name__ == "__main__":
