@@ -1,3 +1,7 @@
+## v0.16.9-beta notes
+
+`H XP` now uses shorter, natural B2-level wording and presents the 1K/10K Knowledge results in a compact aligned table. The table explicitly describes direct extra XP for one Knowledge-equipped pet and identifies the values in parentheses as switch counts. Calculation logic is unchanged. See [clearer H XP guide](RELEASE_NOTES_v0.16.9-beta.md).
+
 ## v0.16.8-beta notes
 
 `H XP` now shows the nonlinear 15% Knowledge-switch benefit per pet at both 1,000 and 10,000 streak, with explicit units and switch counts. `/xp-calc` adds a maximum-streak horizon (default 10,000), keeps current streak responsible for the battle-XP average, and calculates each 10/50/100/500/1,000 switching plan from streak zero through that horizon. See [extended XP simulations](RELEASE_NOTES_v0.16.8-beta.md).

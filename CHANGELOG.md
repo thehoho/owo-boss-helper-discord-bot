@@ -1,3 +1,13 @@
+## v0.16.9-beta - Clearer H XP Guide
+
+- Rewrote `H XP` in concise B2-level English without changing any XP formulas or totals.
+- Removed the unnecessary sentence about the chance of losing a battle.
+- Replaced the dense milestone paragraph with a compact monospaced 1K/10K comparison table.
+- Labeled the table as direct extra XP for one Knowledge-equipped pet and explained that parentheses contain switch counts.
+- Replaced the redundant calculation explanation with a direct description of what the table shows.
+- Simplified the guide credit while preserving Heather's named, linked attribution.
+- Updated the public version to 0.16.9-beta; no database migration, slash-command schema, dependency, or permission change is required.
+
 ## v0.16.8-beta - Extended Knowledge-Switch Simulations
 
 - Expanded `H XP` from a single 1,000-win comparison to side-by-side 1,000- and 10,000-streak totals.

@@ -610,11 +610,15 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
                 comparison = next(
                     field
                     for field in help_embed.fields
-                    if "extra XP per pet" in field.name
+                    if "extra XP for one equipped pet" in field.name
                 )
-                self.assertIn("at 1K", comparison.value)
-                self.assertIn("at 10K", comparison.value)
+                self.assertIn("At 1K", comparison.value)
+                self.assertIn("At 10K", comparison.value)
                 self.assertIn("+45,694", comparison.value)
+                self.assertIn("number of switches", comparison.value)
+                self.assertNotIn("chance of losing", help_embed.fields[1].value)
+                self.assertNotIn("multiplied from", comparison.value)
+                self.assertLessEqual(len(comparison.value), 1024)
                 credits = next(field for field in help_embed.fields if field.name == "Credits")
                 self.assertIn("Heather", credits.value)
                 self.assertIn("https://owo.bwep.net/exp/", credits.value)

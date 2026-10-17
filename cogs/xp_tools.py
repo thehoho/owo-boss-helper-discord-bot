@@ -1552,8 +1552,9 @@ class XPTools(commands.Cog):
         embed = discord.Embed(
             title="🧠 Pet XP and Knowledge switching",
             description=(
-                "Level XP is `1,000 + level⁴`. Wins/ties/losses give 200/100/50 base battle XP, "
-                "then catch-up and Knowledge affect eligible primary-team battle XP."
+                "A pet needs `1,000 + level⁴` XP for its next level. A primary-team pet gets "
+                "200/100/50 base XP from a win/tie/loss. Catch-up and Knowledge can increase "
+                "this battle XP."
             ),
             color=0xF1C40F,
             url=XP_SOURCE_URL,
@@ -1561,34 +1562,36 @@ class XPTools(commands.Cog):
         embed.add_field(
             name="Catch-up and Knowledge",
             value=(
-                "A lower-level pet's catch-up multiplier is `2 + 0.1 × level difference`. "
-                "Knowledge adds `0.05–0.15` to that multiplier; it does not multiply it and "
-                "does not apply to hunting or fixed daily XP."
+                "A lower-level pet gets a catch-up multiplier of `2 + 0.1 × level difference`. "
+                "Knowledge adds `0.05–0.15` to the same multiplier; it does not multiply the "
+                "catch-up value. These bonuses do not apply to hunting or fixed daily XP."
             ),
             inline=False,
         )
         embed.add_field(
             name="Why switch at milestones?",
             value=(
-                "Streaks divisible by 10/50/100/500/1,000 grant increasingly valuable bonus XP. "
-                "Equipping Knowledge only for that battle captures extra XP without weakening every "
-                "ordinary battle. The chance of losing one battle may be low for a strong team, but it is never zero."
+                "Streaks at 10/50/100/500/1,000 give bonus XP. Equip Knowledge for a milestone "
+                "battle to gain extra XP, then switch back to your normal weapon."
             ),
             inline=False,
         )
-        rows = []
+        rows = [f"{'Plan':<12}{'At 1K':>17}  {'At 10K':>21}"]
         for interval in REMINDER_INTERVALS:
-            _first_count, first_extra = switch_benefit(interval, battles=1_000)
-            qualifying, extra = switch_benefit(interval, battles=10_000)
+            first_count, first_extra = switch_benefit(interval, battles=1_000)
+            full_count, full_extra = switch_benefit(interval, battles=10_000)
+            label = f"Every {interval:,}"
+            first_value = f"+{first_extra:,.0f} ({first_count:,})"
+            full_value = f"+{full_extra:,.0f} ({full_count:,})"
             rows.append(
-                f"**Every {interval:,}:** +{first_extra:,.0f} at 1K • "
-                f"+{extra:,.0f} at 10K ({qualifying:,} switches)"
+                f"{label:<12}{first_value:>17}  {full_value:>21}"
             )
         embed.add_field(
-            name="15% Knowledge — extra XP per pet from streak 0",
+            name="15% Knowledge — extra XP for one equipped pet",
             value=(
-                "The bonus grows with the streak, so the 10K result is calculated milestone "
-                "by milestone—not multiplied from the first 1K.\n" + "\n".join(rows)
+                "We did the calculations for you. The table shows the extra XP gained when you "
+                "switch at each milestone. Numbers in parentheses are the number of switches.\n"
+                "```text\n" + "\n".join(rows) + "\n```"
             ),
             inline=False,
         )
@@ -1604,8 +1607,8 @@ class XPTools(commands.Cog):
         embed.add_field(
             name="Credits",
             value=(
-                f"{XP_CREDIT_MARKDOWN} Community streak and XP sheets were also used "
-                "to validate the documented model."
+                f"Based on [Heather's Pet EXP guide]({XP_SOURCE_URL}). Community streak and XP "
+                "sheets were also used to check the model."
             ),
             inline=False,
         )
