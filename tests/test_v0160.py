@@ -433,7 +433,7 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
         cog = XPTools.__new__(XPTools)
         cog.store = SimpleNamespace(
             get=AsyncMock(return_value=profile),
-            upsert=AsyncMock(),
+            upsert=AsyncMock(return_value=SimpleNamespace(enabled=True)),
         )
         view = KnowledgeSetupView(cog, 1, 42, fresh_snapshot)
         interaction = SimpleNamespace(
@@ -449,8 +449,8 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
             1,
             42,
             knowledge=equipped,
-            enabled=False,
             awaiting_restore=False,
+            trigger_streak=0,
         )
         message = interaction.response.edit_message.await_args.kwargs["content"]
         self.assertIn("position(s) **1**", message)
@@ -458,7 +458,7 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
     async def test_normal_icon_saves_current_weapons_in_one_click(self) -> None:
         snapshot = parse_team_xp_snapshot(TEAM_TEXT)
         assert snapshot is not None
-        saved = SimpleNamespace(normal=snapshot.members)
+        saved = SimpleNamespace(normal=snapshot.members, enabled=True)
         cog = XPTools.__new__(XPTools)
         cog.bot = SimpleNamespace()
         cog.store = SimpleNamespace(upsert=AsyncMock(return_value=saved))
@@ -473,10 +473,76 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
             1,
             42,
             normal=snapshot.members,
-            enabled=False,
             awaiting_restore=False,
+            trigger_streak=0,
         )
         self.assertTrue(interaction.response.send_message.await_args.kwargs["ephemeral"])
+
+    async def test_saving_presets_keeps_enabled_reminder_and_next_prompt_works(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        with tempfile.TemporaryDirectory() as directory:
+            cog = XPTools.__new__(XPTools)
+            cog.bot = SimpleNamespace()
+            cog.store = XPReminderStore(Path(directory) / "xp.db")
+            cog.pending_by_channel = {}
+            await cog.store.initialize()
+            await cog.store.upsert(1, 42, enabled=True, interval=10)
+
+            normal_view = TeamXPToolsView(cog, 42, 1, snapshot, "w")
+            normal_interaction = SimpleNamespace(
+                response=SimpleNamespace(send_message=AsyncMock())
+            )
+            await normal_view.save_normal.callback(normal_interaction)
+            self.assertTrue((await cog.store.get(1, 42)).enabled)
+
+            profile = await cog.store.get(1, 42)
+            modal = KnowledgePresetModal(cog, 1, 42, profile)
+            modal.position_1._value = "KNO111"
+            modal.position_2._value = ""
+            modal.position_3._value = ""
+            knowledge_interaction = SimpleNamespace(
+                response=SimpleNamespace(send_message=AsyncMock())
+            )
+            await modal.on_submit(knowledge_interaction)
+            saved = await cog.store.get(1, 42)
+            self.assertTrue(saved.enabled)
+            self.assertTrue(saved.ready)
+
+            channel = SimpleNamespace(id=5, send=AsyncMock())
+            user = SimpleNamespace(
+                id=42,
+                name="member",
+                display_name="Member",
+                global_name=None,
+            )
+            await cog.arm_battle(
+                SimpleNamespace(
+                    id=100,
+                    guild=SimpleNamespace(id=1),
+                    channel=channel,
+                    author=user,
+                )
+            )
+            battle_message = SimpleNamespace(
+                id=200,
+                guild=SimpleNamespace(id=1),
+                channel=channel,
+                reference=None,
+                mentions=[],
+                to_reference=lambda **_kwargs: SimpleNamespace(message_id=200),
+            )
+            with patch(
+                "cogs.xp_tools.get_guild_owo_prefix", AsyncMock(return_value="w")
+            ):
+                await cog.process_battle_result(
+                    battle_message,
+                    BattleResult("win", 9, 200),
+                    "You won | Streak: 9",
+                )
+
+            self.assertIn("next win reaches 10", channel.send.await_args.args[0])
+            self.assertTrue((await cog.store.get(1, 42)).awaiting_restore)
 
     async def test_team_reaction_reply_has_no_ping_or_auto_delete(self) -> None:
         cog = XPTools.__new__(XPTools)

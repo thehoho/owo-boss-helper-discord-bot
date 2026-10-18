@@ -1145,13 +1145,13 @@ class KnowledgePresetModal(discord.ui.Modal, title="Knowledge weapon IDs"):
             self.guild_id,
             self.owner_id,
             knowledge=knowledge,
-            enabled=False,
             awaiting_restore=False,
+            trigger_streak=0,
         )
         changed = changed_positions(saved.normal, saved.knowledge)
         await interaction.response.send_message(
             f"✅ Saved Knowledge weapons for position(s) **{', '.join(map(str, changed))}**. "
-            "Reminder tracking stays off until you enable it.",
+            f"Reminder tracking remains **{'enabled' if saved.enabled else 'disabled'}**.",
             ephemeral=True,
         )
 
@@ -1194,7 +1194,7 @@ def build_knowledge_setup_embed(
         inline=False,
     )
     embed.set_footer(
-        text="Saving a weapon preset turns reminder tracking off until you enable it again."
+        text="Saving a preset keeps your reminder setting and cancels only an unfinished switch-back step."
     )
     return embed
 
@@ -1263,18 +1263,18 @@ class KnowledgeSetupView(discord.ui.View):
                 ephemeral=True,
             )
             return
-        await self.cog.store.upsert(
+        saved = await self.cog.store.upsert(
             self.guild_id,
             self.owner_id,
             knowledge=equipped,
-            enabled=False,
             awaiting_restore=False,
+            trigger_streak=0,
         )
         await interaction.response.edit_message(
             content=(
                 f"✅ Saved the currently equipped weapons as Knowledge for position(s) "
-                f"**{', '.join(map(str, changed))}**. Reminder tracking stays off until "
-                "you enable it."
+                f"**{', '.join(map(str, changed))}**. Reminder tracking remains "
+                f"**{'enabled' if saved.enabled else 'disabled'}**."
             ),
             embed=None,
             view=None,
@@ -1539,12 +1539,12 @@ class TeamXPToolsView(discord.ui.View):
             self.guild_id,
             self.owner_id,
             normal=self.snapshot.members,
-            enabled=False,
             awaiting_restore=False,
+            trigger_streak=0,
         )
         await interaction.response.send_message(
             f"✅ Saved the current {len(profile.normal)} equipped weapon(s) as your normal preset. "
-            "Reminder tracking stays off until you enable it.",
+            f"Reminder tracking remains **{'enabled' if profile.enabled else 'disabled'}**.",
             ephemeral=True,
         )
 
@@ -1794,7 +1794,9 @@ class XPTools(commands.Cog):
             value="\n".join(benefit_lines) + "\n*Uses maximum 15% Knowledge; real results follow each weapon's quality.*",
             inline=False,
         )
-        embed.set_footer(text="No reminder is enabled until you press Enable. Saving a preset turns tracking off for safety.")
+        embed.set_footer(
+            text="Enable or Disable is authoritative everywhere. Saving a preset keeps that setting."
+        )
         return embed
 
     def build_team_tools_embed(
@@ -2170,6 +2172,13 @@ class XPTools(commands.Cog):
                 last_streak=result.streak,
                 last_battle_message_id=message.id,
             )
+            logger.info(
+                "Sent normal-weapon reminder for user %s in guild %s after %s at streak %s",
+                request.user_id,
+                request.guild_id,
+                result.outcome,
+                result.streak,
+            )
             return
 
         await self.store.upsert(
@@ -2213,6 +2222,13 @@ class XPTools(commands.Cog):
             request.user_id,
             awaiting_restore=True,
             trigger_streak=target,
+        )
+        logger.info(
+            "Sent Knowledge reminder for user %s in guild %s at streak %s for milestone %s",
+            request.user_id,
+            request.guild_id,
+            result.streak,
+            target,
         )
 
     @commands.Cog.listener()

@@ -1,3 +1,13 @@
+## v0.16.13-beta - Knowledge Reminder State Consistency
+
+- Fixed normal- and Knowledge-weapon saves silently disabling an already enabled reminder profile.
+- Kept Enable and Disable as the single authoritative reminder choice across `H reminders`, `/xp-reminders`, and the Team XP bell.
+- Made preset changes cancel only an unfinished switch-back step, preventing stale restore commands without turning future reminders off.
+- Added clear save confirmations that report whether reminder tracking remains enabled or disabled.
+- Added success logging for Knowledge and normal-weapon prompts so future milestone reports can be verified from production logs.
+- Added a regression covering enable → save normal → save Knowledge → streak-9 win → streak-10 switch prompt.
+- Updated the public version to 0.16.13-beta; no database migration, slash-command schema, dependency, or permission change is required.
+
 ## v0.16.12-beta - Knowledge Emoji Consistency
 
 - Replaced the generic brain in the Knowledge setup title with the bot's registered Knowledge passive emoji.

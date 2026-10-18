@@ -1,3 +1,7 @@
+## v0.16.13-beta notes
+
+Saving normal or Knowledge weapon presets no longer silently disables an enabled milestone reminder. `H reminders`, `/xp-reminders`, and the Team XP bell now preserve the same explicit Enable/Disable choice; changing a preset only cancels an unfinished switch-back step. Save confirmations display the retained status, and successful milestone/restore prompts are now recorded for production diagnostics. See [Knowledge reminder state consistency](RELEASE_NOTES_v0.16.13-beta.md).
+
 ## v0.16.12-beta notes
 
 The private Knowledge setup card now uses the bot's registered Knowledge emoji in its title and instructions, matching the Team XP button instead of showing a generic brain. See [Knowledge emoji consistency](RELEASE_NOTES_v0.16.12-beta.md).
