@@ -1156,9 +1156,12 @@ class KnowledgePresetModal(discord.ui.Modal, title="Knowledge weapon IDs"):
         )
 
 
-def build_knowledge_setup_embed(profile: XPReminderProfile) -> discord.Embed:
+def build_knowledge_setup_embed(
+    bot: commands.Bot, profile: XPReminderProfile
+) -> discord.Embed:
+    knowledge_icon = ui_emoji_text(bot, "passive_kno", "🧠")
     embed = discord.Embed(
-        title="🧠 Save your Knowledge weapons",
+        title=f"{knowledge_icon} Save your Knowledge weapons",
         description=(
             "Knowledge weapons are optional. Reminders work without them, but saving "
             "them lets the helper include ready-to-copy switch commands."
@@ -1170,7 +1173,7 @@ def build_knowledge_setup_embed(profile: XPReminderProfile) -> discord.Embed:
             name="First, save the normal weapons",
             value=(
                 "Show your OwO team with its usual weapons, reopen Team XP tools, "
-                "and click **⚔️**. Then reopen **🧠** and choose either method below."
+                f"and click **⚔️**. Then reopen {knowledge_icon} and choose either method below."
             ),
             inline=False,
         )
@@ -1186,7 +1189,7 @@ def build_knowledge_setup_embed(profile: XPReminderProfile) -> discord.Embed:
         name="Method 2 — Read the equipped team",
         value=(
             "Equip the Knowledge weapons in OwO, open a fresh OwO team page, reopen "
-            "Team XP tools from that message, click **🧠**, then press **Save equipped**."
+            f"Team XP tools from that message, click {knowledge_icon}, then press **Save equipped**."
         ),
         inline=False,
     )
@@ -1554,7 +1557,7 @@ class TeamXPToolsView(discord.ui.View):
     async def save_knowledge(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         profile = await self.cog.store.get(self.guild_id, self.owner_id)
         await interaction.response.send_message(
-            embed=build_knowledge_setup_embed(profile),
+            embed=build_knowledge_setup_embed(self.cog.bot, profile),
             view=(
                 KnowledgeSetupView(
                     self.cog,
@@ -1741,6 +1744,7 @@ class XPTools(commands.Cog):
         changed = changed_positions(profile.normal, profile.knowledge)
         status = "Enabled" if profile.enabled else "Disabled"
         mode = "Copyable weapon commands" if profile.ready else "Simple switch prompts"
+        knowledge_icon = ui_emoji_text(self.bot, "passive_kno", "🧠")
         embed = discord.Embed(
             title="🔔 Knowledge-switch reminders",
             description=(
@@ -1774,7 +1778,7 @@ class XPTools(commands.Cog):
             name="Setup options",
             value=(
                 "**Simple prompts:** choose an interval and press **Enable**. No weapon IDs are required.\n"
-                "**Copyable commands:** save normal weapons with **⚔️**, then click **🧠** "
+                f"**Copyable commands:** save normal weapons with **⚔️**, then click {knowledge_icon} "
                 "and either enter IDs or save a freshly equipped Knowledge team."
             ),
             inline=False,

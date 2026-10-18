@@ -402,7 +402,9 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
             response=SimpleNamespace(send_message=AsyncMock())
         )
 
-        await view.save_knowledge.callback(interaction)
+        knowledge_emoji = "<:PS_kno:123456789>"
+        with patch("cogs.xp_tools.ui_emoji_text", return_value=knowledge_emoji):
+            await view.save_knowledge.callback(interaction)
 
         kwargs = interaction.response.send_message.await_args.kwargs
         guide_text = "\n".join(
@@ -411,6 +413,9 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
         )
         self.assertIn("Enter IDs", guide_text)
         self.assertIn("Save equipped", guide_text)
+        self.assertTrue(kwargs["embed"].title.startswith(knowledge_emoji))
+        self.assertIn(f"click {knowledge_emoji}", guide_text)
+        self.assertNotIn("🧠", kwargs["embed"].title + guide_text)
         self.assertIsInstance(kwargs["view"], KnowledgeSetupView)
         self.assertTrue(kwargs["ephemeral"])
 

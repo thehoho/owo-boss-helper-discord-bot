@@ -1,3 +1,7 @@
+## v0.16.12-beta notes
+
+The private Knowledge setup card now uses the bot's registered Knowledge emoji in its title and instructions, matching the Team XP button instead of showing a generic brain. See [Knowledge emoji consistency](RELEASE_NOTES_v0.16.12-beta.md).
+
 ## v0.16.11-beta notes
 
 Knowledge-switch reminders now work with or without saved weapon presets. Members without presets receive simple switch-now and switch-back prompts, while members with matching normal and Knowledge presets still receive ready-to-copy commands. The Knowledge button now explains two setup methods: enter weapon IDs manually or save the weapons shown on a fresh equipped team page. See [optional Knowledge presets](RELEASE_NOTES_v0.16.11-beta.md).

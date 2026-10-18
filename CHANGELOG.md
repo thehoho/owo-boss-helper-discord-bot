@@ -1,3 +1,10 @@
+## v0.16.12-beta - Knowledge Emoji Consistency
+
+- Replaced the generic brain in the Knowledge setup title with the bot's registered Knowledge passive emoji.
+- Replaced the generic brain references in the setup instructions and reminder panel with the same Knowledge emoji used by the Team XP button.
+- Preserved the brain as a safe fallback only when the application emoji registry is unavailable.
+- Updated the public version to 0.16.12-beta; no database migration, slash-command schema, dependency, or permission change is required.
+
 ## v0.16.11-beta - Optional Knowledge Presets
 
 - Allowed members to enable Knowledge-switch reminders without saving normal or Knowledge weapon IDs.
