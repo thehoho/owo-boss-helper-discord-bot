@@ -1,3 +1,7 @@
+## v0.16.11-beta notes
+
+Knowledge-switch reminders now work with or without saved weapon presets. Members without presets receive simple switch-now and switch-back prompts, while members with matching normal and Knowledge presets still receive ready-to-copy commands. The Knowledge button now explains two setup methods: enter weapon IDs manually or save the weapons shown on a fresh equipped team page. See [optional Knowledge presets](RELEASE_NOTES_v0.16.11-beta.md).
+
 ## v0.16.10-beta notes
 
 `H XP` now states the positive scope rule directly: its multiplier applies only to battle XP on the primary team. `H Grind`, `H TapDeck`, and `/tapdeck` now describe TapDeck Lite's current 40-key customization, timing controls, guarded slash-command support, and optional clipboard history. The card now uses Google Play as its only installation path and no longer performs a GitHub release lookup. See [XP scope and TapDeck update](RELEASE_NOTES_v0.16.10-beta.md).

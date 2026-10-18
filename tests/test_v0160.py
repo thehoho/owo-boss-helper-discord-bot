@@ -17,6 +17,7 @@ from cogs.xp_tools import (
     ForecastActivityModal,
     ForecastSettings,
     KnowledgePresetModal,
+    KnowledgeSetupView,
     XPReminderStore,
     XPTools,
     BattleResult,
@@ -389,6 +390,66 @@ class XPParsingTests(unittest.TestCase):
 
 
 class XPStoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_knowledge_button_explains_both_save_methods(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        profile = SimpleNamespace(normal=snapshot.members, knowledge=())
+        cog = XPTools.__new__(XPTools)
+        cog.bot = SimpleNamespace()
+        cog.store = SimpleNamespace(get=AsyncMock(return_value=profile))
+        view = TeamXPToolsView(cog, 42, 1, snapshot, "h")
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(send_message=AsyncMock())
+        )
+
+        await view.save_knowledge.callback(interaction)
+
+        kwargs = interaction.response.send_message.await_args.kwargs
+        guide_text = "\n".join(
+            [kwargs["embed"].description]
+            + [field.value for field in kwargs["embed"].fields]
+        )
+        self.assertIn("Enter IDs", guide_text)
+        self.assertIn("Save equipped", guide_text)
+        self.assertIsInstance(kwargs["view"], KnowledgeSetupView)
+        self.assertTrue(kwargs["ephemeral"])
+
+    async def test_save_equipped_knowledge_uses_the_fresh_team_page(self) -> None:
+        snapshot = parse_team_xp_snapshot(TEAM_TEXT)
+        assert snapshot is not None
+        normal = snapshot.members
+        equipped = (
+            TeamMember(1, normal[0].animal, "KNO111"),
+            normal[1],
+            normal[2],
+        )
+        fresh_snapshot = replace(snapshot, members=equipped)
+        profile = SimpleNamespace(normal=normal, knowledge=())
+        cog = XPTools.__new__(XPTools)
+        cog.store = SimpleNamespace(
+            get=AsyncMock(return_value=profile),
+            upsert=AsyncMock(),
+        )
+        view = KnowledgeSetupView(cog, 1, 42, fresh_snapshot)
+        interaction = SimpleNamespace(
+            response=SimpleNamespace(
+                send_message=AsyncMock(),
+                edit_message=AsyncMock(),
+            )
+        )
+
+        await view.save_equipped.callback(interaction)
+
+        cog.store.upsert.assert_awaited_once_with(
+            1,
+            42,
+            knowledge=equipped,
+            enabled=False,
+            awaiting_restore=False,
+        )
+        message = interaction.response.edit_message.await_args.kwargs["content"]
+        self.assertIn("position(s) **1**", message)
+
     async def test_normal_icon_saves_current_weapons_in_one_click(self) -> None:
         snapshot = parse_team_xp_snapshot(TEAM_TEXT)
         assert snapshot is not None
@@ -587,6 +648,74 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
                 )
                 self.assertFalse((await cog.store.get(1, 42)).awaiting_restore)
                 self.assertIn("ww AAA111 snake", channel.send.await_args.args[0])
+
+    async def test_simple_reminders_work_without_any_weapon_presets(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            cog = XPTools.__new__(XPTools)
+            cog.bot = SimpleNamespace()
+            cog.store = XPReminderStore(Path(directory) / "xp.db")
+            cog.pending_by_channel = {}
+            await cog.store.initialize()
+            await cog.store.upsert(1, 42, enabled=True, interval=10)
+            profile = await cog.store.get(1, 42)
+            self.assertFalse(profile.ready)
+            reminder_text = "\n".join(
+                field.value for field in cog.build_reminder_embed(profile).fields
+            )
+            self.assertIn("Simple switch prompts", reminder_text)
+            self.assertIn("No weapon IDs are required", reminder_text)
+            channel = SimpleNamespace(id=5, send=AsyncMock())
+            user = SimpleNamespace(
+                id=42,
+                name="member",
+                display_name="Member",
+                global_name=None,
+            )
+
+            def battle_message(message_id: int) -> SimpleNamespace:
+                return SimpleNamespace(
+                    id=message_id,
+                    guild=SimpleNamespace(id=1),
+                    channel=channel,
+                    reference=None,
+                    mentions=[],
+                    to_reference=lambda **_kwargs: SimpleNamespace(message_id=message_id),
+                )
+
+            async def arm(command_id: int) -> None:
+                await cog.arm_battle(
+                    SimpleNamespace(
+                        id=command_id,
+                        guild=SimpleNamespace(id=1),
+                        channel=channel,
+                        author=user,
+                    )
+                )
+
+            with patch("cogs.xp_tools.get_guild_owo_prefix", AsyncMock(return_value="w")):
+                await arm(100)
+                await cog.process_battle_result(
+                    battle_message(200), BattleResult("win", 9, 200), "You won | Streak: 9"
+                )
+                switch_prompt = channel.send.await_args.args[0]
+                self.assertIn("Switch to your Knowledge weapons", switch_prompt)
+                self.assertNotIn("`ww ", switch_prompt)
+                self.assertTrue((await cog.store.get(1, 42)).awaiting_restore)
+
+                await arm(101)
+                await cog.process_battle_result(
+                    battle_message(201), BattleResult("tie", 9, 100), "Tie | Streak: 9"
+                )
+                self.assertEqual(channel.send.await_count, 1)
+
+                await arm(102)
+                await cog.process_battle_result(
+                    battle_message(202), BattleResult("loss", 0, 50), "Lost | Streak: 0"
+                )
+                restore_prompt = channel.send.await_args.args[0]
+                self.assertIn("Switch back to your normal weapons", restore_prompt)
+                self.assertNotIn("`ww ", restore_prompt)
+                self.assertFalse((await cog.store.get(1, 42)).awaiting_restore)
 
     async def test_cog_registers_both_public_slash_commands(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

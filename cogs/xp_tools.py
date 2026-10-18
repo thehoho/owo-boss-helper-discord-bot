@@ -942,13 +942,6 @@ class XPReminderView(discord.ui.View):
 
     @discord.ui.button(label="Enable", emoji="🔔", style=discord.ButtonStyle.success, row=1)
     async def enable(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
-        profile = await self.cog.store.get(self.guild_id, self.owner_id)
-        if not profile.ready:
-            await interaction.response.send_message(
-                "Save both a normal and a different Knowledge weapon preset from the team-tools reaction first.",
-                ephemeral=True,
-            )
-            return
         await self.cog.store.upsert(self.guild_id, self.owner_id, enabled=True)
         await self.refresh(interaction)
 
@@ -1160,6 +1153,128 @@ class KnowledgePresetModal(discord.ui.Modal, title="Knowledge weapon IDs"):
             f"✅ Saved Knowledge weapons for position(s) **{', '.join(map(str, changed))}**. "
             "Reminder tracking stays off until you enable it.",
             ephemeral=True,
+        )
+
+
+def build_knowledge_setup_embed(profile: XPReminderProfile) -> discord.Embed:
+    embed = discord.Embed(
+        title="🧠 Save your Knowledge weapons",
+        description=(
+            "Knowledge weapons are optional. Reminders work without them, but saving "
+            "them lets the helper include ready-to-copy switch commands."
+        ),
+        color=0x5865F2,
+    )
+    if not profile.normal:
+        embed.add_field(
+            name="First, save the normal weapons",
+            value=(
+                "Show your OwO team with its usual weapons, reopen Team XP tools, "
+                "and click **⚔️**. Then reopen **🧠** and choose either method below."
+            ),
+            inline=False,
+        )
+    embed.add_field(
+        name="Method 1 — Enter weapon IDs",
+        value=(
+            "Press **Enter IDs** and type the six-character Knowledge weapon ID for "
+            "each position you want to change. Leave unchanged positions empty."
+        ),
+        inline=False,
+    )
+    embed.add_field(
+        name="Method 2 — Read the equipped team",
+        value=(
+            "Equip the Knowledge weapons in OwO, open a fresh OwO team page, reopen "
+            "Team XP tools from that message, click **🧠**, then press **Save equipped**."
+        ),
+        inline=False,
+    )
+    embed.set_footer(
+        text="Saving a weapon preset turns reminder tracking off until you enable it again."
+    )
+    return embed
+
+
+class KnowledgeSetupView(discord.ui.View):
+    def __init__(
+        self,
+        cog: "XPTools",
+        guild_id: int,
+        owner_id: int,
+        snapshot: TeamXPSnapshot,
+    ) -> None:
+        super().__init__(timeout=300)
+        self.cog = cog
+        self.guild_id = guild_id
+        self.owner_id = owner_id
+        self.snapshot = snapshot
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.owner_id:
+            return True
+        await interaction.response.send_message(
+            "These Knowledge settings belong to another member.", ephemeral=True
+        )
+        return False
+
+    @discord.ui.button(label="Enter IDs", emoji="📝", style=discord.ButtonStyle.primary)
+    async def enter_ids(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        profile = await self.cog.store.get(self.guild_id, self.owner_id)
+        if not profile.normal:
+            await interaction.response.send_message(
+                "Save your normal weapons with **⚔️** first.", ephemeral=True
+            )
+            return
+        await interaction.response.send_modal(
+            KnowledgePresetModal(self.cog, self.guild_id, self.owner_id, profile)
+        )
+
+    @discord.ui.button(
+        label="Save equipped", emoji="⚔️", style=discord.ButtonStyle.secondary
+    )
+    async def save_equipped(
+        self, interaction: discord.Interaction, _button: discord.ui.Button
+    ) -> None:
+        profile = await self.cog.store.get(self.guild_id, self.owner_id)
+        if not profile.normal:
+            await interaction.response.send_message(
+                "Save your normal weapons with **⚔️** first.", ephemeral=True
+            )
+            return
+        equipped = self.snapshot.members
+        if not presets_compatible(profile.normal, equipped):
+            await interaction.response.send_message(
+                "This team does not match the saved normal team. Open a fresh page for "
+                "the same team after equipping its Knowledge weapons, then try again.",
+                ephemeral=True,
+            )
+            return
+        changed = changed_positions(profile.normal, equipped)
+        if not changed:
+            await interaction.response.send_message(
+                "The current page still shows the saved normal weapons. Equip at least "
+                "one Knowledge weapon, open a fresh OwO team page, and try again.",
+                ephemeral=True,
+            )
+            return
+        await self.cog.store.upsert(
+            self.guild_id,
+            self.owner_id,
+            knowledge=equipped,
+            enabled=False,
+            awaiting_restore=False,
+        )
+        await interaction.response.edit_message(
+            content=(
+                f"✅ Saved the currently equipped weapons as Knowledge for position(s) "
+                f"**{', '.join(map(str, changed))}**. Reminder tracking stays off until "
+                "you enable it."
+            ),
+            embed=None,
+            view=None,
         )
 
 
@@ -1438,14 +1553,19 @@ class TeamXPToolsView(discord.ui.View):
     )
     async def save_knowledge(self, interaction: discord.Interaction, _button: discord.ui.Button) -> None:
         profile = await self.cog.store.get(self.guild_id, self.owner_id)
-        if not profile.normal:
-            await interaction.response.send_message(
-                "Click ⚔️ first to save the currently equipped normal weapons, then open Knowledge again.",
-                ephemeral=True,
-            )
-            return
-        await interaction.response.send_modal(
-            KnowledgePresetModal(self.cog, self.guild_id, self.owner_id, profile)
+        await interaction.response.send_message(
+            embed=build_knowledge_setup_embed(profile),
+            view=(
+                KnowledgeSetupView(
+                    self.cog,
+                    self.guild_id,
+                    self.owner_id,
+                    self.snapshot,
+                )
+                if profile.normal
+                else None
+            ),
+            ephemeral=True,
         )
 
     @discord.ui.button(
@@ -1503,7 +1623,7 @@ class XPTools(commands.Cog):
         if message.guild is None:
             return
         profile = await self.store.get(message.guild.id, message.author.id)
-        if not profile.enabled or not profile.ready:
+        if not profile.enabled:
             return
         pending = [item for item in self.purge_pending(message.channel.id) if item.user_id != message.author.id]
         pending.append(
@@ -1620,12 +1740,13 @@ class XPTools(commands.Cog):
     def build_reminder_embed(self, profile: XPReminderProfile) -> discord.Embed:
         changed = changed_positions(profile.normal, profile.knowledge)
         status = "Enabled" if profile.enabled else "Disabled"
+        mode = "Copyable weapon commands" if profile.ready else "Simple switch prompts"
         embed = discord.Embed(
             title="🔔 Knowledge-switch reminders",
             description=(
                 "The helper watches only your configured OwO battle command and its matching result. "
                 "It prompts before the selected milestone, keeps the Knowledge step open through ties, "
-                "and gives the normal preset after a win or loss."
+                "and reminds you to switch back after a win or loss. Weapon presets are optional."
             ),
             color=0x57F287 if profile.enabled else 0x747F8D,
         )
@@ -1634,6 +1755,7 @@ class XPTools(commands.Cog):
             value=(
                 f"**Status:** {status}\n"
                 f"**Interval:** every {profile.interval:,} wins\n"
+                f"**Prompt mode:** {mode}\n"
                 f"**Mention:** {'On' if profile.mention else 'Off'}\n"
                 f"**Waiting to restore:** {'Yes' if profile.awaiting_restore else 'No'}"
             ),
@@ -1649,11 +1771,11 @@ class XPTools(commands.Cog):
             inline=False,
         )
         embed.add_field(
-            name="Setup",
+            name="Setup options",
             value=(
-                "1. Show the correct OwO team with normal weapons, open the helper panel, and click **⚔️**.\n"
-                "2. Click the **Knowledge icon** and enter the replacement six-character weapon ID(s).\n"
-                "3. Choose an interval and enable reminders below."
+                "**Simple prompts:** choose an interval and press **Enable**. No weapon IDs are required.\n"
+                "**Copyable commands:** save normal weapons with **⚔️**, then click **🧠** "
+                "and either enter IDs or save a freshly equipped Knowledge team."
             ),
             inline=False,
         )
@@ -1668,7 +1790,7 @@ class XPTools(commands.Cog):
             value="\n".join(benefit_lines) + "\n*Uses maximum 15% Knowledge; real results follow each weapon's quality.*",
             inline=False,
         )
-        embed.set_footer(text="No reminder is enabled until you press Enable. Saving either preset turns tracking off for safety.")
+        embed.set_footer(text="No reminder is enabled until you press Enable. Saving a preset turns tracking off for safety.")
         return embed
 
     def build_team_tools_embed(
@@ -1966,13 +2088,6 @@ class XPTools(commands.Cog):
             return
         enable_requested = tokens[0] in {"on", "enable", "start"} or requested_interval is not None
         if enable_requested:
-            if not profile.ready:
-                await safe_reply(
-                    message,
-                    "Save matching normal and Knowledge presets from the team-tools reaction before enabling reminders.",
-                    mention_author=False,
-                )
-                return
             updated = await self.store.upsert(
                 message.guild.id,
                 message.author.id,
@@ -1981,7 +2096,8 @@ class XPTools(commands.Cog):
             )
             await safe_reply(
                 message,
-                f"🔔 XP switch reminders enabled every **{updated.interval:,}** wins.",
+                f"🔔 XP switch reminders enabled every **{updated.interval:,}** wins "
+                f"with **{'copyable commands' if updated.ready else 'simple switch prompts'}**.",
                 mention_author=False,
             )
             return
@@ -1993,7 +2109,7 @@ class XPTools(commands.Cog):
             return
         self.consume_pending(request)
         profile = await self.store.get(request.guild_id, request.user_id)
-        if not profile.enabled or not profile.ready or profile.last_battle_message_id == message.id:
+        if not profile.enabled or profile.last_battle_message_id == message.id:
             return
         owo_prefix = await get_guild_owo_prefix(request.guild_id)
         mention = f"<@{request.user_id}> " if profile.mention else ""
@@ -2014,29 +2130,34 @@ class XPTools(commands.Cog):
                 )
                 return
             commands = weapon_switch_commands(profile.knowledge, profile.normal, owo_prefix)
+            restore_text = (
+                f"↩️ **{result.outcome.title()} recorded at streak {result.streak:,}. "
+                "Switch back to your normal weapons now.**"
+            )
             if commands:
-                try:
-                    await message.channel.send(
-                        mention
-                        + f"↩️ **{result.outcome.title()} recorded at streak {result.streak:,}. Restore normal weapons:**\n"
-                        + "\n".join(f"`{command}`" for command in commands),
-                        reference=message.to_reference(fail_if_not_exists=False),
-                        allowed_mentions=allowed,
-                    )
-                except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
-                    logger.warning(
-                        "Could not send normal-weapon reminder for user %s in guild %s: %s",
-                        request.user_id,
-                        request.guild_id,
-                        exc,
-                    )
-                    await self.store.upsert(
-                        request.guild_id,
-                        request.user_id,
-                        last_streak=result.streak,
-                        last_battle_message_id=message.id,
-                    )
-                    return
+                restore_text += "\n" + "\n".join(
+                    f"`{command}`" for command in commands
+                )
+            try:
+                await message.channel.send(
+                    mention + restore_text,
+                    reference=message.to_reference(fail_if_not_exists=False),
+                    allowed_mentions=allowed,
+                )
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException) as exc:
+                logger.warning(
+                    "Could not send normal-weapon reminder for user %s in guild %s: %s",
+                    request.user_id,
+                    request.guild_id,
+                    exc,
+                )
+                await self.store.upsert(
+                    request.guild_id,
+                    request.user_id,
+                    last_streak=result.streak,
+                    last_battle_message_id=message.id,
+                )
+                return
             await self.store.upsert(
                 request.guild_id,
                 request.user_id,
@@ -2057,14 +2178,21 @@ class XPTools(commands.Cog):
             return
         target = next_switch_streak(result.streak, profile.interval)
         commands = weapon_switch_commands(profile.normal, profile.knowledge, owo_prefix)
-        if not commands:
-            return
+        switch_text = (
+            f"🧠 **Streak {result.streak:,}: the next win reaches {target:,}. "
+            "Switch to your Knowledge weapons for the next battle now.**"
+        )
+        if commands:
+            switch_text += "\n" + "\n".join(
+                f"`{command}`" for command in commands
+            )
+        switch_text += (
+            "\nA tie keeps this step open. After a win or loss, I will remind you "
+            "to switch back."
+        )
         try:
             await message.channel.send(
-                mention
-                + f"🧠 **Streak {result.streak:,}: the next win reaches {target:,}. Equip Knowledge for the next battle:**\n"
-                + "\n".join(f"`{command}`" for command in commands)
-                + "\nA tie keeps this step open. After a win or loss, I will send the normal preset.",
+                mention + switch_text,
                 reference=message.to_reference(fail_if_not_exists=False),
                 allowed_mentions=allowed,
             )

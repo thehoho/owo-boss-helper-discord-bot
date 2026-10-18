@@ -1,3 +1,14 @@
+## v0.16.11-beta - Optional Knowledge Presets
+
+- Allowed members to enable Knowledge-switch reminders without saving normal or Knowledge weapon IDs.
+- Added simple milestone prompts that say when to switch to Knowledge and when to switch back to normal weapons.
+- Preserved the existing copyable weapon commands automatically whenever compatible normal and Knowledge presets are available.
+- Kept ties from closing the Knowledge step in both simple-prompt and saved-command modes.
+- Replaced the direct Knowledge-ID form with a clear two-method setup guide.
+- Added **Enter IDs** for manual six-character weapon entry and **Save equipped** for reading Knowledge weapons from a fresh OwO team page.
+- Updated the reminder panel to show whether it is using simple prompts or copyable commands.
+- Updated the public version to 0.16.11-beta; no database migration, slash-command schema, dependency, or permission change is required.
+
 ## v0.16.10-beta - XP Scope and Current TapDeck Card
 
 - Replaced the long `H XP` exclusion list with the direct rule that its multiplier applies only to battle XP on the primary team.
