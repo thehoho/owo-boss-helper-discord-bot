@@ -1,3 +1,10 @@
+## v0.16.14-beta - OwO Fight Reminder Compatibility
+
+- Added OwO's `fight` battle alias to Knowledge-reminder command recognition, including compact forms such as `owofight` and configured-prefix forms such as `wfight`.
+- Fixed enabled reminder profiles failing to associate an OwO battle result with the member when that member used `owo fight` instead of `owo b` or `owo battle`.
+- Added regression coverage for spaced, compact, long, short, and configured-prefix battle commands.
+- Updated the public version to 0.16.14-beta; no database migration, slash-command schema, dependency, or permission change is required.
+
 ## v0.16.13-beta - Knowledge Reminder State Consistency
 
 - Fixed normal- and Knowledge-weapon saves silently disabling an already enabled reminder profile.

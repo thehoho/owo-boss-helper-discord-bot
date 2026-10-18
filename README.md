@@ -1,3 +1,7 @@
+## v0.16.14-beta notes
+
+Knowledge reminders now recognize OwO's `fight` alias in both spaced and compact forms, including `owo fight`, `owofight`, and the server's configured prefix such as `w fight` or `wfight`. These commands now arm the same member-specific result tracking already used by `owo b` and `owo battle`. See [OwO fight reminder compatibility](RELEASE_NOTES_v0.16.14-beta.md).
+
 ## v0.16.13-beta notes
 
 Saving normal or Knowledge weapon presets no longer silently disables an enabled milestone reminder. `H reminders`, `/xp-reminders`, and the Team XP bell now preserve the same explicit Enable/Disable choice; changing a preset only cancels an unfinished switch-back step. Save confirmations display the retained status, and successful milestone/restore prompts are now recorded for production diagnostics. See [Knowledge reminder state consistency](RELEASE_NOTES_v0.16.13-beta.md).

@@ -11,8 +11,10 @@ from unittest.mock import AsyncMock, patch
 import discord
 from discord.ext import commands
 
+from cogs.owo_prefix import is_owo_prefixed_command
 from cogs.team_templates import TeamMember, extract_all_text, extract_message_text
 from cogs.xp_tools import (
+    BATTLE_COMMAND_SUFFIXES,
     KNOWLEDGE_SCENARIOS,
     ForecastActivityModal,
     ForecastSettings,
@@ -370,6 +372,14 @@ class XPParsingTests(unittest.TestCase):
         self.assertEqual((win.outcome, win.streak), ("win", 1363))
         self.assertEqual((tie.outcome, tie.streak), ("tie", 1363))
         self.assertEqual((loss.outcome, loss.streak), ("loss", 0))
+
+    def test_all_owo_battle_aliases_are_recognized(self) -> None:
+        for command in ("owo b", "owo battle", "owo fight", "Owofight"):
+            with self.subTest(command=command):
+                self.assertTrue(
+                    is_owo_prefixed_command(command, "w", BATTLE_COMMAND_SUFFIXES)
+                )
+        self.assertTrue(is_owo_prefixed_command("wfight", "w", BATTLE_COMMAND_SUFFIXES))
 
     def test_switch_packet_changes_only_different_weapons_and_alternates_aliases(self) -> None:
         normal = (
