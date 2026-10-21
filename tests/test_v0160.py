@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import time
 import unittest
@@ -504,7 +505,7 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
                 response=SimpleNamespace(send_message=AsyncMock())
             )
             await normal_view.save_normal.callback(normal_interaction)
-            self.assertTrue((await cog.store.get(1, 42)).enabled)
+            self.assertTrue((await cog.store.get(2, 42)).enabled)
 
             profile = await cog.store.get(1, 42)
             modal = KnowledgePresetModal(cog, 1, 42, profile)
@@ -529,14 +530,14 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
             await cog.arm_battle(
                 SimpleNamespace(
                     id=100,
-                    guild=SimpleNamespace(id=1),
+                    guild=SimpleNamespace(id=2),
                     channel=channel,
                     author=user,
                 )
             )
             battle_message = SimpleNamespace(
                 id=200,
-                guild=SimpleNamespace(id=1),
+                guild=SimpleNamespace(id=2),
                 channel=channel,
                 reference=None,
                 mentions=[],
@@ -597,12 +598,78 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
             self.assertTrue(saved.ready)
             reopened = XPReminderStore(Path(directory) / "xp.db")
             await reopened.initialize()
-            profile = await reopened.get(1, 42)
+            profile = await reopened.get(999, 42)
+            self.assertEqual(profile.guild_id, 999)
             self.assertTrue(profile.enabled)
             self.assertEqual(profile.interval, 50)
             self.assertFalse(profile.mention)
             self.assertTrue(profile.awaiting_restore)
             self.assertEqual(profile.knowledge[0].weapon_id, "KNO111")
+            await reopened.upsert(999, 42, interval=10)
+            self.assertEqual((await reopened.get(1, 42)).interval, 10)
+
+    async def test_server_scoped_profiles_migrate_to_one_global_profile(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "xp.db"
+            normal_json = '[{"position":1,"animal":"snake","weapon_id":"AAA111"}]'
+            knowledge_json = '[{"position":1,"animal":"snake","weapon_id":"KNO111"}]'
+            connection = sqlite3.connect(path)
+            try:
+                connection.execute(
+                    """
+                    CREATE TABLE xp_reminder_profiles (
+                        guild_id INTEGER NOT NULL,
+                        user_id INTEGER NOT NULL,
+                        enabled INTEGER NOT NULL DEFAULT 0,
+                        interval INTEGER NOT NULL DEFAULT 100,
+                        mention INTEGER NOT NULL DEFAULT 1,
+                        normal_json TEXT NOT NULL DEFAULT '[]',
+                        knowledge_json TEXT NOT NULL DEFAULT '[]',
+                        awaiting_restore INTEGER NOT NULL DEFAULT 0,
+                        trigger_streak INTEGER NOT NULL DEFAULT 0,
+                        last_streak INTEGER NOT NULL DEFAULT 0,
+                        last_battle_message_id INTEGER NOT NULL DEFAULT 0,
+                        updated_at INTEGER NOT NULL DEFAULT 0,
+                        PRIMARY KEY (guild_id, user_id)
+                    )
+                    """
+                )
+                connection.execute(
+                    "INSERT INTO xp_reminder_profiles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (1, 42, 1, 50, 0, normal_json, knowledge_json, 0, 0, 40, 100, 100),
+                )
+                connection.execute(
+                    "INSERT INTO xp_reminder_profiles VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    (2, 42, 1, 10, 1, "[]", "[]", 0, 0, 79, 200, 200),
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            store = XPReminderStore(path)
+            await store.initialize()
+            migrated = await store.get(3, 42)
+            self.assertTrue(migrated.enabled)
+            self.assertEqual(migrated.interval, 10)
+            self.assertTrue(migrated.mention)
+            self.assertEqual(migrated.last_streak, 79)
+            self.assertEqual(migrated.normal[0].weapon_id, "AAA111")
+            self.assertEqual(migrated.knowledge[0].weapon_id, "KNO111")
+            connection = store.connect()
+            try:
+                columns = {
+                    row["name"]
+                    for row in connection.execute(
+                        "PRAGMA table_info(xp_reminder_profiles)"
+                    ).fetchall()
+                }
+                count = connection.execute(
+                    "SELECT COUNT(*) FROM xp_reminder_profiles WHERE user_id = 42"
+                ).fetchone()[0]
+            finally:
+                connection.close()
+            self.assertNotIn("guild_id", columns)
+            self.assertEqual(count, 1)
 
     async def test_forecast_settings_persist_per_user_across_restarts(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

@@ -213,7 +213,7 @@ class NotificationSurfaceTests(unittest.IsolatedAsyncioTestCase):
                 await bot.close()
 
     def test_release_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.16.14-beta")
+        self.assertEqual(BOT_VERSION, "0.16.15-beta")
 
 
 if __name__ == "__main__":

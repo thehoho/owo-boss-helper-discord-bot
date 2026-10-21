@@ -642,29 +642,110 @@ class XPReminderStore:
         connection.execute("PRAGMA busy_timeout=5000")
         return connection
 
+    @staticmethod
+    def create_global_profile_table(connection: sqlite3.Connection) -> None:
+        connection.execute(
+            """
+            CREATE TABLE IF NOT EXISTS xp_reminder_profiles (
+                user_id INTEGER NOT NULL PRIMARY KEY,
+                enabled INTEGER NOT NULL DEFAULT 0,
+                interval INTEGER NOT NULL DEFAULT 100,
+                mention INTEGER NOT NULL DEFAULT 1,
+                normal_json TEXT NOT NULL DEFAULT '[]',
+                knowledge_json TEXT NOT NULL DEFAULT '[]',
+                awaiting_restore INTEGER NOT NULL DEFAULT 0,
+                trigger_streak INTEGER NOT NULL DEFAULT 0,
+                last_streak INTEGER NOT NULL DEFAULT 0,
+                last_battle_message_id INTEGER NOT NULL DEFAULT 0,
+                updated_at INTEGER NOT NULL DEFAULT 0
+            )
+            """
+        )
+
+    def ensure_global_profile_schema(self, connection: sqlite3.Connection) -> None:
+        columns = {
+            str(row["name"])
+            for row in connection.execute(
+                "PRAGMA table_info(xp_reminder_profiles)"
+            ).fetchall()
+        }
+        if not columns:
+            self.create_global_profile_table(connection)
+            return
+        if "guild_id" not in columns:
+            return
+
+        connection.execute("BEGIN IMMEDIATE")
+        try:
+            connection.execute(
+                "ALTER TABLE xp_reminder_profiles RENAME TO xp_reminder_profiles_legacy"
+            )
+            self.create_global_profile_table(connection)
+            rows = connection.execute(
+                """
+                SELECT * FROM xp_reminder_profiles_legacy
+                ORDER BY updated_at DESC, rowid DESC
+                """
+            ).fetchall()
+            by_user: dict[int, list[sqlite3.Row]] = {}
+            for row in rows:
+                by_user.setdefault(int(row["user_id"]), []).append(row)
+            for user_id, user_rows in by_user.items():
+                latest = user_rows[0]
+                normal_json = next(
+                    (
+                        str(row["normal_json"])
+                        for row in user_rows
+                        if deserialize_members(str(row["normal_json"]))
+                    ),
+                    "[]",
+                )
+                knowledge_json = next(
+                    (
+                        str(row["knowledge_json"])
+                        for row in user_rows
+                        if deserialize_members(str(row["knowledge_json"]))
+                    ),
+                    "[]",
+                )
+                connection.execute(
+                    """
+                    INSERT INTO xp_reminder_profiles (
+                        user_id, enabled, interval, mention, normal_json,
+                        knowledge_json, awaiting_restore, trigger_streak,
+                        last_streak, last_battle_message_id, updated_at
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """,
+                    (
+                        user_id,
+                        int(latest["enabled"]),
+                        int(latest["interval"]),
+                        int(latest["mention"]),
+                        normal_json,
+                        knowledge_json,
+                        int(latest["awaiting_restore"]),
+                        int(latest["trigger_streak"]),
+                        int(latest["last_streak"]),
+                        int(latest["last_battle_message_id"]),
+                        int(latest["updated_at"]),
+                    ),
+                )
+            connection.execute("DROP TABLE xp_reminder_profiles_legacy")
+            connection.commit()
+            logger.info(
+                "Migrated %s server-scoped XP reminder profile(s) into %s global member profile(s)",
+                len(rows),
+                len(by_user),
+            )
+        except Exception:
+            connection.rollback()
+            raise
+
     def initialize_sync(self) -> None:
         connection = self.connect()
         try:
             connection.execute("PRAGMA journal_mode=WAL")
-            connection.execute(
-                """
-                CREATE TABLE IF NOT EXISTS xp_reminder_profiles (
-                    guild_id INTEGER NOT NULL,
-                    user_id INTEGER NOT NULL,
-                    enabled INTEGER NOT NULL DEFAULT 0,
-                    interval INTEGER NOT NULL DEFAULT 100,
-                    mention INTEGER NOT NULL DEFAULT 1,
-                    normal_json TEXT NOT NULL DEFAULT '[]',
-                    knowledge_json TEXT NOT NULL DEFAULT '[]',
-                    awaiting_restore INTEGER NOT NULL DEFAULT 0,
-                    trigger_streak INTEGER NOT NULL DEFAULT 0,
-                    last_streak INTEGER NOT NULL DEFAULT 0,
-                    last_battle_message_id INTEGER NOT NULL DEFAULT 0,
-                    updated_at INTEGER NOT NULL DEFAULT 0,
-                    PRIMARY KEY (guild_id, user_id)
-                )
-                """
-            )
+            self.ensure_global_profile_schema(connection)
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS xp_forecast_settings (
@@ -693,7 +774,7 @@ class XPReminderStore:
         if row is None:
             return XPReminderProfile(guild_id, user_id, False, 100, True, (), (), False, 0, 0, 0)
         return XPReminderProfile(
-            guild_id=int(row["guild_id"]),
+            guild_id=guild_id,
             user_id=int(row["user_id"]),
             enabled=bool(row["enabled"]),
             interval=int(row["interval"]),
@@ -710,8 +791,8 @@ class XPReminderStore:
         connection = self.connect()
         try:
             row = connection.execute(
-                "SELECT * FROM xp_reminder_profiles WHERE guild_id = ? AND user_id = ?",
-                (guild_id, user_id),
+                "SELECT * FROM xp_reminder_profiles WHERE user_id = ?",
+                (user_id,),
             ).fetchone()
         finally:
             connection.close()
@@ -756,11 +837,11 @@ class XPReminderStore:
             connection.execute(
                 """
                 INSERT INTO xp_reminder_profiles (
-                    guild_id, user_id, enabled, interval, mention, normal_json,
+                    user_id, enabled, interval, mention, normal_json,
                     knowledge_json, awaiting_restore, trigger_streak, last_streak,
                     last_battle_message_id, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(guild_id, user_id) DO UPDATE SET
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(user_id) DO UPDATE SET
                     enabled = excluded.enabled,
                     interval = excluded.interval,
                     mention = excluded.mention,
@@ -773,7 +854,6 @@ class XPReminderStore:
                     updated_at = excluded.updated_at
                 """,
                 (
-                    guild_id,
                     user_id,
                     int(values["enabled"]),
                     int(values["interval"]),
@@ -1748,6 +1828,8 @@ class XPTools(commands.Cog):
         embed = discord.Embed(
             title="🔔 Knowledge-switch reminders",
             description=(
+                "Your reminder settings and weapon presets are global across every server where "
+                "you and the helper are present. Save or change them once and the same profile follows you. "
                 "The helper watches only your configured OwO battle command and its matching result. "
                 "It prompts before the selected milestone, keeps the Knowledge step open through ties, "
                 "and reminds you to switch back after a win or loss. Weapon presets are optional."
@@ -1795,7 +1877,7 @@ class XPTools(commands.Cog):
             inline=False,
         )
         embed.set_footer(
-            text="Enable or Disable is authoritative everywhere. Saving a preset keeps that setting."
+            text="One global profile • Enable, Disable, and preset changes apply in every server."
         )
         return embed
 

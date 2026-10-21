@@ -1,3 +1,11 @@
+## v0.16.15-beta - Global Knowledge Reminder Profiles
+
+- Made each member's Knowledge-reminder status, interval, mention preference, normal preset, Knowledge preset, streak state, and switch-back state global across every mutual server.
+- Added an automatic migration from server-scoped profiles to one profile per member, keeping the newest settings and the newest available weapon presets.
+- Updated reminder guidance to clearly state that enabling, disabling, or changing presets applies everywhere.
+- Added regression coverage for cross-server preset use, cross-server reminder delivery, global updates, restart persistence, and legacy database migration.
+- Updated the public version to 0.16.15-beta; the database migration runs automatically and requires no slash-command, dependency, or Discord permission change.
+
 ## v0.16.14-beta - OwO Fight Reminder Compatibility
 
 - Added OwO's `fight` battle alias to Knowledge-reminder command recognition, including compact forms such as `owofight` and configured-prefix forms such as `wfight`.

@@ -1,3 +1,7 @@
+## v0.16.15-beta notes
+
+Knowledge reminders now use one global profile per member. Enable the reminder or save normal/Knowledge weapons in one server, then grind in any other server shared with the helper using the same status, interval, presets, streak state, and switch-back flow. Existing server-scoped profiles migrate automatically, preserving the newest settings and newest available presets. See [global Knowledge reminder profiles](RELEASE_NOTES_v0.16.15-beta.md).
+
 ## v0.16.14-beta notes
 
 Knowledge reminders now recognize OwO's `fight` alias in both spaced and compact forms, including `owo fight`, `owofight`, and the server's configured prefix such as `w fight` or `wfight`. These commands now arm the same member-specific result tracking already used by `owo b` and `owo battle`. See [OwO fight reminder compatibility](RELEASE_NOTES_v0.16.14-beta.md).
