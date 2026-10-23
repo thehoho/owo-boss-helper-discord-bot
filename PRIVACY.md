@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 5 September 2026_
+_Last updated: 23 October 2026_
 
 OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 
@@ -9,6 +9,7 @@ OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 The bot stores only the information needed to provide its features and operate safely:
 
 - Discord server IDs, server names, owner IDs, approximate member counts, channel counts, installation status, and aggregate command-use counts.
+- Server-access restriction records, including a denied server's ID and name, the date of the restriction, the bot-owner account that applied it, and an optional private administrative note.
 - Discord user IDs, display names, and Discord account usernames associated with saved team templates and boss-ticket entries.
 - When a server manager enables optional ticket nickname markers, the bot stores the member's prior server nickname, the last nickname applied by the bot, and whether that member chose to show or hide the suffix so it can update or restore the name safely.
 - The bot stores whether a member has personally paused ticket tracking in a server. Paused members are not added by later ticket checks until they resume tracking.
@@ -31,7 +32,7 @@ The bot does not request Discord presence data or a complete server-member list.
 
 ## Why the data is used
 
-Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, authorize configured boss-decision helpers, send optional fighter-role HIT alerts, deliver member-requested boss reward and end DMs, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, provide cached public animal information, publish trusted expert team guides, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, and notify the developer when the bot joins or leaves a server.
+Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, authorize configured boss-decision helpers, send optional fighter-role HIT alerts, deliver member-requested boss reward and end DMs, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, provide cached public animal information, publish trusted expert team guides, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, notify the developer when the bot joins or leaves a server, and enforce server-level access restrictions for the hosted bot.
 
 ## Storage and sharing
 
@@ -50,6 +51,7 @@ Runtime data is stored on the bot's private hosting server in local SQLite datab
 - Ticket nickname markers are disabled by default. Each member can hide or show their marker, remove their current board entry, pause ticket tracking, or resume it later. Disabling the server feature attempts to restore every nickname managed by the bot and remove the associated restoration state after a successful cleanup.
 - Users can delete saved team templates through the documented team commands.
 - Server metadata may remain as historical installation statistics after the bot leaves a server.
+- Server-access restriction records remain until the developer removes the restriction. Removing the bot from a server does not automatically remove that server from the denylist.
 - The developer can remove stored records when requested and reasonably verifiable.
 
 ## Security
