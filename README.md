@@ -1,3 +1,7 @@
+## v0.16.16-beta notes
+
+The configured bot owner can now disconnect the helper from a specific server with `/bot-leave-server`. The command validates the exact server ID, displays a private server preview, and requires a red confirmation button before it calls Discord's leave-server action. See [owner-controlled server removal](RELEASE_NOTES_v0.16.16-beta.md).
+
 ## v0.16.15-beta notes
 
 Knowledge reminders now use one global profile per member. Enable the reminder or save normal/Knowledge weapons in one server, then grind in any other server shared with the helper using the same status, interval, presets, streak state, and switch-back flow. Existing server-scoped profiles migrate automatically, preserving the newest settings and newest available presets. See [global Knowledge reminder profiles](RELEASE_NOTES_v0.16.15-beta.md).
@@ -409,9 +413,10 @@ Owner-only commands configured through `BOT_OWNER_ID`:
 ```text
 /bot-stats
 /bot-servers
+/bot-leave-server server_id:<server ID>
 ```
 
-They show current and historical server counts, approximate member reach, per-server usage, saved-template counts, ticket-board counts, uptime, latency, and local storage size. The bot also sends the configured owner a private message when it joins or leaves a server. Persistent operational metadata is stored in `bot_stats.db`.
+They show current and historical server counts, approximate member reach, per-server usage, saved-template counts, ticket-board counts, uptime, latency, and local storage size. `/bot-leave-server` resolves the live server, shows a private preview, and requires the configured owner to press a destructive confirmation button before the bot leaves. The bot also sends the configured owner a private message when it joins or leaves a server. Persistent operational metadata is stored in `bot_stats.db`.
 
 ### Logging
 

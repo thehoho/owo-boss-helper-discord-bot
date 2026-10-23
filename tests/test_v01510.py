@@ -4,12 +4,14 @@ import unittest
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, patch
 
+import discord
+
 from cogs.boss_generator import (
     BOSS_WATCH_INTERVAL_SECONDS,
     OWO_BOT_ID,
     BossGenerator,
 )
-from cogs.bot_info import BOT_VERSION
+from cogs.bot_info import BOT_VERSION, GuildLeaveConfirmationView
 from cogs.team_guides import FullGuideView, PublicGuideView, TeamGuide
 
 
@@ -182,7 +184,49 @@ class BossFetchReliabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(BOSS_WATCH_INTERVAL_SECONDS, 5 * 60)
 
     def test_public_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.16.15-beta")
+        self.assertEqual(BOT_VERSION, "0.16.16-beta")
+
+
+class OwnerGuildRemovalTests(unittest.IsolatedAsyncioTestCase):
+    async def test_confirmation_is_owner_bound(self) -> None:
+        cog = SimpleNamespace(store=SimpleNamespace(mark_left=AsyncMock()))
+        guild = SimpleNamespace(
+            id=1392506785021296831,
+            name="Homeys",
+            leave=AsyncMock(),
+        )
+        view = GuildLeaveConfirmationView(cog, 42, guild)
+        rejected = SimpleNamespace(
+            user=SimpleNamespace(id=99),
+            response=SimpleNamespace(send_message=AsyncMock()),
+        )
+
+        self.assertFalse(await view.interaction_check(rejected))
+        rejected.response.send_message.assert_awaited_once()
+        self.assertTrue(any(item.style == discord.ButtonStyle.danger for item in view.children))
+
+    async def test_confirm_leaves_and_records_server(self) -> None:
+        store = SimpleNamespace(mark_left=AsyncMock())
+        cog = SimpleNamespace(store=store)
+        guild = SimpleNamespace(
+            id=1392506785021296831,
+            name="Homeys",
+            leave=AsyncMock(),
+        )
+        view = GuildLeaveConfirmationView(cog, 42, guild)
+        interaction = SimpleNamespace(
+            user=SimpleNamespace(id=42),
+            response=SimpleNamespace(defer=AsyncMock()),
+            edit_original_response=AsyncMock(),
+        )
+        confirm = next(item for item in view.children if item.style == discord.ButtonStyle.danger)
+
+        await confirm.callback(interaction)
+
+        guild.leave.assert_awaited_once_with()
+        store.mark_left.assert_awaited_once_with(guild)
+        interaction.edit_original_response.assert_awaited_once()
+        self.assertTrue(all(item.disabled for item in view.children))
 
 
 if __name__ == "__main__":

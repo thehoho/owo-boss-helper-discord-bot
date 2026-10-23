@@ -39,7 +39,7 @@ TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 XP_DATABASE_FILE = PROJECT_ROOT / "xp_reminders.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.16.15-beta"
+BOT_VERSION = "0.16.16-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -572,6 +572,116 @@ class ServerListView(discord.ui.View):
             embed=self.cog.build_servers_embed(records, target),
             view=ServerListView(self.cog, self.owner_id, records, page=target),
         )
+
+
+class GuildLeaveConfirmationView(discord.ui.View):
+    """Owner-bound confirmation for deliberately disconnecting from one guild."""
+
+    def __init__(
+        self,
+        cog: "BotInfo",
+        owner_id: int,
+        guild: discord.Guild,
+    ) -> None:
+        super().__init__(timeout=90)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.guild = guild
+        self.completed = False
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.owner_id:
+            return True
+        await interaction.response.send_message(
+            "Only the configured bot owner can confirm this action.",
+            ephemeral=True,
+        )
+        return False
+
+    def disable_buttons(self) -> None:
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                item.disabled = True
+
+    @discord.ui.button(
+        label="Leave this server",
+        emoji="🚪",
+        style=discord.ButtonStyle.danger,
+    )
+    async def confirm_leave(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        if self.completed:
+            await interaction.response.send_message(
+                "This server removal has already been handled.",
+                ephemeral=True,
+            )
+            return
+
+        self.completed = True
+        self.disable_buttons()
+        await interaction.response.defer(ephemeral=True)
+        try:
+            await self.guild.leave()
+            await self.cog.store.mark_left(self.guild)
+        except discord.HTTPException as exc:
+            self.completed = False
+            for item in self.children:
+                if isinstance(item, discord.ui.Button):
+                    item.disabled = False
+            logger.exception(
+                "Owner-requested leave failed for guild %s (%s)",
+                self.guild.name,
+                self.guild.id,
+            )
+            await interaction.edit_original_response(
+                content=f"❌ Discord did not let me leave `{self.guild.id}`: `{exc}`",
+                embed=None,
+                view=self,
+            )
+            return
+
+        logger.warning(
+            "Bot owner %s removed the bot from guild %s (%s)",
+            interaction.user.id,
+            self.guild.name,
+            self.guild.id,
+        )
+        embed = discord.Embed(
+            title="✅ Bot left the server",
+            description=(
+                f"The bot has left **{discord.utils.escape_markdown(self.guild.name)}** "
+                f"(`{self.guild.id}`)."
+            ),
+            color=0x57F287,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(text="Owner-requested removal • Recorded in bot statistics")
+        try:
+            await interaction.edit_original_response(embed=embed, view=self)
+        except discord.HTTPException:
+            logger.info(
+                "Guild %s was left successfully, but the confirmation message could not be edited",
+                self.guild.id,
+            )
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel_leave(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        self.completed = True
+        self.disable_buttons()
+        await interaction.response.edit_message(
+            content="Cancelled. The bot remains in the server.",
+            embed=None,
+            view=self,
+        )
+        self.stop()
 
 
 class BotInfo(commands.Cog):
@@ -1383,6 +1493,78 @@ class BotInfo(commands.Cog):
         await interaction.followup.send(
             embed=self.build_servers_embed(records, selected_page),
             view=ServerListView(self, interaction.user.id, records, page=selected_page),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @app_commands.command(
+        name="bot-leave-server",
+        description="Developer-only: make the bot leave one server.",
+    )
+    @app_commands.describe(server_id="Discord server ID from /bot-servers")
+    async def developer_leave_server(
+        self,
+        interaction: discord.Interaction,
+        server_id: str,
+    ) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+
+        cleaned = (server_id or "").strip()
+        if not cleaned.isdigit() or not 15 <= len(cleaned) <= 22:
+            await interaction.response.send_message(
+                "Enter the exact numeric server ID from `/bot-servers`.",
+                ephemeral=True,
+            )
+            return
+
+        guild = self.bot.get_guild(int(cleaned))
+        if guild is None:
+            record = await self.store.get_guild_record(int(cleaned))
+            if record is not None and not record.active:
+                message = (
+                    f"The bot is already absent from **{discord.utils.escape_markdown(record.guild_name)}** "
+                    f"(`{cleaned}`)."
+                )
+            else:
+                message = f"The bot is not currently connected to a server with ID `{cleaned}`."
+            await interaction.response.send_message(
+                message,
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+
+        owner = await self.user_label(int(guild.owner_id or 0))
+        embed = discord.Embed(
+            title="⚠️ Confirm server removal",
+            description=(
+                "This immediately disconnects the bot from the server. Rejoining later "
+                "requires someone in that server to invite it again."
+            ),
+            color=0xED4245,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="Server",
+            value=(
+                f"**{discord.utils.escape_markdown(guild.name)}**\n"
+                f"**ID:** `{guild.id}`\n"
+                f"**Approx. members:** {int(guild.member_count or 0):,}\n"
+                f"**Owner:** {owner}"
+            ),
+            inline=False,
+        )
+        if interaction.guild_id == guild.id:
+            embed.add_field(
+                name="Current location",
+                value="You are running this inside the target server. The final confirmation may disappear after the bot leaves.",
+                inline=False,
+            )
+        embed.set_footer(text="Owner-only • No action occurs until the red button is pressed")
+        await interaction.response.send_message(
+            embed=embed,
+            view=GuildLeaveConfirmationView(self, interaction.user.id, guild),
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )
