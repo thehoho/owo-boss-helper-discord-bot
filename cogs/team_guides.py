@@ -57,6 +57,10 @@ GUIDE_BROWSER_CATEGORY_LIMIT = 24
 GUIDE_BROWSER_GUIDE_LIMIT = 25
 GUIDE_SPECIAL_EMOJI_LIMIT = 300
 GUIDE_APPLICATION_EMOJI_RESERVE = 500
+GUIDE_PRIMARY_CATEGORIES = ("Boss", "Streak", "Breaker")
+GUIDE_PRIMARY_CATEGORY_KEYS = tuple(
+    normalize_catalog_token(value) for value in GUIDE_PRIMARY_CATEGORIES
+)
 GUIDE_VARIABLE_RE = re.compile(r"\{([A-Za-z0-9_ -]{1,64})\}")
 GUIDE_STAT_ALIASES = {
     "hp": "hp",
@@ -621,7 +625,18 @@ class TeamGuideStore:
                 seen.add(key)
                 labels.setdefault(key, label)
                 totals[key] = totals.get(key, 0) + 1
-        ordered = sorted(totals, key=lambda key: (-totals[key], labels[key].casefold()))
+        priority = {
+            key: index for index, key in enumerate(GUIDE_PRIMARY_CATEGORY_KEYS)
+        }
+        ordered = sorted(
+            totals,
+            key=lambda key: (
+                0 if key in priority else 1,
+                priority.get(key, 0),
+                -totals[key],
+                labels[key].casefold(),
+            ),
+        )
         return [(labels[key], key, totals[key]) for key in ordered[: max(0, int(limit))]]
 
     def list_guides_by_category(
@@ -1121,7 +1136,9 @@ def build_editor_embed(draft: GuideDraft) -> discord.Embed:
         "Every submitted section is auto-saved; nothing is published until you press **Publish**.\n"
         "-# **Basics**, **Full guide**, and slot notes accept Discord Markdown. "
         "Optional direct emoji variables such as {sword}, {lifesteal}, and "
-        "{fish} resolve through **Preview**. Open **Emoji variables** for examples.\n\n"
+        "{fish} resolve through **Preview**. Open **Emoji variables** for examples.\n"
+        "-# Prefer the general **Boss**, **Streak**, and **Breaker** categories. A team may "
+        "belong to several categories; put weapon names in aliases so direct searches still work.\n\n"
         f"**Name:** {draft.name or 'Not set'}\n"
         f"**Aliases:** {', '.join(draft.aliases) or 'Not set'}\n"
         f"**Categories:** {', '.join(draft.categories) or 'Not set'}\n"
@@ -1143,7 +1160,11 @@ def build_editor_embed(draft: GuideDraft) -> discord.Embed:
 class GuideBasicsModal(discord.ui.Modal, title="Team guide basics"):
     name = discord.ui.TextInput(label="Guide name", max_length=MAX_GUIDE_NAME)
     aliases = discord.ui.TextInput(label="Search aliases (comma-separated)", max_length=300)
-    categories = discord.ui.TextInput(label="Categories (comma-separated)", max_length=300)
+    categories = discord.ui.TextInput(
+        label="Categories (comma-separated)",
+        placeholder="Boss, Streak, Breaker • one team may use several",
+        max_length=300,
+    )
     authors = discord.ui.TextInput(label="Displayed authors / short names", max_length=300)
     description = discord.ui.TextInput(
         label="How to use this team (Markdown supported)",
@@ -1532,25 +1553,25 @@ class GuideCategorySelect(discord.ui.Select):
     def __init__(self, browser: "GuideBrowserView") -> None:
         options = [
             discord.SelectOption(
-                label="All categories",
-                value="all",
-                description="Show the newest guides from every category",
-                emoji="📚",
-                default=not browser.category_key,
-            )
-        ]
-        options.extend(
-            discord.SelectOption(
                 label=label[:100],
                 value=f"category:{index}",
                 description=f"{count} guide{'s' if count != 1 else ''}"[:100],
                 default=key == browser.category_key,
             )
             for index, (label, key, count) in enumerate(browser.categories)
-        )
+        ]
+        if not options:
+            options = [
+                discord.SelectOption(
+                    label="No categories available",
+                    value="none",
+                    description="No expert guides have been published yet",
+                )
+            ]
         super().__init__(
-            placeholder="Filter guides by category",
+            placeholder="Choose a guide category",
             options=options,
+            disabled=not browser.categories,
             row=0,
         )
 
@@ -1601,7 +1622,14 @@ class GuideEntrySelect(discord.ui.Select):
                 else "Open one of these guides"
             )[:150],
             options=options or [
-                discord.SelectOption(label="No guides in this category", value="none")
+                discord.SelectOption(
+                    label=(
+                        "No guides in this category"
+                        if browser.category_key
+                        else "Choose a category above"
+                    ),
+                    value="none",
+                )
             ],
             disabled=not options,
             row=1,
@@ -1654,11 +1682,11 @@ class GuideBrowserView(discord.ui.View):
 
     @classmethod
     async def create(cls, cog: "TeamGuides") -> "GuideBrowserView":
-        categories, guides = await asyncio.gather(
-            asyncio.to_thread(cog.store.list_categories, GUIDE_BROWSER_CATEGORY_LIMIT),
-            asyncio.to_thread(cog.store.list_guides, "", GUIDE_BROWSER_GUIDE_LIMIT),
+        categories = await asyncio.to_thread(
+            cog.store.list_categories,
+            GUIDE_BROWSER_CATEGORY_LIMIT,
         )
-        return cls(cog, categories, guides)
+        return cls(cog, categories, [])
 
     def rebuild(self) -> None:
         self.clear_items()
@@ -1676,14 +1704,33 @@ class GuideBrowserView(discord.ui.View):
         else:
             self.category_key = ""
             self.category_label = ""
-            self.guides = await asyncio.to_thread(
-                self.cog.store.list_guides,
-                "",
-                GUIDE_BROWSER_GUIDE_LIMIT,
-            )
+            self.guides = []
         self.rebuild()
 
     def build_embed(self) -> discord.Embed:
+        if not self.category_key:
+            if not self.categories:
+                return discord.Embed(
+                    title="📚 Team Guides",
+                    description="No expert guides have been published yet.",
+                    color=0x5865F2,
+                )
+            rows = [
+                f"**{label}** — {count} guide{'s' if count != 1 else ''}"
+                for label, _key, count in self.categories
+            ]
+            embed = discord.Embed(
+                title="📚 Team Guide Categories",
+                description=(
+                    "Choose a category below, then choose a team. A team may appear in more "
+                    "than one category. Direct searches by team, weapon alias, category, or "
+                    "author still work with `H guide <query>`.\n\n"
+                    + "\n".join(rows)
+                ),
+                color=0x5865F2,
+            )
+            embed.set_footer(text="Choose a category first; team details open privately.")
+            return embed
         embed = self.cog.list_embed(self.guides, query=self.category_label)
         embed.set_footer(
             text="Choose a category, then choose a guide. Guide details open privately."

@@ -1,3 +1,9 @@
+## v0.16.18-beta notes
+
+Saved XP models now include how often Knowledge is equipped: always, or every 10, 50, 100, 500, or 1,000 battles. The same persisted plan powers both Team XP's **Your model** estimate and the full level forecast, while combined Knowledge quality now supports up to 30%. Forecast pages show 20 lines by default, name all three pets in the table header, and no longer include the separate stats control or redundant max-Knowledge line.
+
+Plain `H guide` and `/team-guide` now open on categories only; selecting a category then reveals its teams. `Boss`, `Streak`, and `Breaker` are prioritized as the general categories, a team can remain in several categories, and direct name, weapon-alias, category, and author searches continue to work. See [saved Knowledge plans and category-first guides](RELEASE_NOTES_v0.16.18-beta.md).
+
 ## v0.16.17-beta notes
 
 The bot owner can now place a Discord server ID on a persistent denylist. A denied server cannot keep the helper: every future invite receives a best-effort access-denied notice and the bot leaves automatically. Only the configured `BOT_OWNER_ID` can ban, unban, or view denied servers. See [persistent server access control](RELEASE_NOTES_v0.16.17-beta.md).
@@ -317,12 +323,12 @@ The default helper prefix is `h`. A server manager can change it with `/helper-p
 
 - The bot owner grants or revokes global trusted-expert access with `/guide-expert`.
 - Trusted experts create guides with `/team-guide-create` and revise them with `/team-guide-edit`.
-- The private editor uses Discord modals and buttons for guide basics, unique aliases, user-created categories, displayed authors, viability, ease of creation, an optional detailed full guide, and all three composition slots.
+- The private editor uses Discord modals and buttons for guide basics, unique aliases, displayed authors, viability, ease of creation, an optional detailed full guide, and all three composition slots. General categories prioritize **Boss**, **Streak**, and **Breaker**; a guide can belong to several categories.
 - Summaries, full guides, and slot notes support Discord Markdown plus direct emoji variables such as `{fish}`, `{pdagger}`, `{lifesteal}`, `{wp_stat}`, and `{legendary}`. The original `{w...}`, `{fp...}`, `{a...}`, `{s...}`, and `{r...}` prefixes remain optional for disambiguation.
 - The editor includes a private **Emoji variables** reference, resolves known variables during **Preview**, and warns about unknown variables without deleting their text.
 - Composition slots keep the level, animal emoji/name, animal rank, up to three weapon specifications, passives, and weapon ranks on one compact row; optional notes render below it using the same checked-in emoji catalogs and guide variables.
 - Search aliases are globally unique, edits increment the guide version, and the last editor is recorded.
-- Everyone can browse with `H guide`, search by name, alias, category, or displayed author with `H guide <query>` or `/team-guide`, open related teams, and privately page through an expert's optional **Full guide**.
+- Everyone can browse categories first with `H guide` or `/team-guide`, then choose a team inside that category. Direct searches by name, weapon alias, category, or displayed author still work with `H guide <query>` or `/team-guide`, and an expert's optional **Full guide** opens privately.
 
 ### Boss-ticket board
 

@@ -242,7 +242,7 @@ class XPParsingTests(unittest.TestCase):
         panel = TeamLevelForecastView(cog, 1, snapshot)
         embed = panel.build_embed()
         labels = {item.label for item in panel.children}
-        self.assertIn("Show stats", labels)
+        self.assertNotIn("Show stats", labels)
         self.assertIn("Hide streak", labels)
         self.assertNotIn("Knowledge & lines", labels)
         self.assertEqual(settings.max_lines, 20)
@@ -250,6 +250,9 @@ class XPParsingTests(unittest.TestCase):
         self.assertNotIn("%", embed.fields[0].value)
         self.assertIn("⬛", embed.fields[0].value)
         self.assertIn("🆙", embed.fields[0].value)
+        self.assertIn("[1] laviniamm", embed.fields[0].value)
+        self.assertIn("[2] lobbot", embed.fields[0].value)
+        self.assertIn("[3] 4m_owo", embed.fields[0].value)
         first_data_row = embed.fields[0].value.splitlines()[2]
         self.assertEqual(first_data_row.count(" | "), 5)
         self.assertIn("0 battles/day", embed.footer.text)
@@ -259,7 +262,7 @@ class XPParsingTests(unittest.TestCase):
         self.assertTrue(all(not item.required for item in modal.children))
         self.assertEqual(modal.maximum_streak.default, "0")
         self.assertEqual(modal.knowledge_quality.default, "0.15")
-        self.assertEqual(modal.max_lines.default, "20")
+        self.assertEqual(modal.max_lines.default, "0, 20")
         self.assertIsNone(ForecastActivityModal._values("", 2, "rates"))
         self.assertEqual(ForecastActivityModal._optional_int("", 2600), 2600)
         self.assertEqual(ForecastActivityModal._optional_float("", 0.15), 0.15)
@@ -267,6 +270,13 @@ class XPParsingTests(unittest.TestCase):
     def test_knowledge_effect_explains_additive_multiplier(self) -> None:
         self.assertEqual(knowledge_effect_text(2.7, 0.15), "2.70× → 2.85× (+5.6%)")
         self.assertEqual(knowledge_effect_text(1.0, 0.15), "1.00× → 1.15× (+15.0%)")
+        self.assertEqual(knowledge_effect_text(1.0, 0.30), "1.00× → 1.30× (+30.0%)")
+        self.assertGreater(
+            raw_battle_xp_needed(49, 50, 0, 56, 0.15),
+            raw_battle_xp_needed(49, 50, 0, 56, 0.30),
+        )
+        with self.assertRaisesRegex(ValueError, "0.30"):
+            raw_battle_xp_needed(49, 50, 0, 56, 0.31)
 
     def test_loss_rate_resets_streak_and_slows_forecast(self) -> None:
         snapshot = parse_team_xp_snapshot(TEAM_TEXT)
@@ -295,6 +305,7 @@ class XPParsingTests(unittest.TestCase):
             loss_rate_percent=0.1,
             maximum_streak=2600,
             knowledge_quality=0.12,
+            knowledge_interval=50,
             max_lines=24,
         )
         team_embed = cog.build_team_tools_embed(snapshot, saved_settings)
@@ -302,7 +313,8 @@ class XPParsingTests(unittest.TestCase):
         self.assertEqual(len(team_embed.fields), 3)
         self.assertIn("Normal: up to", team_embed.fields[0].value)
         self.assertIn("Your model: up to", team_embed.fields[0].value)
-        self.assertIn("Model + Max Knowledge", team_embed.fields[0].value)
+        self.assertNotIn("Model + Max Knowledge", team_embed.fields[0].value)
+        self.assertIn("every 50th battle", team_embed.description)
         self.assertIn("500 battles/day", team_embed.description)
         self.assertIn("21 XP/hunt", team_embed.description)
         self.assertIn("0.82% ties", team_embed.description)
@@ -310,6 +322,11 @@ class XPParsingTests(unittest.TestCase):
         self.assertIn("max streak 2,600", team_embed.description)
         self.assertIn("Heather", team_embed.footer.text)
         self.assertIn("owo.bwep.net/exp/", team_embed.footer.text)
+        _normal, selected = next_level_forecasts(snapshot, saved_settings)
+        _normal, always = next_level_forecasts(
+            snapshot, replace(saved_settings, knowledge_interval=0)
+        )
+        self.assertGreater(selected[1], always[1])
 
         panel = TeamLevelForecastView(cog, 1, snapshot, saved_settings)
         forecast = panel.build_embed()
@@ -684,6 +701,7 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
                 loss_rate_percent=0.1,
                 maximum_streak=2600,
                 knowledge_quality=0.12,
+                knowledge_interval=50,
                 max_lines=24,
             )
             self.assertEqual(
@@ -697,6 +715,41 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
                 await reopened.get_forecast_settings(99), ForecastSettings()
             )
 
+    async def test_existing_forecast_settings_gain_a_knowledge_interval(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "xp.db"
+            connection = sqlite3.connect(path)
+            try:
+                connection.execute(
+                    """
+                    CREATE TABLE xp_forecast_settings (
+                        user_id INTEGER NOT NULL PRIMARY KEY,
+                        battles_per_day INTEGER NOT NULL DEFAULT 0,
+                        fixed_xp_per_day INTEGER NOT NULL DEFAULT 0,
+                        average_xp_per_hunt REAL NOT NULL DEFAULT 0,
+                        tie_rate_percent REAL NOT NULL DEFAULT 0,
+                        loss_rate_percent REAL NOT NULL DEFAULT 0,
+                        maximum_streak INTEGER NOT NULL DEFAULT 0,
+                        knowledge_quality REAL NOT NULL DEFAULT 0.15,
+                        max_lines INTEGER NOT NULL DEFAULT 20,
+                        updated_at INTEGER NOT NULL DEFAULT 0
+                    )
+                    """
+                )
+                connection.execute(
+                    "INSERT INTO xp_forecast_settings (user_id, knowledge_quality) "
+                    "VALUES (42, 0.12)"
+                )
+                connection.commit()
+            finally:
+                connection.close()
+
+            store = XPReminderStore(path)
+            await store.initialize()
+            settings = await store.get_forecast_settings(42)
+            self.assertEqual(settings.knowledge_quality, 0.12)
+            self.assertEqual(settings.knowledge_interval, 0)
+
     async def test_forecast_modal_submit_saves_the_user_model(self) -> None:
         snapshot = parse_team_xp_snapshot(TEAM_TEXT)
         assert snapshot is not None
@@ -708,6 +761,7 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
             loss_rate_percent=0.1,
             maximum_streak=2600,
             knowledge_quality=0.12,
+            knowledge_interval=50,
             max_lines=24,
         )
         cog = XPTools.__new__(XPTools)
@@ -729,7 +783,7 @@ class XPStoreTests(unittest.IsolatedAsyncioTestCase):
         modal.rates._value = "0.82, 0.1"
         modal.maximum_streak._value = "2600"
         modal.knowledge_quality._value = "0.12"
-        modal.max_lines._value = "24"
+        modal.max_lines._value = "50, 24"
         interaction = SimpleNamespace(
             response=SimpleNamespace(defer=AsyncMock()),
             edit_original_response=AsyncMock(),

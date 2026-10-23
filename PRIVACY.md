@@ -1,6 +1,6 @@
 # Privacy Policy
 
-_Last updated: 23 October 2026_
+_Last updated: 24 October 2026_
 
 OwO Boss Helper is an independent community Discord bot developed by Hassaan.
 
@@ -14,6 +14,7 @@ The bot stores only the information needed to provide its features and operate s
 - When a server manager enables optional ticket nickname markers, the bot stores the member's prior server nickname, the last nickname applied by the bot, and whether that member chose to show or hide the suffix so it can update or restore the name safely.
 - The bot stores whether a member has personally paused ticket tracking in a server. Paused members are not added by later ticket checks until they resume tracking.
 - Saved team animals, positions, and weapon IDs.
+- Opt-in Knowledge-reminder and XP-forecast settings associated with a Discord user ID, including reminder status and interval, mention preference, saved normal/Knowledge weapon presets, switch-back state, recent tracked streak/message state, activity assumptions, tie/loss rates, maximum streak, combined Knowledge quality, Knowledge switching interval, and forecast line count.
 - Neon weapon scan entries for public NeonUtil inventory pages, including Discord owner ID, weapon ID, quality values, max-possible status, recognized weapon/passive filters, and learned blueprint text.
 - Public animal facts learned from official OwO Dex responses, including animal name, rank, aliases, global caught total, economy values, six base stats, description, and public image or emoji metadata. The requesting member's personal zoo count and the source message, channel, server, and user IDs are not stored with these records.
 - Trusted guide-expert Discord user IDs and display names, plus published team-guide names, aliases, categories, displayed authors, summaries, optional full-guide text, ratings, composition, creator/editor IDs, and version history metadata.
@@ -32,7 +33,7 @@ The bot does not request Discord presence data or a complete server-member list.
 
 ## Why the data is used
 
-Data is used to generate boss commands, restore saved teams, maintain ticket and cooldown boards, authorize configured boss-decision helpers, send optional fighter-role HIT alerts, deliver member-requested boss reward and end DMs, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, provide cached public animal information, publish trusted expert team guides, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, notify the developer when the bot joins or leaves a server, and enforce server-level access restrictions for the hosted bot.
+Data is used to generate boss commands, restore saved teams, provide opt-in Knowledge reminders and personal XP forecasts, maintain ticket and cooldown boards, authorize configured boss-decision helpers, send optional fighter-role HIT alerts, deliver member-requested boss reward and end DMs, produce daily boss outcome reports, reconcile public Top 10 boss hits, manage personal Neon weapon dex queues, provide cached public animal information, publish trusted expert team guides, remove inactive ticket entries, optionally display ticket availability in server nicknames, restore managed nicknames, diagnose problems, measure bot usage, notify the developer when the bot joins or leaves a server, and enforce server-level access restrictions for the hosted bot.
 
 ## Storage and sharing
 
@@ -50,6 +51,7 @@ Runtime data is stored on the bot's private hosting server in local SQLite datab
 - Server managers can remove ticket-board users with `/boss-ticket-remove`.
 - Ticket nickname markers are disabled by default. Each member can hide or show their marker, remove their current board entry, pause ticket tracking, or resume it later. Disabling the server feature attempts to restore every nickname managed by the bot and remove the associated restoration state after a successful cleanup.
 - Users can delete saved team templates through the documented team commands.
+- Members can disable Knowledge reminders at any time. Saved reminder presets and forecast assumptions remain available until the member changes them or requests deletion.
 - Server metadata may remain as historical installation statistics after the bot leaves a server.
 - Server-access restriction records remain until the developer removes the restriction. Removing the bot from a server does not automatically remove that server from the denylist.
 - The developer can remove stored records when requested and reasonably verifiable.

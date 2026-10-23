@@ -55,11 +55,12 @@ REMINDER_INTERVALS = (10, 50, 100, 500, 1000)
 BATTLE_COMMAND_SUFFIXES = {"b", "battle", "fight"}
 PENDING_BATTLE_SECONDS = 45
 TEAM_TOOLS_SECONDS = 15 * 60
-FORECAST_PAGE_LINES = 12
+FORECAST_PAGE_LINES = 20
 MAX_FORECAST_LINES = 99
 MAX_FORECAST_BATTLES = 3_000_000
 MAX_LEVEL = 250
 MAX_VALIDATED_STREAK = 122_500
+MAX_KNOWLEDGE_QUALITY = 0.30
 KNOWLEDGE_SCENARIOS: tuple[tuple[str, int | None], ...] = (
     ("Always equipped", None),
     ("Every 10th battle", 10),
@@ -87,6 +88,7 @@ class PetXPState:
     level: int
     current_xp: int
     next_xp: int
+    display_name: str = ""
 
 
 @dataclass(frozen=True)
@@ -106,6 +108,7 @@ class ForecastSettings:
     loss_rate_percent: float = 0.0
     maximum_streak: int = 0
     knowledge_quality: float = 0.15
+    knowledge_interval: int = 0
     max_lines: int = 20
 
 
@@ -190,6 +193,14 @@ def knowledge_effect_text(base_multiplier: float, knowledge_quality: float) -> s
     return f"{base_multiplier:.2f}× → {selected:.2f}× (+{relative:.1f}%)"
 
 
+def knowledge_plan_label(interval: int) -> str:
+    return "Always equipped" if interval == 0 else f"Every {interval:,}th battle"
+
+
+def simulation_knowledge_interval(settings: ForecastSettings) -> int | None:
+    return settings.knowledge_interval or None
+
+
 def raw_battle_xp_needed(
     start_level: int,
     target_level: int,
@@ -198,8 +209,8 @@ def raw_battle_xp_needed(
     knowledge_bonus: float = 0.0,
 ) -> float:
     """Return pre-multiplier battle XP needed with dynamic catch-up per level."""
-    if not 0 <= knowledge_bonus <= 0.15:
-        raise ValueError("Knowledge must be between 0 and 0.15")
+    if not 0 <= knowledge_bonus <= MAX_KNOWLEDGE_QUALITY:
+        raise ValueError("Knowledge must be between 0 and 0.30")
     total_level_xp(start_level, target_level, current_xp)
     raw_needed = 0.0
     for level in range(start_level, target_level):
@@ -278,8 +289,8 @@ def estimated_battles_needed(
     """
     if average_battle_xp <= 0 or fixed_xp_per_battle < 0:
         raise ValueError("XP rates cannot be negative or zero")
-    if not 0 <= knowledge_bonus <= 0.15:
-        raise ValueError("Knowledge must be between 0 and 0.15")
+    if not 0 <= knowledge_bonus <= MAX_KNOWLEDGE_QUALITY:
+        raise ValueError("Knowledge must be between 0 and 0.30")
     total_level_xp(start_level, target_level, current_xp)
     battles = 0.0
     for level in range(start_level, target_level):
@@ -314,8 +325,12 @@ def validate_forecast_settings(settings: ForecastSettings) -> None:
         raise ValueError(
             f"Maximum streak must be between 0 and {MAX_VALIDATED_STREAK:,}"
         )
-    if not 0 <= settings.knowledge_quality <= 0.15:
-        raise ValueError("Knowledge quality must be between 0 and 0.15")
+    if not 0 <= settings.knowledge_quality <= MAX_KNOWLEDGE_QUALITY:
+        raise ValueError("Knowledge quality must be between 0 and 0.30")
+    if settings.knowledge_interval not in (0, *REMINDER_INTERVALS):
+        raise ValueError(
+            "Knowledge interval must be 0, 10, 50, 100, 500, or 1,000"
+        )
     if not 1 <= settings.max_lines <= MAX_FORECAST_LINES:
         raise ValueError(f"Maximum lines must be between 1 and {MAX_FORECAST_LINES}")
 
@@ -443,15 +458,15 @@ def next_level_forecasts(
         line_limit=1,
         stop_after_next_levels=True,
     )
-    _, always = simulate_team_forecast(
+    _, selected = simulate_team_forecast(
         snapshot,
         settings,
         use_knowledge=True,
-        knowledge_interval=None,
+        knowledge_interval=simulation_knowledge_interval(settings),
         line_limit=1,
         stop_after_next_levels=True,
     )
-    return normal, always
+    return normal, selected
 
 
 def switch_benefit(
@@ -531,7 +546,21 @@ def parse_team_xp_snapshot(text: str) -> TeamXPSnapshot | None:
         level = int(level_match.group(1))
         current_xp = parse_number(xp_match.group(1)) if xp_match else 0
         next_xp = parse_number(xp_match.group(2)) if xp_match else xp_for_next_level(level)
-        pets.append(PetXPState(position, member.animal, level, current_xp, next_xp))
+        heading = re.sub(
+            r"<a?:[^:>]+:\d+>", "", str(match.group(2) or "")
+        )
+        heading = re.sub(r"^[^\w]+", "", heading, flags=re.UNICODE)
+        display_name = re.sub(r"\s+", " ", heading).strip(" *_")
+        pets.append(
+            PetXPState(
+                position,
+                member.animal,
+                level,
+                current_xp,
+                next_xp,
+                display_name or member.animal,
+            )
+        )
     streak_match = re.search(r"Current\s+Streak\s*:\s*([\d,]+)", cleaned, re.IGNORECASE)
     return TeamXPSnapshot(
         source_title=parsed.source_title,
@@ -757,11 +786,23 @@ class XPReminderStore:
                     loss_rate_percent REAL NOT NULL DEFAULT 0,
                     maximum_streak INTEGER NOT NULL DEFAULT 0,
                     knowledge_quality REAL NOT NULL DEFAULT 0.15,
+                    knowledge_interval INTEGER NOT NULL DEFAULT 0,
                     max_lines INTEGER NOT NULL DEFAULT 20,
                     updated_at INTEGER NOT NULL DEFAULT 0
                 )
                 """
             )
+            forecast_columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(xp_forecast_settings)"
+                ).fetchall()
+            }
+            if "knowledge_interval" not in forecast_columns:
+                connection.execute(
+                    "ALTER TABLE xp_forecast_settings "
+                    "ADD COLUMN knowledge_interval INTEGER NOT NULL DEFAULT 0"
+                )
             connection.commit()
         finally:
             connection.close()
@@ -888,6 +929,7 @@ class XPReminderStore:
             loss_rate_percent=float(row["loss_rate_percent"]),
             maximum_streak=int(row["maximum_streak"]),
             knowledge_quality=float(row["knowledge_quality"]),
+            knowledge_interval=int(row["knowledge_interval"]),
             max_lines=int(row["max_lines"]),
         )
 
@@ -916,8 +958,9 @@ class XPReminderStore:
                 INSERT INTO xp_forecast_settings (
                     user_id, battles_per_day, fixed_xp_per_day,
                     average_xp_per_hunt, tie_rate_percent, loss_rate_percent,
-                    maximum_streak, knowledge_quality, max_lines, updated_at
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                    maximum_streak, knowledge_quality, knowledge_interval,
+                    max_lines, updated_at
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
                 ON CONFLICT(user_id) DO UPDATE SET
                     battles_per_day = excluded.battles_per_day,
                     fixed_xp_per_day = excluded.fixed_xp_per_day,
@@ -926,6 +969,7 @@ class XPReminderStore:
                     loss_rate_percent = excluded.loss_rate_percent,
                     maximum_streak = excluded.maximum_streak,
                     knowledge_quality = excluded.knowledge_quality,
+                    knowledge_interval = excluded.knowledge_interval,
                     max_lines = excluded.max_lines,
                     updated_at = excluded.updated_at
                 """,
@@ -938,6 +982,7 @@ class XPReminderStore:
                     settings.loss_rate_percent,
                     settings.maximum_streak,
                     settings.knowledge_quality,
+                    settings.knowledge_interval,
                     settings.max_lines,
                     int(time.time()),
                 ),
@@ -1064,15 +1109,15 @@ class ForecastActivityModal(discord.ui.Modal, title="Forecast settings"):
     )
     knowledge_quality = discord.ui.TextInput(
         label="Knowledge quality",
-        placeholder="0 to 0.15",
+        placeholder="0 to 0.30 (two 15% Knowledge passives)",
         required=False,
         max_length=4,
     )
     max_lines = discord.ui.TextInput(
-        label="Forecast lines",
-        placeholder="1 to 99 • default 20",
+        label="Knowledge interval, forecast lines",
+        placeholder="Example: 50, 20 • interval 0 = always equipped",
         required=False,
-        max_length=2,
+        max_length=16,
     )
 
     def __init__(self, panel: "TeamLevelForecastView") -> None:
@@ -1088,7 +1133,9 @@ class ForecastActivityModal(discord.ui.Modal, title="Forecast settings"):
         )
         self.maximum_streak.default = str(settings.maximum_streak)
         self.knowledge_quality.default = f"{settings.knowledge_quality:g}"
-        self.max_lines.default = str(settings.max_lines)
+        self.max_lines.default = (
+            f"{settings.knowledge_interval}, {settings.max_lines}"
+        )
 
     @staticmethod
     def _values(value: str, count: int, label: str) -> tuple[str, ...] | None:
@@ -1116,6 +1163,9 @@ class ForecastActivityModal(discord.ui.Modal, title="Forecast settings"):
                 str(self.activity), 3, "activity settings"
             )
             rates = self._values(str(self.rates), 2, "tie and loss rates")
+            plan = self._values(
+                str(self.max_lines), 2, "Knowledge interval and forecast lines"
+            )
             settings = replace(
                 current,
                 battles_per_day=(
@@ -1139,7 +1189,16 @@ class ForecastActivityModal(discord.ui.Modal, title="Forecast settings"):
                 knowledge_quality=self._optional_float(
                     str(self.knowledge_quality), current.knowledge_quality
                 ),
-                max_lines=self._optional_int(str(self.max_lines), current.max_lines),
+                knowledge_interval=(
+                    int(plan[0].replace(",", ""))
+                    if plan
+                    else current.knowledge_interval
+                ),
+                max_lines=(
+                    int(plan[1].replace(",", ""))
+                    if plan
+                    else current.max_lines
+                ),
             )
             validate_forecast_settings(settings)
         except ValueError as exc:
@@ -1147,6 +1206,15 @@ class ForecastActivityModal(discord.ui.Modal, title="Forecast settings"):
             return
         self.panel.settings = await self.panel.cog.store.upsert_forecast_settings(
             self.panel.owner_id, settings
+        )
+        selected_interval = simulation_knowledge_interval(self.panel.settings)
+        self.panel.scenario_index = next(
+            (
+                index
+                for index, (_label, interval) in enumerate(KNOWLEDGE_SCENARIOS)
+                if interval == selected_interval
+            ),
+            0,
         )
         self.panel.page = 0
         await interaction.response.defer()
@@ -1381,14 +1449,19 @@ class TeamLevelForecastView(discord.ui.View):
         self.guild_id = guild_id
         self.helper_prefix = helper_prefix
         self.team_tools_message = team_tools_message
-        self.scenario_index = 0
+        selected_interval = simulation_knowledge_interval(self.settings)
+        self.scenario_index = next(
+            (
+                index
+                for index, (_label, interval) in enumerate(KNOWLEDGE_SCENARIOS)
+                if interval == selected_interval
+            ),
+            0,
+        )
         self.page = 0
-        self.show_stats = False
         self.show_streak = True
         self._cache_key: tuple[ForecastSettings, int] | None = None
         self._cache_lines: tuple[ForecastLine, ...] = ()
-        self._cache_selected_counts: dict[int, int] = {}
-        self._cache_normal_counts: dict[int, int] = {}
 
     async def interaction_check(self, interaction: discord.Interaction) -> bool:
         if interaction.user.id == self.owner_id:
@@ -1401,45 +1474,32 @@ class TeamLevelForecastView(discord.ui.View):
     def _scenario(self) -> tuple[str, int | None]:
         return KNOWLEDGE_SCENARIOS[self.scenario_index]
 
-    def _forecast_data(
-        self,
-    ) -> tuple[tuple[ForecastLine, ...], dict[int, int], dict[int, int]]:
-        label, interval = self._scenario()
+    def _forecast_data(self) -> tuple[ForecastLine, ...]:
+        _label, interval = self._scenario()
         key = (self.settings, self.scenario_index)
         if key == self._cache_key:
-            return self._cache_lines, self._cache_selected_counts, self._cache_normal_counts
+            return self._cache_lines
         self._cache_lines, _ = simulate_team_forecast(
             self.snapshot,
             self.settings,
             use_knowledge=True,
             knowledge_interval=interval,
         )
-        _, self._cache_selected_counts = simulate_team_forecast(
-            self.snapshot,
-            self.settings,
-            use_knowledge=True,
-            knowledge_interval=interval,
-            line_limit=1,
-            stop_after_next_levels=True,
-        )
-        _, self._cache_normal_counts = simulate_team_forecast(
-            self.snapshot,
-            self.settings,
-            use_knowledge=False,
-            line_limit=1,
-            stop_after_next_levels=True,
-        )
         self._cache_key = key
-        return self._cache_lines, self._cache_selected_counts, self._cache_normal_counts
+        return self._cache_lines
 
     def build_embed(self) -> discord.Embed:
         label, _interval = self._scenario()
-        lines, selected_counts, normal_counts = self._forecast_data()
+        lines = self._forecast_data()
         page_count = max(1, math.ceil(len(lines) / FORECAST_PAGE_LINES))
         self.page = min(self.page, page_count - 1)
         start = self.page * FORECAST_PAGE_LINES
         visible = lines[start : start + FORECAST_PAGE_LINES]
-        headings = ["Levels", "Battles"]
+        headings = [
+            f"[{pet.position}] {pet.display_name or pet.animal}".replace("`", "'")[:18]
+            for pet in self.snapshot.pets
+        ]
+        headings.append("Battles")
         if self.show_streak:
             headings.append("Streak")
         headings.append("Days")
@@ -1458,30 +1518,13 @@ class TeamLevelForecastView(discord.ui.View):
         embed = discord.Embed(
             title=f"🔮 Level Forecaster — {self.snapshot.source_title}",
             description=(
-                f"**Knowledge plan:** {label}\n"
+                f"**Knowledge plan:** {label} at "
+                f"{self.settings.knowledge_quality * 100:g}% quality\n"
                 "*Need tie/loss estimates? Run Neon Global in the Neon server.*"
             ),
             color=0x5865F2,
             url=XP_SOURCE_URL,
         )
-        if self.show_stats:
-            highest = max(pet.level for pet in self.snapshot.pets)
-            for pet in self.snapshot.pets:
-                selected = selected_counts.get(pet.position, 0)
-                normal = normal_counts.get(pet.position, 0)
-                saved = max(0, normal - selected)
-                multiplier = catchup_multiplier(pet.level, highest)
-                pet_icon = ui_emoji_text(self.cog.bot, animal_emoji_key(pet.animal), "🐾")
-                embed.add_field(
-                    name=f"{pet_icon} [{pet.position}] {pet.animal}",
-                    value=(
-                        f"Normal: **{normal:,}**\n"
-                        f"Selected: **{selected:,}**\n"
-                        f"Benefit: **{saved:,} battles**\n"
-                        f"Knowledge: `{knowledge_effect_text(multiplier, self.settings.knowledge_quality)}`"
-                    ),
-                    inline=True,
-                )
         embed.add_field(
             name="Progress",
             value="```text\n" + "\n".join(table_rows) + "\n```",
@@ -1496,11 +1539,10 @@ class TeamLevelForecastView(discord.ui.View):
                 f"{self.settings.average_xp_per_hunt:g} XP/hunt • "
                 f"{self.settings.tie_rate_percent:g}% tie • "
                 f"{self.settings.loss_rate_percent:g}% loss • max streak: {maximum} • "
-                f"Knowledge: {self.settings.knowledge_quality * 100:g}%"
+                f"Knowledge: {self.settings.knowledge_quality * 100:g}% • {label}"
             )
         )
         self.scenario.label = f"Scenario: {label}"
-        self.stats.label = "Hide stats" if self.show_stats else "Show stats"
         self.streak.label = "Hide streak" if self.show_streak else "Show streak"
         self.previous.disabled = self.page <= 0
         self.next.disabled = self.page >= page_count - 1
@@ -1512,13 +1554,6 @@ class TeamLevelForecastView(discord.ui.View):
         self, interaction: discord.Interaction, _button: discord.ui.Button
     ) -> None:
         await interaction.response.send_modal(ForecastActivityModal(self))
-
-    @discord.ui.button(label="Show stats", style=discord.ButtonStyle.secondary, row=0)
-    async def stats(
-        self, interaction: discord.Interaction, _button: discord.ui.Button
-    ) -> None:
-        self.show_stats = not self.show_stats
-        await interaction.response.edit_message(embed=self.build_embed(), view=self)
 
     @discord.ui.button(label="Hide streak", style=discord.ButtonStyle.secondary, row=0)
     async def streak(
@@ -1766,8 +1801,9 @@ class XPTools(commands.Cog):
             name="Catch-up and Knowledge",
             value=(
                 "A lower-level pet gets a catch-up multiplier of `2 + 0.1 × level difference`. "
-                "Knowledge adds `0.05–0.15` to the same multiplier; it does not multiply the "
-                "catch-up value. This multiplier applies only to battle XP on the primary team."
+                "Each Knowledge passive adds `0.05–0.15` to the same multiplier; it does not "
+                "multiply the catch-up value. Two fabled Knowledge passives can therefore add "
+                "up to `0.30`. This multiplier applies only to battle XP on the primary team."
             ),
             inline=False,
         )
@@ -1873,7 +1909,11 @@ class XPTools(commands.Cog):
             )
         embed.add_field(
             name="Benefit across 1,000 straight wins",
-            value="\n".join(benefit_lines) + "\n*Uses maximum 15% Knowledge; real results follow each weapon's quality.*",
+            value=(
+                "\n".join(benefit_lines)
+                + "\n*Uses one 15% Knowledge passive as a reference. The saved forecast "
+                "model accepts combined Knowledge up to 30%.*"
+            ),
             inline=False,
         )
         embed.set_footer(
@@ -1890,11 +1930,23 @@ class XPTools(commands.Cog):
         average_text = "not available"
         baseline: dict[int, int] = {}
         modeled: dict[int, int] = {}
-        modeled_knowledge: dict[int, int] = {}
         if snapshot.streak <= MAX_VALIDATED_STREAK:
             average_text = f"{current_streak_average_xp(snapshot.streak):,.1f} XP/battle"
-            baseline, _ = next_level_forecasts(snapshot, ForecastSettings())
-            modeled, modeled_knowledge = next_level_forecasts(snapshot, settings)
+            _, baseline = simulate_team_forecast(
+                snapshot,
+                ForecastSettings(),
+                use_knowledge=False,
+                line_limit=1,
+                stop_after_next_levels=True,
+            )
+            _, modeled = simulate_team_forecast(
+                snapshot,
+                settings,
+                use_knowledge=True,
+                knowledge_interval=simulation_knowledge_interval(settings),
+                line_limit=1,
+                stop_after_next_levels=True,
+            )
         embed = discord.Embed(
             title="Team XP tools",
             description=(
@@ -1903,7 +1955,9 @@ class XPTools(commands.Cog):
                 f"+{settings.fixed_xp_per_day:,} fixed XP/day • "
                 f"{settings.average_xp_per_hunt:g} XP/hunt • "
                 f"{settings.tie_rate_percent:g}% ties • {settings.loss_rate_percent:g}% losses • "
-                f"max streak {'none' if not settings.maximum_streak else f'{settings.maximum_streak:,}'}"
+                f"max streak {'none' if not settings.maximum_streak else f'{settings.maximum_streak:,}'} • "
+                f"{settings.knowledge_quality * 100:g}% Knowledge "
+                f"{knowledge_plan_label(settings.knowledge_interval).lower()}"
             ),
             color=0x5865F2,
         )
@@ -1912,6 +1966,7 @@ class XPTools(commands.Cog):
                 pet.level, max(item.level for item in snapshot.pets)
             )
             pet_icon = ui_emoji_text(self.bot, animal_emoji_key(pet.animal), "🐾")
+            pet_name = pet.display_name or pet.animal
             model_battles = modeled.get(pet.position, 0)
             model_days = (
                 f" (~{model_battles / settings.battles_per_day:,.1f} days)"
@@ -1919,14 +1974,13 @@ class XPTools(commands.Cog):
                 else ""
             )
             embed.add_field(
-                name=f"{pet_icon} [{pet.position}] {pet.animal}",
+                name=f"{pet_icon} [{pet.position}] {pet_name}",
                 value=(
                     f"**L.{pet.level} → L.{pet.level + 1}**\n"
                     f"Need: **{max(0, pet.next_xp - pet.current_xp):,} XP**\n"
                     f"Knowledge: `{knowledge_effect_text(multiplier, settings.knowledge_quality)}`\n"
                     f"Normal: up to **{baseline.get(pet.position, 0):,} battles**\n"
-                    f"Your model: up to **{model_battles:,} battles**{model_days}\n"
-                    f"Model + Max Knowledge: **{modeled_knowledge.get(pet.position, 0):,}**"
+                    f"Your model: up to **{model_battles:,} battles**{model_days}"
                 ),
                 inline=True,
             )
@@ -1974,14 +2028,15 @@ class XPTools(commands.Cog):
                 knowledge_bonus=0.15,
             ) if needed else 0
             pet_icon = ui_emoji_text(self.bot, animal_emoji_key(pet.animal), "🐾")
+            pet_name = pet.display_name or pet.animal
             embed.add_field(
-                name=f"{pet_icon} [{pet.position}] {pet.animal}",
+                name=f"{pet_icon} [{pet.position}] {pet_name}",
                 value=(
                     f"**L.{pet.level} → L.{pet.level + 1}**\n"
                     f"Need: **{needed:,} XP**\n"
                     f"Multiplier: **{multiplier:.2f}×**\n"
                     f"Up to **{base_battles:,} battles**\n"
-                    f"{knowledge_icon} Max Knowledge: **{knowledge_battles:,}**"
+                    f"{knowledge_icon} 15% Knowledge: **{knowledge_battles:,}**"
                 ),
                 inline=True,
             )
@@ -2369,7 +2424,7 @@ class XPTools(commands.Cog):
         maximum_streak="Streak horizon for the milestone-switch simulation",
         battles_per_day="Expected battles per day",
         fixed_xp_per_day="XP earned daily outside battles, such as hunts",
-        knowledge_quality="Knowledge bonus from 0.05 to 0.15; use 0 for none",
+        knowledge_quality="Combined Knowledge bonus from 0 to 0.30",
     )
     async def xp_calc(
         self,
@@ -2382,7 +2437,7 @@ class XPTools(commands.Cog):
         current_xp: app_commands.Range[int, 0, 2_000_000_000] = 0,
         battles_per_day: app_commands.Range[int, 1, 5760] = 1000,
         fixed_xp_per_day: app_commands.Range[int, 0, 2_000_000_000] = 0,
-        knowledge_quality: app_commands.Range[float, 0.0, 0.15] = 0.15,
+        knowledge_quality: app_commands.Range[float, 0.0, 0.30] = 0.15,
     ) -> None:
         try:
             embed = self.build_calculator_embed(

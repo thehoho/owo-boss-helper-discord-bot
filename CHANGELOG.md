@@ -1,3 +1,15 @@
+## v0.16.18-beta - Saved Knowledge Plans and Category-First Guides
+
+- Persisted each member's Knowledge switching interval as part of the existing global XP forecast model: always equipped or every 10, 50, 100, 500, or 1,000 battles.
+- Applied that saved interval to the compact Team XP **Your model** estimate and to the full level forecaster after restarts and across servers.
+- Raised combined Knowledge quality support from 15% to 30% for weapons carrying two fabled Knowledge passives.
+- Removed the redundant forecast stats control and **Model + Max Knowledge** line, named the three pets directly in the progress header, and increased visible forecast rows to 20 per page.
+- Removed two unnecessary next-level simulations from every full-forecast refresh and two more from each compact Team XP render.
+- Changed plain guide browsing into a category-first flow: choose a category, then choose a team; direct searches still work without the browser.
+- Prioritized the general **Boss**, **Streak**, and **Breaker** categories and clarified that one team may use several categories while weapon names belong in searchable aliases.
+- Added an automatic SQLite migration for the saved Knowledge interval and expanded XP/guide regression coverage.
+- Updated the public version to 0.16.18-beta; no dependency or Discord permission change is required.
+
 ## v0.16.15-beta - Global Knowledge Reminder Profiles
 
 - Made each member's Knowledge-reminder status, interval, mention preference, normal preset, Knowledge preset, streak state, and switch-back state global across every mutual server.

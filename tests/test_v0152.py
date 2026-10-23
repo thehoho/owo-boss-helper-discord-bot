@@ -142,9 +142,11 @@ class GuideCategoryBrowserTests(unittest.IsolatedAsyncioTestCase):
             first = store.save(self.draft("Solo Finisher", "solo", ["One Boss", "Finisher"]), 1)
             store.save(self.draft("Another Solo", "solo2", ["one   boss"]), 1)
             third = store.save(self.draft("Three Boss Opener", "opener", ["Three Bosses"]), 1)
+            store.save(self.draft("General Boss Team", "boss", ["Boss", "Streak"]), 1)
 
             categories = store.list_categories()
             counts = {key: count for _label, key, count in categories}
+            self.assertEqual([key for _label, key, _count in categories[:2]], ["boss", "streak"])
             self.assertEqual(counts["one boss"], 2)
             self.assertEqual(counts["three bosses"], 1)
             self.assertEqual(store.get(first.guide_id).name, "Solo Finisher")
@@ -158,6 +160,8 @@ class GuideCategoryBrowserTests(unittest.IsolatedAsyncioTestCase):
             cog.bot = SimpleNamespace(ui_emoji_manager=None)
             browser = await GuideBrowserView.create(cog)
             self.assertEqual(len(browser.children), 2)
+            self.assertEqual(browser.guides, [])
+            self.assertEqual(browser.build_embed().title, "📚 Team Guide Categories")
             self.assertLessEqual(len(browser.children[0].options), 25)
             index = next(
                 index
