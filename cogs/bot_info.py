@@ -15,6 +15,7 @@ import platform
 import re
 import sqlite3
 import time
+from contextlib import closing
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterable
@@ -39,7 +40,7 @@ TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 XP_DATABASE_FILE = PROJECT_ROOT / "xp_reminders.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.16.16-beta"
+BOT_VERSION = "0.16.17-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -72,6 +73,15 @@ class GuildRecord:
     inviter_id: int = 0
     inviter_name: str = ""
     inviter_checked_at: int = 0
+
+
+@dataclass(frozen=True)
+class GuildBanRecord:
+    guild_id: int
+    guild_name: str
+    banned_at: int
+    banned_by: int
+    reason: str
 
 
 def compact_command(content: str) -> str:
@@ -202,7 +212,7 @@ class StatsStore:
             await asyncio.to_thread(self._initialize_sync)
 
     def _initialize_sync(self) -> None:
-        with self._connect() as connection:
+        with closing(self._connect()) as connection, connection:
             connection.execute(
                 """
                 CREATE TABLE IF NOT EXISTS guild_registry (
@@ -241,6 +251,17 @@ class StatsStore:
                     count INTEGER NOT NULL DEFAULT 0,
                     last_used_at INTEGER NOT NULL,
                     PRIMARY KEY (guild_id, metric)
+                )
+                """
+            )
+            connection.execute(
+                """
+                CREATE TABLE IF NOT EXISTS guild_denylist (
+                    guild_id INTEGER PRIMARY KEY,
+                    guild_name TEXT NOT NULL DEFAULT '',
+                    banned_at INTEGER NOT NULL,
+                    banned_by INTEGER NOT NULL,
+                    reason TEXT NOT NULL DEFAULT ''
                 )
                 """
             )
@@ -331,6 +352,128 @@ class StatsStore:
                     active = 0
                 """,
                 (guild_id, guild_name[:200], now, now, now),
+            )
+
+    async def ban_guild(
+        self,
+        guild_id: int,
+        guild_name: str,
+        banned_by: int,
+        reason: str,
+    ) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._ban_guild_sync,
+                guild_id,
+                guild_name,
+                banned_by,
+                reason,
+            )
+
+    def _ban_guild_sync(
+        self,
+        guild_id: int,
+        guild_name: str,
+        banned_by: int,
+        reason: str,
+    ) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                """
+                INSERT INTO guild_denylist (
+                    guild_id, guild_name, banned_at, banned_by, reason
+                ) VALUES (?, ?, ?, ?, ?)
+                ON CONFLICT(guild_id) DO UPDATE SET
+                    guild_name = CASE
+                        WHEN excluded.guild_name != '' THEN excluded.guild_name
+                        ELSE guild_denylist.guild_name
+                    END,
+                    banned_at = excluded.banned_at,
+                    banned_by = excluded.banned_by,
+                    reason = excluded.reason
+                """,
+                (
+                    guild_id,
+                    guild_name[:200],
+                    int(time.time()),
+                    banned_by,
+                    reason[:500],
+                ),
+            )
+
+    async def get_guild_ban(self, guild_id: int) -> GuildBanRecord | None:
+        async with self.lock:
+            return await asyncio.to_thread(self._get_guild_ban_sync, guild_id)
+
+    def _get_guild_ban_sync(self, guild_id: int) -> GuildBanRecord | None:
+        with closing(self._connect()) as connection, connection:
+            row = connection.execute(
+                """
+                SELECT guild_id, guild_name, banned_at, banned_by, reason
+                FROM guild_denylist
+                WHERE guild_id = ?
+                """,
+                (guild_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        return GuildBanRecord(
+            guild_id=int(row["guild_id"]),
+            guild_name=str(row["guild_name"] or ""),
+            banned_at=int(row["banned_at"]),
+            banned_by=int(row["banned_by"]),
+            reason=str(row["reason"] or ""),
+        )
+
+    async def list_guild_bans(self) -> list[GuildBanRecord]:
+        async with self.lock:
+            return await asyncio.to_thread(self._list_guild_bans_sync)
+
+    def _list_guild_bans_sync(self) -> list[GuildBanRecord]:
+        with closing(self._connect()) as connection, connection:
+            rows = connection.execute(
+                """
+                SELECT guild_id, guild_name, banned_at, banned_by, reason
+                FROM guild_denylist
+                ORDER BY banned_at DESC, guild_id ASC
+                """
+            ).fetchall()
+        return [
+            GuildBanRecord(
+                guild_id=int(row["guild_id"]),
+                guild_name=str(row["guild_name"] or ""),
+                banned_at=int(row["banned_at"]),
+                banned_by=int(row["banned_by"]),
+                reason=str(row["reason"] or ""),
+            )
+            for row in rows
+        ]
+
+    async def unban_guild(self, guild_id: int) -> bool:
+        async with self.lock:
+            return await asyncio.to_thread(self._unban_guild_sync, guild_id)
+
+    def _unban_guild_sync(self, guild_id: int) -> bool:
+        with closing(self._connect()) as connection, connection:
+            cursor = connection.execute(
+                "DELETE FROM guild_denylist WHERE guild_id = ?",
+                (guild_id,),
+            )
+        return cursor.rowcount > 0
+
+    async def note_banned_guild_name(self, guild_id: int, guild_name: str) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._note_banned_guild_name_sync,
+                guild_id,
+                guild_name,
+            )
+
+    def _note_banned_guild_name_sync(self, guild_id: int, guild_name: str) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                "UPDATE guild_denylist SET guild_name = ? WHERE guild_id = ?",
+                (guild_name[:200], guild_id),
             )
 
     async def record_usage(self, guild_id: int, metric: str) -> None:
@@ -684,6 +827,122 @@ class GuildLeaveConfirmationView(discord.ui.View):
         self.stop()
 
 
+class GuildBanConfirmationView(discord.ui.View):
+    """Owner-bound confirmation for persistently denying one guild."""
+
+    def __init__(
+        self,
+        cog: "BotInfo",
+        owner_id: int,
+        guild_id: int,
+        guild_name: str,
+        reason: str,
+    ) -> None:
+        super().__init__(timeout=90)
+        self.cog = cog
+        self.owner_id = owner_id
+        self.guild_id = guild_id
+        self.guild_name = guild_name
+        self.reason = reason
+        self.completed = False
+
+    async def interaction_check(self, interaction: discord.Interaction) -> bool:
+        if interaction.user.id == self.owner_id:
+            return True
+        await interaction.response.send_message(
+            "Only the configured bot owner can confirm this action.",
+            ephemeral=True,
+        )
+        return False
+
+    def disable_buttons(self) -> None:
+        for item in self.children:
+            if isinstance(item, discord.ui.Button):
+                item.disabled = True
+
+    @discord.ui.button(
+        label="Ban and remove",
+        emoji="⛔",
+        style=discord.ButtonStyle.danger,
+    )
+    async def confirm_ban(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        if self.completed:
+            await interaction.response.send_message(
+                "This server ban has already been handled.",
+                ephemeral=True,
+            )
+            return
+
+        self.completed = True
+        self.disable_buttons()
+        await interaction.response.defer(ephemeral=True)
+        await self.cog.store.ban_guild(
+            self.guild_id,
+            self.guild_name,
+            interaction.user.id,
+            self.reason,
+        )
+
+        guild = self.cog.bot.get_guild(self.guild_id)
+        leave_error = ""
+        if guild is not None:
+            try:
+                await self.cog.remove_banned_guild(
+                    guild,
+                    announce_to_guild=True,
+                    notify_owner=False,
+                )
+            except discord.HTTPException as exc:
+                leave_error = str(exc)
+
+        description = (
+            f"**{discord.utils.escape_markdown(self.guild_name or 'Unknown server')}** "
+            f"(`{self.guild_id}`) is now blocked from using the bot. "
+            "Any future invite will be rejected automatically until you unban it."
+        )
+        if leave_error:
+            description += (
+                "\n\nThe denylist was saved, but Discord rejected the immediate leave "
+                f"request: `{leave_error}`"
+            )
+        embed = discord.Embed(
+            title="⛔ Server banned from the bot",
+            description=description,
+            color=(0xED4245 if leave_error else 0x57F287),
+            timestamp=discord.utils.utcnow(),
+        )
+        if self.reason:
+            embed.add_field(name="Private note", value=self.reason, inline=False)
+        embed.set_footer(text="Only the configured bot owner can remove this restriction")
+        try:
+            await interaction.edit_original_response(embed=embed, view=self)
+        except discord.HTTPException:
+            logger.info(
+                "Guild %s was banned successfully, but the confirmation message could not be edited",
+                self.guild_id,
+            )
+        self.stop()
+
+    @discord.ui.button(label="Cancel", style=discord.ButtonStyle.secondary)
+    async def cancel_ban(
+        self,
+        interaction: discord.Interaction,
+        button: discord.ui.Button,
+    ) -> None:
+        self.completed = True
+        self.disable_buttons()
+        await interaction.response.edit_message(
+            content="Cancelled. This server was not banned.",
+            embed=None,
+            view=self,
+        )
+        self.stop()
+
+
 class BotInfo(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -694,6 +953,7 @@ class BotInfo(commands.Cog):
         self.daily_report_utc_hour = max(0, min(safe_epoch(os.getenv("BOT_DAILY_REPORT_UTC_HOUR"), DAILY_REPORT_DEFAULT_UTC_HOUR), 23))
         self.daily_report_utc_minute = max(0, min(safe_epoch(os.getenv("BOT_DAILY_REPORT_UTC_MINUTE"), DAILY_REPORT_DEFAULT_UTC_MINUTE), 59))
         self.restored = False
+        self.denylist_leave_ids: set[int] = set()
         self.owner_id = safe_epoch(os.getenv("BOT_OWNER_ID"), 0)
         self.developer_name = os.getenv(
             "BOT_DEVELOPER_NAME", DEFAULT_DEVELOPER_NAME
@@ -730,8 +990,16 @@ class BotInfo(commands.Cog):
         try:
             while True:
                 await asyncio.sleep(PERIODIC_SYNC_SECONDS)
-                await self.store.sync_guilds(self.bot.guilds)
-                logger.info("Refreshed persistent metadata for %s guild(s)", len(self.bot.guilds))
+                bans = await self.store.list_guild_bans()
+                banned_ids = {record.guild_id for record in bans}
+                allowed_guilds = [
+                    guild for guild in self.bot.guilds if guild.id not in banned_ids
+                ]
+                await self.store.sync_guilds(allowed_guilds)
+                logger.info(
+                    "Refreshed persistent metadata for %s allowed guild(s)",
+                    len(allowed_guilds),
+                )
         except asyncio.CancelledError:
             return
 
@@ -783,11 +1051,51 @@ class BotInfo(commands.Cog):
         if self.restored:
             return
         self.restored = True
-        await self.store.sync_guilds(self.bot.guilds)
-        logger.info("Recorded %s active guild(s) in bot statistics", len(self.bot.guilds))
+        bans = await self.store.list_guild_bans()
+        bans_by_id = {record.guild_id: record for record in bans}
+        for guild in list(self.bot.guilds):
+            if guild.id not in bans_by_id:
+                continue
+            try:
+                await self.remove_banned_guild(
+                    guild,
+                    announce_to_guild=True,
+                    notify_owner=True,
+                    ban=bans_by_id[guild.id],
+                )
+            except discord.HTTPException:
+                logger.exception(
+                    "Could not leave denied guild %s (%s) during startup",
+                    guild.name,
+                    guild.id,
+                )
+        allowed_guilds = [
+            guild for guild in self.bot.guilds if guild.id not in bans_by_id
+        ]
+        await self.store.sync_guilds(allowed_guilds)
+        logger.info(
+            "Recorded %s active allowed guild(s) in bot statistics",
+            len(allowed_guilds),
+        )
 
     @commands.Cog.listener()
     async def on_guild_join(self, guild: discord.Guild) -> None:
+        ban = await self.store.get_guild_ban(guild.id)
+        if ban is not None:
+            try:
+                await self.remove_banned_guild(
+                    guild,
+                    announce_to_guild=True,
+                    notify_owner=True,
+                    ban=ban,
+                )
+            except discord.HTTPException:
+                logger.exception(
+                    "Could not reject denied guild %s (%s)",
+                    guild.name,
+                    guild.id,
+                )
+            return
         await self.store.upsert_guild(guild)
         logger.info(
             "Bot joined guild %s (%s) with approximately %s members",
@@ -800,8 +1108,123 @@ class BotInfo(commands.Cog):
     @commands.Cog.listener()
     async def on_guild_remove(self, guild: discord.Guild) -> None:
         await self.store.mark_left(guild)
+        if guild.id in self.denylist_leave_ids:
+            self.denylist_leave_ids.discard(guild.id)
+            logger.info("Bot left denied guild %s (%s)", guild.name, guild.id)
+            return
         logger.info("Bot left guild %s (%s)", guild.name, guild.id)
         await self.notify_owner_about_guild(guild, joined=False)
+
+    async def send_banned_server_notice(self, guild: discord.Guild) -> bool:
+        member = guild.me
+        if member is None:
+            return False
+        channels: list[discord.TextChannel] = []
+        if guild.system_channel is not None:
+            channels.append(guild.system_channel)
+        channels.extend(
+            channel for channel in guild.text_channels if channel not in channels
+        )
+        message = (
+            "This bot has been banned from this server by the bot administrator "
+            "and will now leave. Contact the bot administrator to request access "
+            "again or ask about the restriction."
+        )
+        if self.support_url.startswith("https://"):
+            message += f"\n{self.support_url}"
+        embed = discord.Embed(
+            title="⛔ Bot access denied",
+            description=message,
+            color=0xED4245,
+        )
+        for channel in channels:
+            permissions = channel.permissions_for(member)
+            if not permissions.send_messages:
+                continue
+            try:
+                if permissions.embed_links:
+                    await channel.send(
+                        embed=embed,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                else:
+                    await channel.send(
+                        message,
+                        allowed_mentions=discord.AllowedMentions.none(),
+                    )
+                return True
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                continue
+        return False
+
+    async def remove_banned_guild(
+        self,
+        guild: discord.Guild,
+        *,
+        announce_to_guild: bool,
+        notify_owner: bool,
+        ban: GuildBanRecord | None = None,
+    ) -> None:
+        ban = ban or await self.store.get_guild_ban(guild.id)
+        await self.store.note_banned_guild_name(guild.id, guild.name)
+        notice_sent = False
+        if announce_to_guild:
+            notice_sent = await self.send_banned_server_notice(guild)
+        self.denylist_leave_ids.add(guild.id)
+        try:
+            await guild.leave()
+        except discord.HTTPException:
+            self.denylist_leave_ids.discard(guild.id)
+            raise
+        await self.store.mark_left(guild)
+        logger.warning(
+            "Rejected denied guild %s (%s); server_notice=%s",
+            guild.name,
+            guild.id,
+            notice_sent,
+        )
+        if notify_owner:
+            await self.notify_owner_about_blocked_guild(guild, ban, notice_sent)
+
+    async def notify_owner_about_blocked_guild(
+        self,
+        guild: discord.Guild,
+        ban: GuildBanRecord | None,
+        notice_sent: bool,
+    ) -> None:
+        if not self.owner_id:
+            return
+        try:
+            owner = self.bot.get_user(self.owner_id) or await self.bot.fetch_user(
+                self.owner_id
+            )
+            embed = discord.Embed(
+                title="⛔ Blocked server invite rejected",
+                description=(
+                    f"The bot automatically left **{discord.utils.escape_markdown(guild.name)}** "
+                    f"(`{guild.id}`) because that server is on your denylist."
+                ),
+                color=0xED4245,
+                timestamp=discord.utils.utcnow(),
+            )
+            embed.add_field(
+                name="Approximate members",
+                value=str(guild.member_count or 0),
+                inline=True,
+            )
+            embed.add_field(
+                name="Server notice",
+                value=("sent" if notice_sent else "could not send"),
+                inline=True,
+            )
+            if ban is not None and ban.reason:
+                embed.add_field(name="Private note", value=ban.reason, inline=False)
+            embed.set_footer(text="Use /bot-unban-server to allow this server again")
+            await owner.send(embed=embed)
+        except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+            logger.warning(
+                "Could not DM the developer about rejected guild %s", guild.id
+            )
 
     async def notify_owner_about_guild(
         self,
@@ -1565,6 +1988,187 @@ class BotInfo(commands.Cog):
         await interaction.response.send_message(
             embed=embed,
             view=GuildLeaveConfirmationView(self, interaction.user.id, guild),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @app_commands.command(
+        name="bot-ban-server",
+        description="Developer-only: deny a server access to the bot.",
+    )
+    @app_commands.describe(
+        server_id="Exact Discord server ID",
+        reason="Optional private note visible only in owner tools",
+    )
+    async def developer_ban_server(
+        self,
+        interaction: discord.Interaction,
+        server_id: str,
+        reason: str | None = None,
+    ) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+
+        cleaned = (server_id or "").strip()
+        if not cleaned.isdigit() or not 15 <= len(cleaned) <= 22:
+            await interaction.response.send_message(
+                "Enter the exact numeric Discord server ID.",
+                ephemeral=True,
+            )
+            return
+
+        guild_id = int(cleaned)
+        existing = await self.store.get_guild_ban(guild_id)
+        if existing is not None:
+            name = existing.guild_name or "Unknown server"
+            await interaction.response.send_message(
+                (
+                    f"**{discord.utils.escape_markdown(name)}** (`{guild_id}`) is already "
+                    "banned. Use `/bot-unban-server` if you want to allow it again."
+                ),
+                ephemeral=True,
+                allowed_mentions=discord.AllowedMentions.none(),
+            )
+            return
+
+        guild = self.bot.get_guild(guild_id)
+        record = await self.store.get_guild_record(guild_id)
+        guild_name = (
+            guild.name
+            if guild is not None
+            else (record.guild_name if record is not None else "Unknown server")
+        )
+        member_count = (
+            int(guild.member_count or 0)
+            if guild is not None
+            else (record.member_count if record is not None else 0)
+        )
+        private_reason = (reason or "").strip()[:500]
+
+        embed = discord.Embed(
+            title="⛔ Confirm permanent server ban",
+            description=(
+                "The bot will leave this server now if connected. Every future invite "
+                "from this server will receive an access-denied notice and the bot will "
+                "leave automatically until you unban the server."
+            ),
+            color=0xED4245,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.add_field(
+            name="Server",
+            value=(
+                f"**{discord.utils.escape_markdown(guild_name)}**\n"
+                f"**ID:** `{guild_id}`\n"
+                f"**Approx. members:** {member_count:,}\n"
+                f"**Currently connected:** {'yes' if guild is not None else 'no'}"
+            ),
+            inline=False,
+        )
+        if private_reason:
+            embed.add_field(
+                name="Private note",
+                value=private_reason,
+                inline=False,
+            )
+        embed.set_footer(
+            text="Owner-only • The restriction remains until /bot-unban-server is used"
+        )
+        await interaction.response.send_message(
+            embed=embed,
+            view=GuildBanConfirmationView(
+                self,
+                interaction.user.id,
+                guild_id,
+                guild_name,
+                private_reason,
+            ),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+
+    @app_commands.command(
+        name="bot-unban-server",
+        description="Developer-only: allow a denied server to invite the bot again.",
+    )
+    @app_commands.describe(server_id="Exact Discord server ID")
+    async def developer_unban_server(
+        self,
+        interaction: discord.Interaction,
+        server_id: str,
+    ) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+
+        cleaned = (server_id or "").strip()
+        if not cleaned.isdigit() or not 15 <= len(cleaned) <= 22:
+            await interaction.response.send_message(
+                "Enter the exact numeric Discord server ID.",
+                ephemeral=True,
+            )
+            return
+        guild_id = int(cleaned)
+        ban = await self.store.get_guild_ban(guild_id)
+        if ban is None:
+            await interaction.response.send_message(
+                f"Server `{guild_id}` is not on the denylist.",
+                ephemeral=True,
+            )
+            return
+        await self.store.unban_guild(guild_id)
+        name = ban.guild_name or "Unknown server"
+        await interaction.response.send_message(
+            (
+                f"✅ **{discord.utils.escape_markdown(name)}** (`{guild_id}`) is no longer "
+                "banned. This only permits a future invite; it does not re-add the bot."
+            ),
+            ephemeral=True,
+            allowed_mentions=discord.AllowedMentions.none(),
+        )
+        logger.warning(
+            "Bot owner %s removed guild %s (%s) from the denylist",
+            interaction.user.id,
+            name,
+            guild_id,
+        )
+
+    @app_commands.command(
+        name="bot-banned-servers",
+        description="Developer-only: list servers denied access to the bot.",
+    )
+    async def developer_banned_servers(
+        self,
+        interaction: discord.Interaction,
+    ) -> None:
+        if await self.reject_non_owner(interaction):
+            return
+
+        bans = await self.store.list_guild_bans()
+        lines = []
+        for ban in bans[:20]:
+            name = discord.utils.escape_markdown(ban.guild_name or "Unknown server")
+            private_note = discord.utils.escape_markdown(ban.reason[:100])
+            note = f" • {private_note}" if private_note else ""
+            lines.append(
+                f"⛔ **{name}**\n`{ban.guild_id}` • <t:{ban.banned_at}:R>{note}"
+            )
+        if len(bans) > 20:
+            lines.append(f"…and {len(bans) - 20} more.")
+        embed = discord.Embed(
+            title="⛔ Banned servers",
+            description=(
+                "\n\n".join(lines)
+                if lines
+                else "No servers are currently denied access."
+            ),
+            color=0xED4245,
+            timestamp=discord.utils.utcnow(),
+        )
+        embed.set_footer(
+            text=f"{len(bans)} blocked • Only the configured bot owner can unban"
+        )
+        await interaction.response.send_message(
+            embed=embed,
             ephemeral=True,
             allowed_mentions=discord.AllowedMentions.none(),
         )

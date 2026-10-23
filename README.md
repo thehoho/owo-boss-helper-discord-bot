@@ -1,3 +1,7 @@
+## v0.16.17-beta notes
+
+The bot owner can now place a Discord server ID on a persistent denylist. A denied server cannot keep the helper: every future invite receives a best-effort access-denied notice and the bot leaves automatically. Only the configured `BOT_OWNER_ID` can ban, unban, or view denied servers. See [persistent server access control](RELEASE_NOTES_v0.16.17-beta.md).
+
 ## v0.16.16-beta notes
 
 The configured bot owner can now disconnect the helper from a specific server with `/bot-leave-server`. The command validates the exact server ID, displays a private server preview, and requires a red confirmation button before it calls Discord's leave-server action. See [owner-controlled server removal](RELEASE_NOTES_v0.16.16-beta.md).
@@ -414,9 +418,12 @@ Owner-only commands configured through `BOT_OWNER_ID`:
 /bot-stats
 /bot-servers
 /bot-leave-server server_id:<server ID>
+/bot-ban-server server_id:<server ID> reason:<optional private note>
+/bot-unban-server server_id:<server ID>
+/bot-banned-servers
 ```
 
-They show current and historical server counts, approximate member reach, per-server usage, saved-template counts, ticket-board counts, uptime, latency, and local storage size. `/bot-leave-server` resolves the live server, shows a private preview, and requires the configured owner to press a destructive confirmation button before the bot leaves. The bot also sends the configured owner a private message when it joins or leaves a server. Persistent operational metadata is stored in `bot_stats.db`.
+They show current and historical server counts, approximate member reach, per-server usage, saved-template counts, ticket-board counts, uptime, latency, and local storage size. `/bot-leave-server` performs a one-time departure. `/bot-ban-server` persists the server ID and automatically rejects future invitations until `/bot-unban-server` is used; `/bot-banned-servers` shows the private denylist. Destructive actions display a private preview and require confirmation. The bot also sends the configured owner a private message when it joins, leaves, or rejects a denied server. Persistent operational metadata is stored in `bot_stats.db`.
 
 ### Logging
 

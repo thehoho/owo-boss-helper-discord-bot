@@ -123,7 +123,7 @@ class BossMailIsolationTests(unittest.IsolatedAsyncioTestCase):
 
 class ReleaseSurfaceTests(unittest.TestCase):
     def test_incident_hotfix_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.16.16-beta")
+        self.assertEqual(BOT_VERSION, "0.16.17-beta")
 
 
 if __name__ == "__main__":
