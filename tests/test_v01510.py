@@ -193,7 +193,7 @@ class BossFetchReliabilityTests(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(BOSS_WATCH_INTERVAL_SECONDS, 5 * 60)
 
     def test_public_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.16.18-beta")
+        self.assertEqual(BOT_VERSION, "0.16.19-beta")
 
 
 class OwnerGuildRemovalTests(unittest.IsolatedAsyncioTestCase):

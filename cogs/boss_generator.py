@@ -2644,6 +2644,7 @@ class BossGenerator(commands.Cog):
         guide_help = helper_command(helper_prefix, "guide help")
         xp_help = helper_alias(helper_prefix, "hxp")
         xp_reminders = helper_alias(helper_prefix, "hreminders")
+        vote_short = helper_alias(helper_prefix, "hv")
 
         embed = discord.Embed(
             title="🐾 OwO Boss Helper",
@@ -2780,6 +2781,16 @@ class BossGenerator(commands.Cog):
                 f"Use `{rng_short} <maximum>` or `{rng_short} <minimum>, <maximum>`, "
                 f"or `/rng`. Compact values work, for example `{rng_short} 1M` and "
                 f"`{rng_short} 100K, 2.5M`; the result is posted as full digits."
+            ),
+            inline=False,
+        )
+        embed.add_field(
+            name="🗳️ Optional Top.gg vote",
+            value=(
+                f"Open `{helper_command(helper_prefix, 'vote')}`, `{vote_short}`, or "
+                "`/vote` for the vote link, your recorded vote count, and an optional "
+                "one-time reminder when you can vote again. Voting does not unlock or "
+                "limit any feature, and every reminder has a one-click opt-out."
             ),
             inline=False,
         )

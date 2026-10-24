@@ -125,6 +125,8 @@ async def main() -> None:
         logger.info("TapDeck Lite information card loaded")
         await bot.load_extension("cogs.bot_info")
         logger.info("Bot information and developer statistics loaded")
+        await bot.load_extension("cogs.topgg_votes")
+        logger.info("Top.gg voting and optional reminders loaded")
         await bot.start(TOKEN)
 
 

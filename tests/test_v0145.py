@@ -170,7 +170,7 @@ class BossHpRegressionTests(unittest.TestCase):
 
 class ReleaseSurfaceTests(unittest.TestCase):
     def test_hotfix_version(self) -> None:
-        self.assertEqual(BOT_VERSION, "0.16.18-beta")
+        self.assertEqual(BOT_VERSION, "0.16.19-beta")
 
 
 if __name__ == "__main__":

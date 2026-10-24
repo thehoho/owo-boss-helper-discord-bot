@@ -1,3 +1,9 @@
+## v0.16.19-beta notes
+
+OwO Boss Helper now has an optional Top.gg voting panel through `H vote`, `HV`, and `/vote`. Voting never unlocks or limits features. The panel shows each member's recorded votes and vote points, links directly to Top.gg, and offers a global opt-in reminder. An enabled reminder sends one DM when the latest vote becomes available again, never repeats when ignored, and always includes a one-click opt-out.
+
+The Top.gg integration stores deduplicated vote events, periodically imports authenticated vote history, and publishes the bot's current server count without opening a public webhook port. Vote syncing starts when `TOPGG_TOKEN` is configured after Top.gg makes the project API available. See [optional Top.gg voting and reminders](RELEASE_NOTES_v0.16.19-beta.md).
+
 ## v0.16.18-beta notes
 
 Saved XP models now include how often Knowledge is equipped: always, or every 10, 50, 100, 500, or 1,000 battles. The same persisted plan powers both Team XP's **Your model** estimate and the full level forecast, while combined Knowledge quality now supports up to 30%. Forecast pages show 20 lines by default, name all three pets in the table header, and no longer include the separate stats control or redundant max-Knowledge line.
@@ -410,6 +416,18 @@ H about
 
 The public profile identifies Hassaan as the developer, shows the current version, summarizes the bot, and links to the source repository.
 
+Optional Top.gg support:
+
+```text
+H vote
+HV
+H vote on
+H vote off
+/vote
+```
+
+Voting is optional and does not gate any feature. The panel shows the member's recorded vote history and opens the bot's Top.gg vote page. Vote reminders are global, explicit opt-in, and limited to one DM when the latest vote becomes available again. Ignoring that DM produces no repeated reminder; every reminder also includes a **Turn off vote reminders** button.
+
 Server-manager diagnostics:
 
 ```text
@@ -473,9 +491,10 @@ Add your private token to `.env`:
 
 ```env
 DISCORD_TOKEN=your_real_bot_token_here
+TOPGG_TOKEN=
 ```
 
-Never upload `.env` or share the token.
+Never upload `.env` or share the Discord or Top.gg token.
 
 ## Discord installation
 

@@ -40,7 +40,7 @@ TICKET_DATABASE_FILE = PROJECT_ROOT / "boss_tickets.db"
 XP_DATABASE_FILE = PROJECT_ROOT / "xp_reminders.db"
 LOG_FILE = PROJECT_ROOT / "logs" / "bot.log"
 
-BOT_VERSION = "0.16.18-beta"
+BOT_VERSION = "0.16.19-beta"
 DEFAULT_DEVELOPER_NAME = "Hassaan"
 DEFAULT_GITHUB_URL = "https://github.com/thehoho/owo-boss-helper-discord-bot"
 DEFAULT_DESCRIPTION = (
@@ -122,6 +122,8 @@ def classify_message_usage(
         return "ticket_management"
     if compact == "habout":
         return "about_views"
+    if compact in {"hvote", "hv", "hvoteon", "hvoteoff", "hvon", "hvoff"}:
+        return "vote_views"
     if compact in {"hxp", "hexp", "hreminder", "hreminders", "hxpreminder", "hxpreminders"}:
         return "xp_tools"
     if compact.startswith(("ht", "htm", "hteam")):
@@ -1029,6 +1031,8 @@ class BotInfo(commands.Cog):
                 "• Guild-boss timing, cooldowns, and opt-in reward/end DMs\n"
                 "• Exact weapon-ID team templates with confirmed Smart replace\n"
                 "• Per-server boss-ticket boards in channels or threads\n"
+                "• Pet XP forecasts and optional Knowledge reminders\n"
+                "• Optional Top.gg voting with one-time opt-in reminders\n"
                 "• Community RNG and the TapDeck Lite Android information card"
             ),
             inline=False,

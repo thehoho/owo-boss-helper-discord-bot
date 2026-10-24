@@ -1,3 +1,14 @@
+## v0.16.19-beta - Optional Top.gg Voting and Reminders
+
+- Added `H vote`, compact `HV`, configured-prefix equivalents, and `/vote` with a direct Top.gg link and per-member recorded vote totals.
+- Kept voting fully optional: no existing or future-facing bot capability is gated by this release.
+- Added a global opt-in 12-hour reminder that sends one DM when the latest vote expires, never repeats after being ignored, and includes a one-click unsubscribe control in every notification.
+- Added deduplicated SQLite vote history plus authenticated Top.gg API polling, avoiding a new public webhook service or inbound firewall port.
+- Added periodic server-count publishing to Top.gg when `TOPGG_TOKEN` is configured.
+- Added `topgg_votes.db` to protected backups and documented the new stored data and deletion controls.
+- Added regression coverage for alias parsing, vote deduplication, weighted counts, API overlap, reminder scheduling, opt-out clarity, and slash-command registration.
+- Updated the public version to 0.16.19-beta; startup creates one SQLite database and registers one slash command, with no new Python dependency or Discord permission.
+
 ## v0.16.18-beta - Saved Knowledge Plans and Category-First Guides
 
 - Persisted each member's Knowledge switching interval as part of the existing global XP forecast model: always equipped or every 10, 50, 100, 500, or 1,000 battles.

@@ -89,6 +89,7 @@ BOT_OWNER_ID=your_discord_user_id
 BOT_DEVELOPER_NAME=Hassaan
 BOT_GITHUB_URL=https://github.com/thehoho/owo-boss-helper-discord-bot
 BOT_SUPPORT_URL=
+TOPGG_TOKEN=
 ```
 
 Protect the secret file:
@@ -107,7 +108,7 @@ scp "D:\owo-boss-helper-discord-bot-github-ready\owo-boss-helper-discord-bot	eam
 scp "D:\owo-boss-helper-discord-bot-github-ready\owo-boss-helper-discord-botoss_tickets.db" owohelper@YOUR_SERVER_IP:/opt/owo-boss-helper/
 ```
 
-For a complete current migration, preserve `.env`, `boss_cooldown_config.json`, and every runtime database that exists: `team_templates.db`, `animal_dex.db`, `team_guides.db`, `boss_tickets.db`, `bot_stats.db`, `neon_weapons.db`, `emoji_overrides.db`, `boss_notifications.db`, and `xp_reminders.db`. Stop the service before copying live SQLite files, or use SQLite's online backup command as the bundled backup script does.
+For a complete current migration, preserve `.env`, `boss_cooldown_config.json`, and every runtime database that exists: `team_templates.db`, `animal_dex.db`, `team_guides.db`, `boss_tickets.db`, `bot_stats.db`, `neon_weapons.db`, `emoji_overrides.db`, `boss_notifications.db`, `xp_reminders.db`, and `topgg_votes.db`. Stop the service before copying live SQLite files, or use SQLite's online backup command as the bundled backup script does.
 
 ## 6. Test manually
 
@@ -159,6 +160,8 @@ Emoji artwork overrides introduced in v0.14.12-beta are stored in `emoji_overrid
 Opt-in reward rules, consent, short-lived reward snapshots, and DM deduplication state introduced in v0.15.0-beta are stored in `boss_notifications.db`. Its schema is created automatically on first startup, and the current backup helper includes it.
 
 Opt-in Knowledge-switch presets, reminder settings, and pending restore state introduced in v0.16.0-beta are stored in `xp_reminders.db`. Its schema is created automatically on first startup, and the current backup helper includes it.
+
+Top.gg vote history and reminder preferences introduced in v0.16.19-beta are stored in `topgg_votes.db`. The public vote command works without `TOPGG_TOKEN`; authenticated vote syncing and server-count publishing begin after the token is added to `.env`. The integration polls Top.gg's API and does not require an inbound firewall port.
 
 ## 9. Normal update workflow
 
