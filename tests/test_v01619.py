@@ -1,10 +1,12 @@
 from __future__ import annotations
 
+import sqlite3
 import tempfile
 import time
 import unittest
+from contextlib import closing
 from pathlib import Path
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import discord
 from discord.ext import commands
@@ -19,6 +21,33 @@ from cogs.topgg_votes import (
 
 
 class VoteStoreTests(unittest.IsolatedAsyncioTestCase):
+    async def test_existing_database_migrates_thank_you_delivery_column(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "votes.db"
+            with closing(sqlite3.connect(path)) as connection, connection:
+                connection.execute(
+                    """
+                    CREATE TABLE topgg_vote_events (
+                        event_id TEXT PRIMARY KEY,
+                        user_id INTEGER NOT NULL,
+                        voted_at INTEGER NOT NULL,
+                        expires_at INTEGER NOT NULL,
+                        weight INTEGER NOT NULL DEFAULT 1,
+                        reminded_at INTEGER
+                    )
+                    """
+                )
+            store = VoteStore(path)
+            await store.initialize()
+            with closing(sqlite3.connect(path)) as connection:
+                columns = {
+                    row[1]
+                    for row in connection.execute(
+                        "PRAGMA table_info(topgg_vote_events)"
+                    ).fetchall()
+                }
+            self.assertIn("thanked_at", columns)
+
     async def test_votes_are_deduplicated_counted_and_reminded_once(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             store = VoteStore(Path(directory) / "votes.db")
@@ -83,6 +112,30 @@ class VoteStoreTests(unittest.IsolatedAsyncioTestCase):
             await store.set_reminders(77, True)
             self.assertEqual(await store.due_reminders(), [])
 
+    async def test_only_active_unacknowledged_votes_need_thank_you(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            store = VoteStore(Path(directory) / "votes.db")
+            await store.initialize()
+            now = int(time.time())
+            await store.record_vote(
+                user_id=42,
+                voted_at=now - 100,
+                expires_at=now + 43_100,
+                weight=2,
+            )
+            await store.record_vote(
+                user_id=77,
+                voted_at=now - 50_000,
+                expires_at=now - 6_800,
+                weight=1,
+            )
+            pending = await store.pending_thanks(now=now)
+            self.assertEqual(len(pending), 1)
+            self.assertEqual(pending[0].user_id, 42)
+            self.assertEqual(pending[0].weight, 2)
+            await store.mark_thanked(pending[0].event_id, at=now)
+            self.assertEqual(await store.pending_thanks(now=now), [])
+
 
 class VoteCommandTests(unittest.IsolatedAsyncioTestCase):
     def test_prefix_aliases_follow_the_server_prefix(self) -> None:
@@ -144,6 +197,34 @@ class VoteCommandTests(unittest.IsolatedAsyncioTestCase):
                 self.assertIn("Ignoring that DM causes no repeat messages", rendered)
                 self.assertIn("Turn off", rendered)
                 self.assertIn("h vote off", embed.footer.text or "")
+            finally:
+                await bot.close()
+
+    async def test_new_vote_sends_one_thank_you_with_totals_and_expiry(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bot = commands.Bot(command_prefix="!", intents=discord.Intents.none())
+            cog = TopGGVotes(bot)
+            cog.store = VoteStore(Path(directory) / "votes.db")
+            await cog.store.initialize()
+            now = int(time.time())
+            await cog.store.record_vote(
+                user_id=123456789,
+                voted_at=now,
+                expires_at=now + 43_200,
+                weight=2,
+            )
+            fake_user = MagicMock()
+            fake_user.send = AsyncMock()
+            bot.get_user = MagicMock(return_value=fake_user)
+            try:
+                self.assertEqual(await cog.deliver_vote_thanks(), 1)
+                fake_user.send.assert_awaited_once()
+                message = fake_user.send.await_args.args[0]
+                self.assertIn("Thank you for voting", message)
+                self.assertIn("2 vote points", message)
+                self.assertIn("1 recorded vote", message)
+                self.assertIn(str(now + 43_200), message)
+                self.assertEqual(await cog.deliver_vote_thanks(), 0)
             finally:
                 await bot.close()
 

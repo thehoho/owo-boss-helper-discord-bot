@@ -1,3 +1,12 @@
+## v0.16.20-beta - Complete Top.gg Vote Acknowledgements
+
+- Added an immediate thank-you DM for every newly imported active Top.gg vote, including that vote's weight, the member's cumulative vote count and points, and the exact next-vote time.
+- Reduced authenticated vote synchronization from five minutes to one minute so new votes are acknowledged promptly without exposing an inbound webhook endpoint.
+- Added persistent per-vote acknowledgement state, including a safe automatic migration for the existing vote database and one-attempt handling when a member has DMs closed.
+- Prevented old expired votes from producing surprise DMs during the first production backfill while retaining them in each member's history.
+- Expanded regression coverage for database migration, active-vote filtering, cumulative totals, weighted votes, next-vote timestamps, and duplicate-DM prevention.
+- Updated the public version to 0.16.20-beta; no new dependency, slash command, Discord permission, or inbound network port is required.
+
 ## v0.16.19-beta - Optional Top.gg Voting and Reminders
 
 - Added `H vote`, compact `HV`, configured-prefix equivalents, and `/vote` with a direct Top.gg link and per-member recorded vote totals.

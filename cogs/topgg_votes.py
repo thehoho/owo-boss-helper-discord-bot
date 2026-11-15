@@ -73,6 +73,15 @@ class DueReminder:
     expires_at: int
 
 
+@dataclass(frozen=True)
+class PendingVoteThank:
+    event_id: str
+    user_id: int
+    voted_at: int
+    expires_at: int
+    weight: int
+
+
 class VoteStore:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -98,10 +107,21 @@ class VoteStore:
                     voted_at INTEGER NOT NULL,
                     expires_at INTEGER NOT NULL,
                     weight INTEGER NOT NULL DEFAULT 1,
-                    reminded_at INTEGER
+                    reminded_at INTEGER,
+                    thanked_at INTEGER
                 )
                 """
             )
+            columns = {
+                str(row["name"])
+                for row in connection.execute(
+                    "PRAGMA table_info(topgg_vote_events)"
+                ).fetchall()
+            }
+            if "thanked_at" not in columns:
+                connection.execute(
+                    "ALTER TABLE topgg_vote_events ADD COLUMN thanked_at INTEGER"
+                )
             connection.execute(
                 "CREATE INDEX IF NOT EXISTS idx_topgg_vote_user "
                 "ON topgg_vote_events(user_id, voted_at)"
@@ -166,6 +186,53 @@ class VoteStore:
                 ),
             )
             return cursor.rowcount > 0
+
+    async def pending_thanks(
+        self, now: int | None = None, *, limit: int = 100
+    ) -> list[PendingVoteThank]:
+        async with self.lock:
+            return await asyncio.to_thread(
+                self._pending_thanks_sync,
+                int(now or time.time()),
+                max(1, min(int(limit), 500)),
+            )
+
+    def _pending_thanks_sync(self, now: int, limit: int) -> list[PendingVoteThank]:
+        with closing(self._connect()) as connection:
+            rows = connection.execute(
+                """
+                SELECT event_id, user_id, voted_at, expires_at, weight
+                FROM topgg_vote_events
+                WHERE thanked_at IS NULL
+                  AND expires_at > ?
+                ORDER BY voted_at ASC
+                LIMIT ?
+                """,
+                (int(now), int(limit)),
+            ).fetchall()
+        return [
+            PendingVoteThank(
+                event_id=str(row["event_id"]),
+                user_id=int(row["user_id"]),
+                voted_at=int(row["voted_at"]),
+                expires_at=int(row["expires_at"]),
+                weight=max(1, int(row["weight"] or 1)),
+            )
+            for row in rows
+        ]
+
+    async def mark_thanked(self, event_id: str, at: int | None = None) -> None:
+        async with self.lock:
+            await asyncio.to_thread(
+                self._mark_thanked_sync, str(event_id), int(at or time.time())
+            )
+
+    def _mark_thanked_sync(self, event_id: str, at: int) -> None:
+        with closing(self._connect()) as connection, connection:
+            connection.execute(
+                "UPDATE topgg_vote_events SET thanked_at = ? WHERE event_id = ?",
+                (int(at), str(event_id)),
+            )
 
     async def summary(self, user_id: int) -> VoteSummary:
         async with self.lock:
@@ -420,6 +487,19 @@ class VoteReminderDMView(discord.ui.View):
         )
 
 
+class VoteThankYouView(discord.ui.View):
+    def __init__(self) -> None:
+        super().__init__(timeout=None)
+        self.add_item(
+            discord.ui.Button(
+                label="View your next vote",
+                emoji="🗳️",
+                style=discord.ButtonStyle.link,
+                url=TOPGG_VOTE_URL,
+            )
+        )
+
+
 class TopGGVotes(commands.Cog):
     def __init__(self, bot: commands.Bot) -> None:
         self.bot = bot
@@ -530,12 +610,51 @@ class TopGGVotes(commands.Cog):
             payload={"server_count": len(self.bot.guilds)},
         )
 
-    @tasks.loop(minutes=5)
+    async def deliver_vote_thanks(self) -> int:
+        delivered = 0
+        for vote in await self.store.pending_thanks():
+            try:
+                user = self.bot.get_user(vote.user_id) or await self.bot.fetch_user(
+                    vote.user_id
+                )
+                summary = await self.store.summary(vote.user_id)
+                point_label = "point" if vote.weight == 1 else "points"
+                vote_label = "vote" if summary.votes == 1 else "votes"
+                total_point_label = "point" if summary.points == 1 else "points"
+                await user.send(
+                    "🗳️ **Thank you for voting for OwO Boss Helper!**\n"
+                    f"Your vote was recorded and counted for **{vote.weight} vote "
+                    f"{point_label}**. You now have **{summary.votes:,} recorded "
+                    f"{vote_label}** and **{summary.points:,} vote {total_point_label}**.\n\n"
+                    f"You can vote again <t:{vote.expires_at}:R> "
+                    f"(<t:{vote.expires_at}:f>).\n"
+                    "Voting is optional and never locks or unlocks bot features. Use "
+                    "`/vote` in a server with the bot to view your history or manage "
+                    "the optional next-vote reminder.",
+                    view=VoteThankYouView(),
+                )
+                delivered += 1
+                logger.info("Sent Top.gg vote thank-you to user %s", vote.user_id)
+            except (discord.Forbidden, discord.NotFound, discord.HTTPException):
+                logger.info(
+                    "Could not deliver Top.gg vote thank-you to user %s",
+                    vote.user_id,
+                )
+            # One acknowledgement attempt per vote prevents repeated DMs when a
+            # member has DMs closed or ignores the message. Unexpected failures still
+            # escape before this point so the next synchronization can retry them.
+            await self.store.mark_thanked(vote.event_id)
+        return delivered
+
+    @tasks.loop(minutes=1)
     async def vote_sync_loop(self) -> None:
         try:
             inserted = await self.sync_votes_once()
+            delivered = await self.deliver_vote_thanks()
             if inserted:
                 logger.info("Recorded %s new Top.gg vote event(s)", inserted)
+            if delivered:
+                logger.info("Delivered %s Top.gg vote thank-you DM(s)", delivered)
         except Exception:
             logger.exception("Top.gg vote synchronization failed")
 

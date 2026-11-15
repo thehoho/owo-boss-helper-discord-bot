@@ -1,3 +1,7 @@
+## v0.16.20-beta notes
+
+Approved Top.gg votes are now imported every minute and acknowledged by DM. Each message confirms the vote's weight, the member's cumulative recorded votes and points, and when the next vote becomes available. A persisted acknowledgement marker prevents duplicate messages across restarts, while expired historical votes remain counted without generating old notifications. See [complete Top.gg vote acknowledgements](RELEASE_NOTES_v0.16.20-beta.md).
+
 ## v0.16.19-beta notes
 
 OwO Boss Helper now has an optional Top.gg voting panel through `H vote`, `HV`, and `/vote`. Voting never unlocks or limits features. The panel shows each member's recorded votes and vote points, links directly to Top.gg, and offers a global opt-in reminder. An enabled reminder sends one DM when the latest vote becomes available again, never repeats when ignored, and always includes a one-click opt-out.
