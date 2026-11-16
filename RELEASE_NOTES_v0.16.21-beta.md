@@ -17,7 +17,7 @@ Already imported active votes remain eligible for their one-time thank-you DM du
 - `scripts/secret_guard.py` checks both filenames and content without printing suspected values.
 - Repository pre-commit and pre-push hooks automatically run the guard.
 - `AGENTS.md` permanently instructs coding agents never to reveal `.env` or token values, even when asked later.
-- The live Top.gg token exists only in the production host's owner-only `.env`; it is not stored in this repository.
+- The live Top.gg token is confined to the production host's owner-only `.env` and owner-only operational backups; it is not stored in this repository or a developer worktree.
 
 ## Deployment
 
