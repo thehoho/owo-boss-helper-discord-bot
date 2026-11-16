@@ -498,7 +498,7 @@ class VoteThankYouView(discord.ui.View):
         super().__init__(timeout=None)
         self.add_item(
             discord.ui.Button(
-                label="View your next vote",
+                label="Vote on Top.gg",
                 emoji="🗳️",
                 style=discord.ButtonStyle.link,
                 url=TOPGG_VOTE_URL,
@@ -643,19 +643,12 @@ class TopGGVotes(commands.Cog):
                     vote.user_id
                 )
                 summary = await self.store.summary(vote.user_id)
-                point_label = "point" if vote.weight == 1 else "points"
                 vote_label = "vote" if summary.votes == 1 else "votes"
-                total_point_label = "point" if summary.points == 1 else "points"
+                point_label = "point" if summary.points == 1 else "points"
                 await user.send(
-                    "🗳️ **Thank you for voting for OwO Boss Helper!**\n"
-                    f"Your vote was recorded and counted for **{vote.weight} vote "
-                    f"{point_label}**. You now have **{summary.votes:,} recorded "
-                    f"{vote_label}** and **{summary.points:,} vote {total_point_label}**.\n\n"
-                    f"You can vote again <t:{vote.expires_at}:R> "
-                    f"(<t:{vote.expires_at}:f>).\n"
-                    "Voting is optional and never locks or unlocks bot features. Use "
-                    "`/vote` in a server with the bot to view your history or manage "
-                    "the optional next-vote reminder.",
+                    "🗳️ **Thank you for voting!**\n"
+                    f"**{summary.votes:,} {vote_label} • {summary.points:,} {point_label}**\n"
+                    f"You can vote again <t:{vote.expires_at}:R>.",
                     view=VoteThankYouView(),
                 )
                 delivered += 1
@@ -723,11 +716,7 @@ class TopGGVotes(commands.Cog):
                     reminder.user_id
                 )
                 await user.send(
-                    "🗳️ **You can vote for OwO Boss Helper again.**\n"
-                    "Voting is optional and does not unlock or limit any feature. "
-                    "This is the only reminder for your last vote; ignoring it will not "
-                    "send repeated reminders. To unsubscribe, press **Turn off vote "
-                    "reminders** below.",
+                    "🔔 **You can vote for OwO Boss Helper again!**",
                     view=VoteReminderDMView(self),
                 )
                 logger.info("Sent Top.gg vote reminder to user %s", reminder.user_id)

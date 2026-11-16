@@ -1,3 +1,10 @@
+## v0.16.22-beta - Compact Top.gg Vote Messages
+
+- Shortened the vote thank-you DM to the total votes, total points, and next-vote time.
+- Shortened the next-vote reminder to one line while keeping the vote and opt-out buttons.
+- Renamed the thank-you link to the clearer **Vote on Top.gg** label.
+- Updated the public version to 0.16.22-beta; vote tracking and reminder behavior are unchanged.
+
 ## v0.16.21-beta - Top.gg Pagination and Secret Safeguards
 
 - Fixed Top.gg v1 vote pagination to stop on the documented empty result page instead of repeatedly following its final cursor.

@@ -1,6 +1,6 @@
-## v0.16.21-beta notes
+## v0.16.22-beta notes
 
-Top.gg vote imports now follow the v1 API's documented stopping rule: pagination ends when the next cursor page contains no votes. Repeated cursors stop safely, HTTP 429 responses pause all Top.gg requests for the requested interval, and pending thank-you DMs can still be delivered from the local database during that pause. The repository also includes a local secret guard, automatic Git hooks, expanded credential-file ignores, and persistent instructions that prohibit revealing `.env` values. See [Top.gg pagination and secret safeguards](RELEASE_NOTES_v0.16.21-beta.md).
+Top.gg vote DMs now follow the compact style used by familiar OwO utilities: the thank-you message keeps only totals and the next-vote time, while the reminder is a single line with vote and opt-out buttons. See [Compact Top.gg vote messages](RELEASE_NOTES_v0.16.22-beta.md).
 
 ## v0.16.20-beta notes
 

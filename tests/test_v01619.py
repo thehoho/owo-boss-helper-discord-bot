@@ -274,9 +274,12 @@ class VoteCommandTests(unittest.IsolatedAsyncioTestCase):
                 fake_user.send.assert_awaited_once()
                 message = fake_user.send.await_args.args[0]
                 self.assertIn("Thank you for voting", message)
-                self.assertIn("2 vote points", message)
-                self.assertIn("1 recorded vote", message)
+                self.assertIn("1 vote • 2 points", message)
                 self.assertIn(str(now + 43_200), message)
+                self.assertNotIn("Voting is optional", message)
+                self.assertLess(len(message), 140)
+                view = fake_user.send.await_args.kwargs["view"]
+                self.assertEqual(view.children[0].label, "Vote on Top.gg")
                 self.assertEqual(await cog.deliver_vote_thanks(), 0)
             finally:
                 await bot.close()
