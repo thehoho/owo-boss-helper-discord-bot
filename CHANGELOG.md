@@ -1,3 +1,12 @@
+## v0.16.21-beta - Top.gg Pagination and Secret Safeguards
+
+- Fixed Top.gg v1 vote pagination to stop on the documented empty result page instead of repeatedly following its final cursor.
+- Added repeated-cursor protection and shared HTTP 429 backoff so a malformed page or rate limit cannot create a request storm.
+- Preserved pending thank-you delivery during API backoff, allowing an already imported active vote to be acknowledged without another Top.gg request.
+- Added repository-wide secret rules, broader ignored credential formats, a staged/tracked secret scanner, and automatic pre-commit/pre-push hooks.
+- Added regression coverage for the real empty-page cursor behavior and repeated-cursor safety stop.
+- Updated the public version to 0.16.21-beta; no new dependency, slash command, Discord permission, or inbound network port is required.
+
 ## v0.16.20-beta - Complete Top.gg Vote Acknowledgements
 
 - Added an immediate thank-you DM for every newly imported active Top.gg vote, including that vote's weight, the member's cumulative vote count and points, and the exact next-vote time.

@@ -1,3 +1,7 @@
+## v0.16.21-beta notes
+
+Top.gg vote imports now follow the v1 API's documented stopping rule: pagination ends when the next cursor page contains no votes. Repeated cursors stop safely, HTTP 429 responses pause all Top.gg requests for the requested interval, and pending thank-you DMs can still be delivered from the local database during that pause. The repository also includes a local secret guard, automatic Git hooks, expanded credential-file ignores, and persistent instructions that prohibit revealing `.env` values. See [Top.gg pagination and secret safeguards](RELEASE_NOTES_v0.16.21-beta.md).
+
 ## v0.16.20-beta notes
 
 Approved Top.gg votes are now imported every minute and acknowledged by DM. Each message confirms the vote's weight, the member's cumulative recorded votes and points, and when the next vote becomes available. A persisted acknowledgement marker prevents duplicate messages across restarts, while expired historical votes remain counted without generating old notifications. See [complete Top.gg vote acknowledgements](RELEASE_NOTES_v0.16.20-beta.md).

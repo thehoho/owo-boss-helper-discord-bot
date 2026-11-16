@@ -180,6 +180,59 @@ class VoteCommandTests(unittest.IsolatedAsyncioTestCase):
             finally:
                 await bot.close()
 
+    async def test_sync_stops_when_cursor_page_has_no_votes(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bot = commands.Bot(command_prefix="!", intents=discord.Intents.none())
+            cog = TopGGVotes(bot)
+            cog.store = VoteStore(Path(directory) / "votes.db")
+            await cog.store.initialize()
+            cog.api_request = AsyncMock(
+                side_effect=[
+                    {
+                        "data": [
+                            {
+                                "platform_id": "123456789",
+                                "created_at": "2026-11-16T08:00:00Z",
+                                "expires_at": "2026-11-16T20:00:00Z",
+                                "weight": 2,
+                            }
+                        ],
+                        "cursor": "opaque-next-page",
+                    },
+                    {"data": [], "cursor": "opaque-next-page"},
+                ]
+            )
+            try:
+                self.assertEqual(await cog.sync_votes_once(), 1)
+                self.assertEqual(cog.api_request.await_count, 2)
+            finally:
+                await bot.close()
+
+    async def test_repeated_nonempty_cursor_fails_before_request_storm(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            bot = commands.Bot(command_prefix="!", intents=discord.Intents.none())
+            cog = TopGGVotes(bot)
+            cog.store = VoteStore(Path(directory) / "votes.db")
+            await cog.store.initialize()
+            page = {
+                "data": [
+                    {
+                        "platform_id": "123456789",
+                        "created_at": "2026-11-16T08:00:00Z",
+                        "expires_at": "2026-11-16T20:00:00Z",
+                        "weight": 1,
+                    }
+                ],
+                "cursor": "repeated-cursor",
+            }
+            cog.api_request = AsyncMock(side_effect=[page, page])
+            try:
+                with self.assertRaisesRegex(RuntimeError, "repeated a cursor"):
+                    await cog.sync_votes_once()
+                self.assertEqual(cog.api_request.await_count, 2)
+            finally:
+                await bot.close()
+
     async def test_embed_makes_voting_optional_and_opt_out_clear(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             bot = commands.Bot(command_prefix="!", intents=discord.Intents.none())

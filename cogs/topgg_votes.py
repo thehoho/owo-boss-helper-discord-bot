@@ -82,6 +82,12 @@ class PendingVoteThank:
     weight: int
 
 
+class TopGGRateLimited(RuntimeError):
+    def __init__(self, retry_after: int) -> None:
+        self.retry_after = max(60, int(retry_after))
+        super().__init__(f"Top.gg API rate limited for {self.retry_after} seconds")
+
+
 class VoteStore:
     def __init__(self, path: Path) -> None:
         self.path = path
@@ -506,6 +512,7 @@ class TopGGVotes(commands.Cog):
         self.store = VoteStore(DATABASE_FILE)
         self.api_token = os.getenv("TOPGG_TOKEN", "").strip()
         self.http_session: aiohttp.ClientSession | None = None
+        self.api_retry_at = 0
 
     async def cog_load(self) -> None:
         await self.store.initialize()
@@ -553,6 +560,16 @@ class TopGGVotes(commands.Cog):
             json=payload,
         ) as response:
             body = await response.text()
+            if response.status == 429:
+                retry_header = str(response.headers.get("Retry-After") or "").strip()
+                try:
+                    retry_after = max(60, int(float(retry_header)))
+                except (TypeError, ValueError):
+                    retry_after = 3600
+                self.api_retry_at = max(
+                    self.api_retry_at, int(time.time()) + retry_after
+                )
+                raise TopGGRateLimited(retry_after)
             if not 200 <= response.status < 300:
                 raise RuntimeError(
                     f"Top.gg API returned HTTP {response.status}: {body[:300]}"
@@ -576,10 +593,14 @@ class TopGGVotes(commands.Cog):
         path = f"/projects/@me/votes?startDate={quote(start_date, safe='')}"
         inserted = 0
         pages = 0
+        seen_cursors: set[str] = set()
         while path and pages < MAX_VOTE_PAGES:
             response = await self.api_request("GET", path)
             pages += 1
-            for item in response.get("data") or []:
+            data = response.get("data")
+            if not isinstance(data, list) or not data:
+                break
+            for item in data:
                 if not isinstance(item, dict):
                     continue
                 user_id_text = str(item.get("platform_id") or "").strip()
@@ -597,6 +618,10 @@ class TopGGVotes(commands.Cog):
                 ):
                     inserted += 1
             cursor = str(response.get("cursor") or "").strip()
+            if cursor in seen_cursors:
+                raise RuntimeError("Top.gg vote pagination repeated a cursor")
+            if cursor:
+                seen_cursors.add(cursor)
             path = f"/projects/@me/votes?cursor={quote(cursor, safe='')}" if cursor else ""
         if pages >= MAX_VOTE_PAGES and path:
             raise RuntimeError("Top.gg vote pagination exceeded the safety limit")
@@ -648,6 +673,9 @@ class TopGGVotes(commands.Cog):
 
     @tasks.loop(minutes=1)
     async def vote_sync_loop(self) -> None:
+        if int(time.time()) < self.api_retry_at:
+            await self.deliver_vote_thanks()
+            return
         try:
             inserted = await self.sync_votes_once()
             delivered = await self.deliver_vote_thanks()
@@ -655,6 +683,12 @@ class TopGGVotes(commands.Cog):
                 logger.info("Recorded %s new Top.gg vote event(s)", inserted)
             if delivered:
                 logger.info("Delivered %s Top.gg vote thank-you DM(s)", delivered)
+        except TopGGRateLimited as error:
+            logger.warning(
+                "Top.gg vote synchronization paused for %s seconds after HTTP 429",
+                error.retry_after,
+            )
+            await self.deliver_vote_thanks()
         except Exception:
             logger.exception("Top.gg vote synchronization failed")
 
@@ -664,9 +698,16 @@ class TopGGVotes(commands.Cog):
 
     @tasks.loop(minutes=30)
     async def metrics_loop(self) -> None:
+        if int(time.time()) < self.api_retry_at:
+            return
         try:
             await self.post_metrics_once()
             logger.info("Posted Top.gg metric: %s servers", len(self.bot.guilds))
+        except TopGGRateLimited as error:
+            logger.warning(
+                "Top.gg metrics paused for %s seconds after HTTP 429",
+                error.retry_after,
+            )
         except Exception:
             logger.exception("Top.gg metric update failed")
 
